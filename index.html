@@ -1121,7 +1121,7 @@ select.rk,.row select{background:var(--field);border:1px solid var(--line);borde
         <button class="btn" type="button" data-act="save-char" id="charFile">Save open character as a file</button>
       </div>
       <textarea id="outBox" readonly placeholder="Exported text appears here" aria-label="Exported JSON"></textarea>
-      <p>Large characters can be too big to copy on a phone, so use the Save buttons to get a file instead. A full backup holds every campaign and character and can be imported back into Ledger on any device. The Roll20 option writes basic stats using the D&amp;D 5e Roll20 sheet's attribute names; check the character in Roll20 afterwards to confirm the fields landed where you expect.</p>
+      <p>Large characters can be too big to copy on a phone, so use the Save buttons to get a file instead. A full backup holds every campaign, character and your Library, and can be imported back into Ledger on any device. The Roll20 option writes basic stats using the D&amp;D 5e Roll20 sheet's attribute names; check the character in Roll20 afterwards to confirm the fields landed where you expect.</p>
     </section>
     <section><h3>Storage on this device</h3>
       <p id="stoNote">Checking...</p><div class="btns" id="stoBtn"></div>
@@ -1182,6 +1182,48 @@ function normLib(p){
 }
 let LIB=normLib({});
 try{const r=localStorage.getItem(LIBLS);if(r)LIB=normLib(JSON.parse(r))}catch(e){}
+/* The Library lives in IndexedDB (room for whole books); localStorage keeps a quick-start copy while it fits.
+   On first run the old localStorage copy is also kept as a one-time backup inside IndexedDB. Newest copy wins. */
+let libIdbP=null, libIdbOk=false, libLsFull=false;
+function libIdb(){
+  if(!libIdbP)libIdbP=new Promise((res,rej)=>{
+    try{
+      if(!window.indexedDB)throw new Error("no indexedDB");
+      const r=indexedDB.open("ledger-library",1);
+      r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains("kv"))r.result.createObjectStore("kv")};
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error||new Error("idb")); r.onblocked=()=>rej(new Error("idb blocked"));
+    }catch(e){rej(e)}
+  });
+  return libIdbP;
+}
+async function libIdbDo(mode,fn){
+  const db=await libIdb();
+  return new Promise((res,rej)=>{const t=db.transaction("kv",mode),s=t.objectStore("kv");let out;const q=fn(s);if(q)q.onsuccess=()=>{out=q.result};t.oncomplete=()=>res(out);t.onerror=t.onabort=()=>rej(t.error||new Error("idb"))});
+}
+const libIdbGet=k=>libIdbDo("readonly",s=>s.get(k));
+const libIdbPut=(k,v)=>libIdbDo("readwrite",s=>s.put(v,k));
+const libReady=(async()=>{
+  try{
+    if(!(await libIdbGet("migrated-v1"))){
+      let raw=null; try{raw=localStorage.getItem(LIBLS)}catch(e){}
+      if(raw)await libIdbPut("backup-localstorage-v1",{at:Date.now(),raw:raw});
+      await libIdbPut("migrated-v1",Date.now());
+    }
+    const stored=await libIdbGet("lib");
+    if(stored){
+      const L=normLib(stored);
+      if(L.updated>LIB.updated){LIB=L;try{if(ui.lib&&!$("#libOv").hidden&&!ui.lib.draft)renderLib()}catch(e){}}
+      else if(L.updated<LIB.updated)await libIdbPut("lib",JSON.parse(JSON.stringify(LIB)));
+    }else await libIdbPut("lib",JSON.parse(JSON.stringify(LIB)));
+    libIdbOk=true;
+    try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+  }catch(e){libIdbOk=false}
+})();
+function libWriteLocal(){
+  if(libIdbOk||libIdbP)libIdbPut("lib",JSON.parse(JSON.stringify(LIB))).then(()=>{libIdbOk=true}).catch(()=>{});
+  try{localStorage.setItem(LIBLS,JSON.stringify(LIB));libLsFull=false}
+  catch(e){libLsFull=true; if(libIdbOk){try{localStorage.removeItem(LIBLS)}catch(e2){}}}
+}
 const libClass=n=>{const k=lc(n);return k?LIB.classes.find(x=>lc(x.name)===k&&!x.addOn&&sysOf(x)==='dnd5e'):undefined};
 function withAddOns(d,name){
   const ad=LIB.classes.filter(x=>x.addOn&&sysOf(x)==='dnd5e'&&lc(x.name)===lc(name)&&(x.subclasses||[]).length);
@@ -2762,6 +2804,7 @@ document.addEventListener("input",e=>{
 document.addEventListener("toggle",e=>{
   const d=e.target;
   if(d&&d.tagName==="DETAILS"&&d.dataset&&d.dataset.id){d.open?ui.open.add(d.dataset.id):ui.open.delete(d.dataset.id)}
+  if(d&&d.id==="imp2box")IMP2open=d.open;
 },true);
 document.addEventListener("change",e=>{
   const t=e.target;
@@ -2772,6 +2815,7 @@ document.addEventListener("change",e=>{
   if(t.id==="gearPC"||t.id==="gearEd"){if(ui.gp){if(t.id==="gearPC")ui.gp.cat=t.value;else ui.gp.ed=t.value;ui.gp.limit=60;renderGearList()}return}
   if(t.id==="pdfFile"&&t.files&&t.files[0]){readPdfFile(t.files[0]);t.value="";return}
   if(t.id==="bookFile"&&t.files&&t.files[0]){scanBookFile(t.files[0]);t.value="";return}
+  if(t.id==="bookFile2"&&t.files&&t.files[0]){imp2Run(t.files[0]);t.value="";return}
   if(t.dataset&&t.dataset.bkc!=null&&BOOK){const ch=BOOK.chapters[num(t.dataset.bkc)];if(ch){ch.type=t.value;ch.found=null}return}
   if(t.dataset&&t.dataset.f==="spellcasting.auto"){const c5=cur();if(c5){syncSlots(c5);save();renderSpells(c5)}return}
   if(t.dataset&&/^classes\.\d+\.name$/.test(t.dataset.f||"")){const c6=cur();if(c6)refreshSubLists(c6);return}
@@ -2988,6 +3032,9 @@ document.addEventListener("click",e=>{
     case "bk-sel": {const e=bookState().entries&&bookState().entries[num(b.dataset.i)];if(e){e.sel=b.checked;const bt=document.querySelector('[data-act="bk-add"]');if(bt)bt.textContent="Add "+bookState().entries.filter(x=>x.sel).length+" selected to library"}break;}
     case "bk-all": {const bk=bookState();(bk.entries||[]).forEach(e=>{if(e.g===b.dataset.g)e.sel=b.dataset.v==="1"});renderLib();break;}
     case "imp-parse": importParse(); break;
+    case "imp2-list": case "imp2-cancel": case "imp2-del": case "imp2-open": case "imp2-resume":
+      if(b.dataset.act==="imp2-del"&&!confirmTwice(b,"Tap again to delete"))break;
+      imp2Do(b.dataset.act.slice(5),b.dataset.id); break;
     case "imp-sel": {const i=num(b.dataset.i),m=ui.lib.imp;b.checked?m.sel.add(i):m.sel.delete(i);break;}
     case "imp-all": {const m=ui.lib.imp;m.sel=b.dataset.v==="1"?new Set(m.found.map((x,i)=>i)):new Set();renderLib();break;}
     case "imp-add": importAdd(); break;
@@ -3244,10 +3291,10 @@ function closeGear(){
 
 /* ----- library: private storage ----- */
 let libDb=null, libTimer=0, libNote="";
-function libStatusText(){return libNote||(libDb?"Saved and synced privately":"Saved on this device")}
+function libStatusText(){return libNote||(libLsFull&&!libIdbOk?"Not saved: this device's storage is full":libDb?"Saved and synced privately":"Saved on this device")}
 function saveLib(){
   LIB.updated=Date.now();
-  try{localStorage.setItem(LIBLS,JSON.stringify(LIB))}catch(e){}
+  libWriteLocal();
   clearTimeout(libTimer); libTimer=setTimeout(pushLib,900);
 }
 async function pushLib(){
@@ -3266,13 +3313,14 @@ async function pullLib(meta){
     for(let i=0;i<num(meta.n);i++){const s=await libDb.doc("lib-"+i).get();if(!s.exists)return;json+=String(s.data().p||"")}
     const L=normLib(JSON.parse(json));
     if(L.updated<=LIB.updated)return;
-    LIB=L; try{localStorage.setItem(LIBLS,JSON.stringify(LIB))}catch(e){}
+    LIB=L; libWriteLocal();
     if(ui.lib&&!$("#libOv").hidden&&!ui.lib.draft)renderLib();
     const el=$("#libStatus"); if(el)el.textContent=libStatusText();
   }catch(e){}
 }
 (async function initLibDb(){
   try{
+    await libReady;
     const db=await (window.claude&&window.claude.use?window.claude.use("db"):null);
     const user=await (window.claude&&window.claude.use?window.claude.use("user"):null);
     if(!db||!user)return;
@@ -3555,6 +3603,30 @@ function bookAdd(){
   bk.busy="Added "+added+" to your library"+(dup?" and skipped "+dup+" that were already there":"")+".";
   renderLib();
 }
+/* ----- importer v2 (preview): the new reader lives in importer/ and is loaded only when used ----- */
+let IMP2=null, IMP2open=false;
+function imp2Section(){
+  return `<details class="item" id="imp2box"${IMP2open?" open":""}><summary><span class="sum-t">New importer preview</span></summary><div class="ibody">
+    <p class="hint">Reads a PDF with the new engine and reports what it found: bookmarks, printed page numbers, fonts, colours, and pages that will need OCR. It does not add anything to your Library yet. The page range above applies here too. The PDF is kept on this device so a long book can resume; you can delete it below.</p>
+    <div class="btns"><span class="btn filebtn">Inspect a PDF<input id="bookFile2" type="file" accept=".pdf,application/pdf,application/octet-stream,*/*" aria-label="Inspect a PDF with the new importer"></span><button class="btn" type="button" data-act="imp2-list">Books read so far</button></div>
+    <div id="imp2">${IMP2?IMP2.html():""}</div></div></details>`;
+}
+async function imp2Mod(){
+  if(IMP2)return IMP2;
+  const M=await import("./importer/importer.js");
+  M.attach(()=>{const e=$("#imp2");if(e)e.innerHTML=M.html()});
+  IMP2=M; return M;
+}
+async function imp2Run(file){
+  IMP2open=true; const bk=bookState();
+  try{const M=await imp2Mod(); await M.inspect(file,{appBase:document.baseURI,from:num(bk.from)||1,to:num(bk.to)||0})}
+  catch(e){const x=$("#imp2"); if(x)x.innerHTML=`<div class="msg">The new importer could not start here: ${esc(e&&e.message||e)}</div>`}
+}
+async function imp2Do(name,id){
+  IMP2open=true;
+  try{const M=await imp2Mod(); await M.action(name,id,{appBase:document.baseURI})}
+  catch(e){const x=$("#imp2"); if(x)x.innerHTML=`<div class="msg">The new importer could not start here: ${esc(e&&e.message||e)}</div>`}
+}
 function libBookHTML(){
   const bk=bookState();
   const head=`<p>Choose a whole book. It is read once in your browser, split into chapters, and sorted into classes, subclasses, spells, items, feats and rules text for you to review. Nothing is uploaded.</p>
@@ -3562,7 +3634,7 @@ function libBookHTML(){
       <label class="fld"><span>First page (optional)</span><input data-bk="from" inputmode="numeric" value="${esc(bk.from)}" placeholder="1"></label>
       <label class="fld"><span>Last page (optional)</span><input data-bk="to" inputmode="numeric" value="${esc(bk.to)}" placeholder="all"></label></div>
     <div class="btns"><span class="btn filebtn">Choose a book PDF<input id="bookFile" type="file" accept=".pdf,application/pdf,application/octet-stream,*/*" aria-label="Choose a book PDF"></span></div>
-    <div class="msg" id="bookMsg" role="status">${esc(bk.busy)}</div>`;
+    <div class="msg" id="bookMsg" role="status">${esc(bk.busy)}</div>`+imp2Section();
   if(!BOOK)return head;
   let chap=`<h3 style="margin:.8em 0 .3em">Chapters</h3><div class="items">`+BOOK.chapters.map((c,i)=>`<div class="prow"><div class="pmain" style="flex-wrap:wrap"><div class="plink" style="flex:1 1 100%"><b>${esc(c.title)}</b><span>Pages ${c.page}\u2013${c.pageTo}${c.found!=null?" \u00b7 "+c.found+" found":""}</span></div>
     <select style="flex:1 1 100%;min-width:0" data-bkc="${i}" aria-label="Type of ${esc(c.title)}">${BOOKTYPES.map(([v,t])=>`<option value="${v}"${c.type===v?" selected":""}>${t}</option>`).join("")}</select></div></div>`).join("")+`</div>
@@ -3629,12 +3701,24 @@ function importAdd(){
 /* ----- PDF reading (pdf.js is loaded from cdnjs only when you choose a PDF) ----- */
 const PDFJS="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("load"));document.head.appendChild(s)})}
-async function pdfLib(){
-  if(window.pdfjsLib)return window.pdfjsLib;
-  await loadScript(PDFJS+"pdf.min.js");
-  if(!window.pdfjsLib)throw new Error("pdf.js missing");
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+"pdf.worker.min.js";
-  return window.pdfjsLib;
+/* pdf.js v6 is kept in the app (vendor/pdfjs) so book import works offline; the old CDN copy is only a fallback */
+const PDFJS_LOCAL="vendor/pdfjs/";
+let pdfLibP=null;
+function pdfLib(){
+  if(!pdfLibP)pdfLibP=(async()=>{
+    try{
+      const base=new URL(PDFJS_LOCAL,document.baseURI).href;
+      const m=await import(base+"pdf.mjs");
+      m.GlobalWorkerOptions.workerSrc=base+"pdf.worker.mjs";
+      const opts={cMapUrl:base+"cmaps/",cMapPacked:true,standardFontDataUrl:base+"standard_fonts/",wasmUrl:base+"wasm/"};
+      return {version:m.version,raw:m,getDocument:o=>m.getDocument(Object.assign({},opts,o))};
+    }catch(e){
+      if(!window.pdfjsLib){await loadScript(PDFJS+"pdf.min.js");if(!window.pdfjsLib)throw new Error("pdf.js missing")}
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+"pdf.worker.min.js";
+      return window.pdfjsLib;
+    }
+  })().catch(e=>{pdfLibP=null;throw e});
+  return pdfLibP;
 }
 async function extractPdf(file,progress){
   const L=await pdfLib(), doc=await L.getDocument({data:await file.arrayBuffer()}).promise, pages=[];
@@ -3690,7 +3774,7 @@ async function saveTextFile(name,text,okMsg){
   }
 }
 function exportBackup(asFile){
-  const text=JSON.stringify(backupObj(),null,2);
+  const text=JSON.stringify(Object.assign(backupObj(),{library:LIB}),null,2);
   if(!asFile){giveText(text,"Full backup ready.");return}
   saveTextFile("character-ledger-backup.json",text,"Backup saved.");
 }
@@ -3855,6 +3939,11 @@ function doImport(){
       const n=norm(d);
       n.campaigns.forEach(k=>{if(!S.campaigns.some(x=>x.id===k.id))S.campaigns.push(k)});
       n.characters.forEach(put);
+      if(d.library&&typeof d.library==="object"){
+        const L=normLib(d.library); let libAdded=0;
+        ["classes","spells","items","sections"].forEach(k=>L[k].forEach(x=>{if(!LIB[k].some(y=>y.id===x.id)){LIB[k].push(x);libAdded++}}));
+        if(libAdded){saveLib();note=" Added "+libAdded+" Library "+(libAdded===1?"entry":"entries")+" from the backup."}
+      }
     }else if(Array.isArray(d)&&d.length&&d[0]&&d[0].attribs){
       d.forEach(x=>put(fromR20(x.name,x.attribs,camp)));
     }else if(Array.isArray(d)&&d.every(x=>x&&x.name!=null&&"current" in x)){

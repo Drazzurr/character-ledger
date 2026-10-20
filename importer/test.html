@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Importer Tests</title>
+<style>
+:root{--bg:#f6f7f6;--ink:#17201d;--muted:#5b6762;--line:#d6ddda;--ok:#1f7a4d;--bad:#b23d2c;--accent:#0d7a6a;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111416;--ink:#e9eeec;--muted:#9aa6a1;--line:#2a3134;--ok:#5fd39a;--bad:#ff8f7a;--accent:#3ccfb2;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111416;--ink:#e9eeec;--muted:#9aa6a1;--line:#2a3134;--ok:#5fd39a;--bad:#ff8f7a;--accent:#3ccfb2;color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:.2em 0 .6em}
+button,label.file{font:inherit;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 12px;border-radius:8px;cursor:pointer;display:inline-block}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+label.file input{display:none}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:.6em 0}
+.ok{color:var(--ok)} .bad{color:var(--bad)}
+pre{white-space:pre-wrap;word-break:break-word;background:transparent;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12.5px;max-height:420px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:13px} td,th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
+#log{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Importer v2 tests</h1>
+<p id="log">Runs Stage 1 (text extraction) on the built-in test PDFs and checks the results, or reads a PDF you choose.</p>
+<div class="row">
+  <button class="pri" id="runFix" type="button">Run fixture checks</button>
+  <label class="file">Read a PDF<input id="pick" type="file" accept=".pdf,application/pdf"></label>
+</div>
+<div id="out"></div>
+</main>
+<script type="module">
+import { run } from "./core.js";
+import { getBook, getPages, deleteBook } from "./db.js";
+import { parseFontName } from "./extract.js";
+
+const $ = (s) => document.querySelector(s);
+const appBase = new URL("../", location.href).href;
+const log = (t) => { $("#log").textContent = t; };
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+async function readInWorker(file, name) {
+  return new Promise((res, rej) => {
+    const w = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+    w.onerror = (e) => rej(new Error("worker failed: " + (e.message || "")));
+    w.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === "ready") w.postMessage({ cmd: "run", file, name, appBase });
+      else if (m.type === "progress") log("Reading page " + m.page + " of " + m.to + "...");
+      else if (m.type === "done") { w.terminate(); res(m); }
+      else if (m.type === "error") { w.terminate(); rej(new Error(m.message)); }
+    };
+  });
+}
+
+async function fixture(name) {
+  const r = await fetch("tests/fixtures/" + name);
+  return new File([await r.blob()], name, { type: "application/pdf" });
+}
+
+function check(results, name, ok, detail) { results.push({ name, ok: !!ok, detail: detail == null ? "" : String(detail) }); }
+
+async function fixtureChecks() {
+  const results = [];
+  const t0 = performance.now();
+  // 1. two-column book, read in the worker
+  const f1 = await fixture("two-column-book.pdf");
+  const r1 = await readInWorker(f1, f1.name);
+  const b1 = await getBook(r1.id);
+  const p = await getPages(r1.id);
+  check(results, "Worker read all 3 pages", p.length === 3, p.length);
+  check(results, "Outline has 4 bookmarks with pages", b1.info.outline.length === 4 && b1.info.outline.every((o) => o.page), JSON.stringify(b1.info.outline.map((o) => [o.title, o.level, o.page])));
+  check(results, "Nested bookmark is level 1", (b1.info.outline.find((o) => o.title === "Spell Descriptions") || {}).level === 1);
+  check(results, "Page labels are i, 1, 2", JSON.stringify(b1.info.labels) === '["i","1","2"]', JSON.stringify(b1.info.labels));
+  check(results, "Title from metadata", b1.title === "Fixture Grimoire", b1.title);
+  const runs2 = p[1].runs;
+  const find = (pg, s) => pg.runs.find((r) => r.t.indexOf(s) >= 0);
+  const head = find(p[1], "Emberlight Lance");
+  check(results, "Spell heading is red", head && head.c === "#7a200d", head && head.c);
+  check(results, "Spell heading font is bold", head && b1.fonts[head.f] && b1.fonts[head.f].bold, head && b1.fonts[head.f] && b1.fonts[head.f].name);
+  const lab = find(p[1], "Casting Time:");
+  check(results, "Field label is bold, value is not", lab && b1.fonts[lab.f].bold && !b1.fonts[(find(p[1], "1 action") || {}).f].bold);
+  const it = find(p[1], "2nd-level evocation");
+  check(results, "School line is italic", it && b1.fonts[it.f].italic, it && b1.fonts[it.f].name);
+  const body = find(p[1], "A spear of banked firelight");
+  check(results, "Body text is black, about 9.5 pt", body && body.c === "#000000" && Math.abs(body.s - 9.5) < 0.05, body && body.c + " " + body.s);
+  const colX = new Set(runs2.filter((r) => r.s < 10 && r.s > 9).map((r) => Math.round(r.x / 50)));
+  check(results, "Text found in two columns", runs2.some((r) => r.x < 100) && runs2.some((r) => r.x > 300), [...colX].join(","));
+  check(results, "Every run matched to the drawing commands", runs2.every((r) => r.m >= 0.99), Math.min(...runs2.map((r) => r.m)));
+  check(results, "Running head and page number present", find(p[1], "CHAPTER 1") && runs2.some((r) => r.t.trim() === "1" && r.b > 700));
+  const shaded = p[2].boxes.filter((b) => b.fill === "#e0e5c1");
+  check(results, "Two shaded table rows found", shaded.length === 2, shaded.length);
+  const side = p[2].boxes.find((b) => b.fill === "#ece3cf" && b.stroke);
+  check(results, "Sidebar box found with fill and frame", side && side.w > 200, side && JSON.stringify(side));
+  check(results, "Top-left coordinates (heading near top)", head && head.y < 200, head && head.y);
+  check(results, "Text pages pass the quality check", p.slice(1).every((x) => x.quality.status === "ok"), p.map((x) => x.quality.status + " dict " + x.quality.dict).join("; "));
+  check(results, "Fonts recorded for the book", Object.keys(b1.fonts).length >= 4, Object.values(b1.fonts).map((f) => f.name).join(", "));
+
+  // 2. scanned page, read on the page itself (no worker) to cover the fallback path
+  const f2 = await fixture("scanned-page.pdf");
+  const r2 = await run({ file: f2, name: f2.name, appBase });
+  const p2 = await getPages(r2.id);
+  check(results, "Scanned page flagged for OCR", p2[0].quality.status === "scan" && p2[0].quality.needsOcr, JSON.stringify(p2[0].quality));
+  check(results, "Scanned page image found", p2[0].images.length === 1 && p2[0].images[0].w > 600, JSON.stringify(p2[0].images));
+
+  // 3. scrambled text layer is sent to OCR
+  const f3 = await fixture("garbled-text.pdf");
+  const r3 = await run({ file: f3, name: f3.name, appBase });
+  const p3 = await getPages(r3.id);
+  check(results, "Scrambled text flagged for OCR", p3[0].quality.status === "garbled", JSON.stringify(p3[0].quality));
+  await deleteBook(r3.id);
+
+  // 4. font style names
+  const fn = [["NimbusRomNo9L-ReguItal", 400, true, false], ["TimesNewRomanPS-BoldItalicMT", 700, true, false], ["GillSans-SemiBold", 600, false, false],
+    ["MrsEavesSmallCaps", 400, false, true], ["Bookinsanity-Bold", 700, false, false], ["Arial,BoldItalic", 700, true, false], ["NimbusRomNo9L-Medi", 500, false, false]];
+  const bad = fn.filter(([n, w, it, sc]) => { const r = parseFontName(n); return r.weight !== w || r.italic !== it || r.smallCaps !== sc; });
+  check(results, "Font style names parsed (" + fn.length + " cases)", !bad.length, bad.map((b) => b[0]).join(", "));
+
+  // 5. resume: a second run skips pages already read
+  let skipped = 0;
+  await run({ file: f1, name: f1.name, appBase, post: (m) => { if (m.type === "progress" && m.skipped) skipped++; } });
+  check(results, "Second read resumes (skips pages already read)", skipped === 3, skipped);
+
+  await deleteBook(r1.id); await deleteBook(r2.id);
+  const gone = await getBook(r1.id);
+  check(results, "Delete removes the book", !gone);
+
+  const pass = results.filter((r) => r.ok).length;
+  log(pass + " of " + results.length + " checks passed in " + Math.round(performance.now() - t0) + " ms.");
+  $("#out").innerHTML = `<table><thead><tr><th></th><th>Check</th><th>Detail</th></tr></thead><tbody>` +
+    results.map((r) => `<tr><td class="${r.ok ? "ok" : "bad"}">${r.ok ? "PASS" : "FAIL"}</td><td>${esc(r.name)}</td><td>${esc(r.detail).slice(0, 400)}</td></tr>`).join("") + `</tbody></table>`;
+  window.RESULTS = results;
+  document.title = "Importer Tests - done";
+}
+
+$("#runFix").onclick = () => fixtureChecks().catch((e) => { log("Error: " + e.message); window.RESULTS = [{ name: "run", ok: false, detail: e.message }]; document.title = "Importer Tests - done"; });
+$("#pick").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const t0 = performance.now();
+    const r = await readInWorker(f, f.name);
+    const b = await getBook(r.id);
+    const pages = await getPages(r.id, 1, 3);
+    const allp = await getPages(r.id);
+    const qtab = allp.map((p) => p.page + "\t" + (p.label || "") + "\t" + p.quality.status + "\tchars " + p.quality.chars + "\twords " + p.quality.words + "\tdict " + p.quality.dict + "\tprintable " + p.quality.printable + "\timages " + p.quality.imageCover + (p.quality.why ? "\t" + p.quality.why : "")).join("\n");
+    log("Read " + Object.keys(b.pageStatus).length + " pages in " + Math.round(performance.now() - t0) + " ms.");
+    $("#out").innerHTML = "<h2>Book</h2><pre>" + esc(JSON.stringify({ title: b.title, info: b.info, stats: b.stats, pageStatus: b.pageStatus, fonts: b.fonts }, null, 1)) + "</pre><h2>Page check</h2><pre>" + esc(qtab) + "</pre><h2>First pages</h2><pre>" +
+      esc(JSON.stringify(pages.map((p) => ({ page: p.page, label: p.label, quality: p.quality, boxes: p.boxes.length, images: p.images.length, runs: p.runs.slice(0, 40) })), null, 1)) + "</pre>";
+  } catch (err) { log("Error: " + err.message); }
+};
+if (new URLSearchParams(location.search).has("auto")) $("#runFix").click();
+</script>
+</body>
+</html>
