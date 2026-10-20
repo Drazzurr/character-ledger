@@ -248,6 +248,145 @@
 [data-skin="rune"] .pc-lvl>span{color:#8fe3ee;font-family:var(--display)}
 [data-skin="rune"] .pc-lvl b{border-radius:50%;background:radial-gradient(circle,#2a3037 58%,#6fd6e6 60%,#6fd6e6 66%,#2a3037 68%);color:#bff4fa;text-shadow:0 0 10px #6fd6e6;font-weight:400;width:64px;height:64px}
 [data-skin="rune"] .hic{color:#6fd6e6}
+
+/* ===== theme effects (toggle: data-fx) ===== */
+html[data-fx="off"] *:not(#app),html[data-fx="off"] *::before,html[data-fx="off"] *::after{animation:none!important}
+.btn:active,.tt:active,.ibtn:active,.chip:active{transform:scale(.95)}
+.btn,.tt,.ibtn,.chip{transition:transform .12s ease}
+@keyframes fxsp{to{transform:rotate(360deg)}}
+@keyframes fxbr{0%,100%{filter:brightness(1)}50%{filter:brightness(1.25)}}
+@keyframes fxpf{from{filter:brightness(.95)}to{filter:brightness(1.25)}}
+@keyframes fxtw{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+@keyframes fxhp{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3)}}
+@keyframes fxhf{0%{filter:brightness(1)}25%{filter:brightness(1.25)}50%{filter:brightness(1.05)}75%{filter:brightness(1.35)}}
+@keyframes fxhue{to{filter:hue-rotate(360deg)}}
+@keyframes fxfk{0%,100%{opacity:1}44%{opacity:1}46%{opacity:.45}48%{opacity:1}50%{opacity:.7}52%{opacity:1}}
+@media (prefers-reduced-motion:no-preference){
+@keyframes fxe-modern{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fxbr{0%,100%{filter:brightness(1)}50%{filter:brightness(1.22) saturate(1.15)}}
+@keyframes fxpg{0%,100%{box-shadow:0 0 10px color-mix(in srgb,var(--accent) 30%,transparent)}50%{box-shadow:0 0 22px color-mix(in srgb,var(--accent) 65%,transparent)}}
+@keyframes fxtg{0%,100%{box-shadow:0 2px 6px color-mix(in srgb,var(--accent) 25%,transparent)}50%{box-shadow:0 4px 16px color-mix(in srgb,var(--accent) 60%,transparent)}}
+html[data-enter][data-fx="on"][data-skin="modern"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="modern"] #app>.grid>*{animation:fxe-modern .38s cubic-bezier(.22,1,.36,1) backwards}
+html[data-enter][data-fx="on"][data-skin="modern"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="modern"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="modern"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="modern"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="modern"] .pc-lvl b{animation:fxbr 4s ease-in-out infinite;will-change:transform}
+html[data-fx="on"][data-skin="modern"] .pc-port{animation:fxpg 4.5s ease-in-out infinite}
+html[data-fx="on"][data-skin="modern"] .tt[aria-current="page"]{animation:fxtg 3.2s ease-in-out infinite}
+html[data-fx="on"][data-skin="modern"] .hpbar>i{animation:fxhp 3s ease-in-out infinite}
+@keyframes fxe-tome{from{opacity:0;filter:blur(3px);transform:translateY(4px)}to{opacity:1;filter:none;transform:none}}
+@keyframes fxst{0%{transform:scale(1.5) rotate(-14deg);opacity:0}100%{transform:none;opacity:1}}
+@keyframes fxun{0%{transform:scaleY(.7);transform-origin:top}100%{transform:none;transform-origin:top}}
+html[data-enter][data-fx="on"][data-skin="tome"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="tome"] #app>.grid>*{animation:fxe-tome .55s ease-out backwards}
+html[data-enter][data-fx="on"][data-skin="tome"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="tome"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="tome"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="tome"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="tome"] .pc-lvl b{animation:fxst .7s cubic-bezier(.3,1.6,.5,1) both;will-change:transform}
+html[data-fx="on"][data-skin="tome"] .tt[aria-current="page"]{animation:fxun .5s cubic-bezier(.3,1.4,.5,1) both}
+@keyframes fxe-forge{from{opacity:0;transform:translateY(14px);filter:brightness(1.8) sepia(.6)}to{opacity:1;transform:none;filter:none}}
+@keyframes fxfp{from{filter:brightness(.95);transform:scale(1)}to{filter:brightness(1.35) saturate(1.2);transform:scale(1.05)}}
+@keyframes fxfl{0%{filter:brightness(2)}100%{filter:none}}
+html[data-enter][data-fx="on"][data-skin="forge"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="forge"] #app>.grid>*{animation:fxe-forge .5s cubic-bezier(.2,.9,.3,1) backwards}
+html[data-enter][data-fx="on"][data-skin="forge"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="forge"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="forge"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="forge"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="forge"] .pc-lvl b{animation:fxfp 2.4s ease-in-out infinite alternate;will-change:transform}
+html[data-fx="on"][data-skin="forge"] .pc-port{animation:fxpf 3.2s ease-in-out infinite alternate}
+html[data-fx="on"][data-skin="forge"] .tt[aria-current="page"]{animation:fxfl .7s ease-out both}
+html[data-fx="on"][data-skin="forge"] .hpbar>i{animation:fxhf 1.8s steps(1,end) infinite}
+@keyframes fxe-sylvan{from{opacity:0;transform:translateY(12px) scale(.96);transform-origin:50% 100%}to{opacity:1;transform:none}}
+@keyframes fxsw{from{transform:rotate(-5deg)}to{transform:rotate(5deg)}}
+@keyframes fxpg2{0%,100%{box-shadow:0 0 6px rgba(155,211,106,.2)}50%{box-shadow:0 0 22px rgba(155,211,106,.6)}}
+@keyframes fxgr{0%{transform:scale(.88) rotate(-3deg)}100%{transform:none}}
+@keyframes fxhp{0%,100%{filter:brightness(1)}50%{filter:brightness(1.25)}}
+html[data-enter][data-fx="on"][data-skin="sylvan"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="sylvan"] #app>.grid>*{animation:fxe-sylvan .55s cubic-bezier(.2,1.2,.4,1) backwards}
+html[data-enter][data-fx="on"][data-skin="sylvan"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="sylvan"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="sylvan"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="sylvan"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="sylvan"] .pc-lvl b{animation:fxsw 5s ease-in-out infinite alternate;will-change:transform}
+html[data-fx="on"][data-skin="sylvan"] .pc-port{animation:fxpg2 5s ease-in-out infinite}
+html[data-fx="on"][data-skin="sylvan"] .tt[aria-current="page"]{animation:fxgr .6s cubic-bezier(.2,1.4,.4,1) both}
+html[data-fx="on"][data-skin="sylvan"] .hpbar>i{animation:fxhp 3.4s ease-in-out infinite}
+@keyframes fxe-crypt{from{opacity:0;filter:blur(5px) brightness(.7)}to{opacity:1;filter:none}}
+@keyframes fxpg3{0%,100%{box-shadow:0 0 10px rgba(142,230,181,.2)}50%{box-shadow:0 0 30px rgba(142,230,181,.55)}}
+html[data-enter][data-fx="on"][data-skin="crypt"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="crypt"] #app>.grid>*{animation:fxe-crypt .7s ease-out backwards}
+html[data-enter][data-fx="on"][data-skin="crypt"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="crypt"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="crypt"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="crypt"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="crypt"] .pc-lvl b{animation:fxfk 7s linear infinite;will-change:transform}
+html[data-fx="on"][data-skin="crypt"] .pc-port{animation:fxpg3 5s ease-in-out infinite}
+html[data-fx="on"][data-skin="crypt"] .tt[aria-current="page"]{animation:fxfk 5s linear infinite}
+@keyframes fxe-astral{from{opacity:0;transform:scale(1.04);filter:brightness(1.5)}to{opacity:1;transform:none;filter:none}}
+@keyframes fxpg4{0%,100%{box-shadow:0 0 10px rgba(180,155,255,.25)}50%{box-shadow:0 0 26px rgba(180,155,255,.65)}}
+@keyframes fxtw{0%,100%{filter:brightness(1)}50%{filter:brightness(1.4)}}
+html[data-enter][data-fx="on"][data-skin="astral"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="astral"] #app>.grid>*{animation:fxe-astral .6s ease-out backwards}
+html[data-enter][data-fx="on"][data-skin="astral"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="astral"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="astral"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="astral"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="astral"] .pc-lvl b{animation:fxsp 28s linear infinite;will-change:transform}
+html[data-fx="on"][data-skin="astral"] .pc-port{animation:fxpg4 4s ease-in-out infinite}
+html[data-fx="on"][data-skin="astral"] .tt[aria-current="page"]{animation:fxtw 2.6s ease-in-out infinite}
+@keyframes fxe-tavern{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes fxcf{0%{transform:rotateY(0)}100%{transform:rotateY(720deg)}}
+@keyframes fxhs{0%{transform:rotate(-4deg);transform-origin:50% 0}30%{transform:rotate(3deg);transform-origin:50% 0}60%{transform:rotate(-1.5deg);transform-origin:50% 0}100%{transform:none;transform-origin:50% 0}}
+@keyframes fxhp{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3) sepia(.2)}}
+html[data-enter][data-fx="on"][data-skin="tavern"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="tavern"] #app>.grid>*{animation:fxe-tavern .5s cubic-bezier(.3,1.5,.5,1) backwards}
+html[data-enter][data-fx="on"][data-skin="tavern"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="tavern"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="tavern"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="tavern"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="tavern"] .pc-lvl b{animation:fxcf 1s ease-out both;will-change:transform}
+html[data-fx="on"][data-skin="tavern"] .tt[aria-current="page"]{animation:fxhs .9s ease-out both}
+html[data-fx="on"][data-skin="tavern"] .hpbar>i{animation:fxhp 2.6s ease-in-out infinite}
+@keyframes fxe-frost{from{opacity:0;transform:translateY(-6px);filter:brightness(1.6) saturate(.6)}to{opacity:1;transform:none;filter:none}}
+html[data-enter][data-fx="on"][data-skin="frost"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="frost"] #app>.grid>*{animation:fxe-frost .5s ease-out backwards}
+html[data-enter][data-fx="on"][data-skin="frost"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="frost"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="frost"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="frost"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="frost"] .pc-lvl b{animation:fxsp 40s linear infinite;will-change:transform}
+html[data-fx="on"][data-skin="frost"] .pc-port{animation:fxpf 5s ease-in-out infinite alternate}
+html[data-fx="on"][data-skin="frost"] .tt[aria-current="page"]{animation:fxtw 3s ease-in-out infinite}
+html[data-fx="on"][data-skin="frost"] .hpbar>i{animation:fxhp 3s ease-in-out infinite}
+@keyframes fxe-infernal{from{opacity:0;filter:brightness(2) saturate(1.4)}to{opacity:1;filter:none}}
+@keyframes fxbp{from{filter:brightness(.9);transform:scale(1)}to{filter:brightness(1.5) saturate(1.3);transform:scale(1.07)}}
+html[data-enter][data-fx="on"][data-skin="infernal"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="infernal"] #app>.grid>*{animation:fxe-infernal .5s steps(7,end) backwards}
+html[data-enter][data-fx="on"][data-skin="infernal"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="infernal"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="infernal"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="infernal"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="infernal"] .pc-lvl b{animation:fxbp 1.6s ease-in-out infinite alternate;will-change:transform}
+html[data-fx="on"][data-skin="infernal"] .pc-port{animation:fxpf 2.2s ease-in-out infinite alternate}
+html[data-fx="on"][data-skin="infernal"] .tt[aria-current="page"]{animation:fxhf 2s steps(1,end) infinite}
+html[data-fx="on"][data-skin="infernal"] .hpbar>i{animation:fxhf 1.4s steps(1,end) infinite}
+@keyframes fxe-fey{from{opacity:0;transform:scale(.9);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+@keyframes fxfl2{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4px) rotate(4deg)}}
+html[data-enter][data-fx="on"][data-skin="fey"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="fey"] #app>.grid>*{animation:fxe-fey .55s cubic-bezier(.3,1.5,.5,1) backwards}
+html[data-enter][data-fx="on"][data-skin="fey"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="fey"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="fey"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="fey"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="fey"] .pc-lvl b{animation:fxfl2 3.2s ease-in-out infinite;will-change:transform}
+html[data-fx="on"][data-skin="fey"] .pc-port{animation:fxhue 14s linear infinite}
+html[data-fx="on"][data-skin="fey"] .tt[aria-current="page"]{animation:fxtw 2.4s ease-in-out infinite}
+html[data-fx="on"][data-skin="fey"] .hpbar>i{animation:fxhue 10s linear infinite}
+@keyframes fxe-clock{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes fxcl{0%{transform:translateY(-5px)}100%{transform:none}}
+@keyframes fxhs2{0%{filter:brightness(1)}50%{filter:brightness(1.22)}100%{filter:brightness(1)}}
+html[data-enter][data-fx="on"][data-skin="clock"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="clock"] #app>.grid>*{animation:fxe-clock .45s steps(6,end) backwards}
+html[data-enter][data-fx="on"][data-skin="clock"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="clock"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="clock"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="clock"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="clock"] .pc-lvl b{animation:fxsp 36s linear infinite;will-change:transform}
+html[data-fx="on"][data-skin="clock"] .tt[aria-current="page"]{animation:fxcl .4s steps(5,end) both}
+html[data-fx="on"][data-skin="clock"] .hpbar>i{animation:fxhs2 1.2s steps(6,end) infinite}
+@keyframes fxe-neon{from{opacity:0;filter:brightness(2.2)}to{opacity:1;filter:none}}
+@keyframes fxnf{0%,100%{opacity:1}91%{opacity:1}92%{opacity:.5}93%{opacity:1}95%{opacity:.7}96%{opacity:1}}
+html[data-enter][data-fx="on"][data-skin="neon"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="neon"] #app>.grid>*{animation:fxe-neon .55s steps(1,end) backwards}
+html[data-enter][data-fx="on"][data-skin="neon"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="neon"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="neon"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="neon"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="neon"] .pc-lvl b{animation:fxhue 9s linear infinite;will-change:transform}
+html[data-fx="on"][data-skin="neon"] .pc-port{animation:fxhue 12s linear infinite}
+html[data-fx="on"][data-skin="neon"] .tt[aria-current="page"]{animation:fxnf 5s linear infinite}
+html[data-fx="on"][data-skin="neon"] .hpbar>i{animation:fxhp 1.8s ease-in-out infinite}
+@keyframes fxe-deep{from{opacity:0;transform:translateY(16px);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
+@keyframes fxbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes fxpg5{0%,100%{box-shadow:0 0 0 3px #04222d,0 0 14px rgba(59,224,192,.35)}50%{box-shadow:0 0 0 3px #04222d,0 0 30px rgba(59,224,192,.7)}}
+@keyframes fxwv{0%{transform:skewX(-8deg) translateY(3px)}40%{transform:skewX(6deg)}100%{transform:none}}
+html[data-enter][data-fx="on"][data-skin="deep"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="deep"] #app>.grid>*{animation:fxe-deep .7s cubic-bezier(.3,.7,.3,1) backwards}
+html[data-enter][data-fx="on"][data-skin="deep"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="deep"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="deep"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="deep"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="deep"] .pc-lvl b{animation:fxbob 4s ease-in-out infinite;will-change:transform}
+html[data-fx="on"][data-skin="deep"] .pc-port{animation:fxpg5 5s ease-in-out infinite}
+html[data-fx="on"][data-skin="deep"] .tt[aria-current="page"]{animation:fxwv .7s ease-out both}
+html[data-fx="on"][data-skin="deep"] .hpbar>i{animation:fxhp 3.6s ease-in-out infinite}
+@keyframes fxe-sand{from{opacity:0;transform:translateY(6px);filter:blur(1.5px) sepia(.4)}to{opacity:1;transform:none;filter:none}}
+@keyframes fxsh{0%,100%{filter:brightness(1)}50%{filter:brightness(1.12) saturate(1.2)}}
+html[data-enter][data-fx="on"][data-skin="sand"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="sand"] #app>.grid>*{animation:fxe-sand .65s ease-out backwards}
+html[data-enter][data-fx="on"][data-skin="sand"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="sand"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="sand"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="sand"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="sand"] .pc-lvl b{animation:fxsp 32s linear infinite;will-change:transform}
+html[data-fx="on"][data-skin="sand"] .tt[aria-current="page"]{animation:fxsh 4s ease-in-out infinite}
+@keyframes fxe-rune{from{opacity:0;filter:brightness(1.9) saturate(.5)}to{opacity:1;filter:none}}
+@keyframes fxpg6{0%,100%{box-shadow:inset 0 0 14px rgba(111,214,230,.15)}50%{box-shadow:inset 0 0 24px rgba(111,214,230,.5)}}
+html[data-enter][data-fx="on"][data-skin="rune"] #app>*:not(#top),html[data-enter][data-fx="on"][data-skin="rune"] #app>.grid>*{animation:fxe-rune .6s ease-out backwards}
+html[data-enter][data-fx="on"][data-skin="rune"] #app>*:nth-child(3){animation-delay:.04s}html[data-enter][data-fx="on"][data-skin="rune"] #app>*:nth-child(4){animation-delay:.08s}html[data-enter][data-fx="on"][data-skin="rune"] #app>*:nth-child(5){animation-delay:.12s}html[data-enter][data-fx="on"][data-skin="rune"] #app>*:nth-child(n+6){animation-delay:.16s}
+html[data-fx="on"][data-skin="rune"] .pc-lvl b{animation:fxbr 3.4s ease-in-out infinite;will-change:transform}
+html[data-fx="on"][data-skin="rune"] .pc-port{animation:fxpg6 3.6s ease-in-out infinite}
+html[data-fx="on"][data-skin="rune"] .tt[aria-current="page"]{animation:fxtw 3s ease-in-out infinite}
+html[data-fx="on"][data-skin="rune"] .hpbar>i{animation:fxhp 3.2s ease-in-out infinite}
+}
 </style>
 </head><body>
 <title>Character Ledger</title>
@@ -4374,7 +4513,7 @@ const CFONTS=[
 const MAINS=["#14181f","#1b1426","#10201a","#241612","#1d1d1d","#e9e2d0","#e6ecef","#f4efe6"];
 const ACCS=["#3ccfb2","#e8742a","#b49bff","#e0b04a","#e0566b","#5aa0f0","#8fd16a","#c86b3c"];
 const CUSTOM0={main:"#14181f",accent:"#3ccfb2",font:"grotesk",bg:"none",scrim:55,pa:92};
-let TH={skin:"modern",mode:"system",custom:Object.assign({},CUSTOM0)};
+let TH={skin:"modern",mode:"system",fx:"on",custom:Object.assign({},CUSTOM0)};
 let THIMG="";
 try{
   const r=localStorage.getItem(THLS);
@@ -4405,7 +4544,7 @@ function loadFonts(g){
 const CVARS=["--bg","--bg2","--panel","--panel2","--field","--ink","--muted","--line","--accent","--accent-ink","--accent-soft","--display","--body","--fs","--hd-font","--pa"];
 function applyTheme(){
   const root=document.documentElement, sk=SKINS.find(s=>s.id===TH.skin);
-  root.setAttribute("data-skin",sk?TH.skin:"custom");
+  root.setAttribute("data-skin",sk?TH.skin:"custom"); root.setAttribute("data-fx",TH.fx==="off"?"off":"on");
   CVARS.forEach(k=>root.style.removeProperty(k));
   let meta;
   if(TH.skin==="custom"){
@@ -4469,6 +4608,7 @@ function renderThemePanel(){
     <div class="bar" style="margin:0"><h2 id="thT">Themes</h2><button class="btn sm pri" type="button" data-act="theme-close">Done</button></div>
     <p>Each built-in theme changes the whole look of the app: textures, frames, shapes, fonts and ambient effects. Your choice is saved on this device.</p>
     <section><div class="skins">${cards}</div></section>${extra}
+    <section><h3>Theme effects</h3>${seg("th-fx",TH.fx==="off"?"off":"on",[["on","On"],["off","Off"]])}<p class="hint" style="margin:0">Animated glows, drifting particles and small flourishes that suit each theme. Turn them off for a still look or to save battery.</p></section>
     <div class="btns"><button class="btn" type="button" data-act="th-reset">Reset to Modern</button></div></div>`;
 }
 function openTheme(){renderThemePanel();$("#themeOv").hidden=false}
@@ -4496,11 +4636,12 @@ document.addEventListener("click",e=>{
   else if(a==="theme-close")closeTheme();
   else if(a==="th-skin"){TH.skin=v;done()}
   else if(a==="th-mode"){TH.mode=v;done()}
+  else if(a==="th-fx"){TH.fx=v==="off"?"off":"on";done()}
   else if(a==="th-main"){C.main=v;done()}
   else if(a==="th-acc"){C.accent=v;done()}
   else if(a==="th-bg"){C.bg=v;done()}
   else if(a==="th-img-clear"){THIMG="";try{localStorage.removeItem(BGLS)}catch(e){}if(C.bg==="image")C.bg="none";done()}
-  else if(a==="th-reset"){TH={skin:"modern",mode:"system",custom:Object.assign({},CUSTOM0)};done()}
+  else if(a==="th-reset"){TH={skin:"modern",mode:"system",fx:TH.fx,custom:Object.assign({},CUSTOM0)};done()}
 });
 document.addEventListener("input",e=>{
   const t=e.target, C=TH.custom;
@@ -5767,6 +5908,17 @@ new MutationObserver(decorateRows).observe(document.getElementById("app"),{child
     if(i<0||!n)return;
     go(n,dx<0?1:-1);
   },{passive:true});
+})();
+
+
+/* theme effects: flag a fresh screen so entrance animations play once per navigation */
+(function(){
+  let key="",t=0; const root=document.documentElement;
+  new MutationObserver(()=>{
+    const k=(ui.view||"")+"|"+(ui.sel||"")+"|"+(ui.tab||"");
+    if(k===key)return; key=k;
+    root.setAttribute("data-enter","1"); clearTimeout(t); t=setTimeout(()=>root.removeAttribute("data-enter"),900);
+  }).observe(document.getElementById("app"),{childList:true});
 })();
 
 render(); setStatus();
