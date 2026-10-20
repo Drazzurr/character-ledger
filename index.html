@@ -5738,6 +5738,20 @@ new MutationObserver(decorateRows).observe(document.getElementById("app"),{child
     }
     return false;
   }
+  let busy=false;
+  function kids(){return [...document.querySelectorAll("#app>*:not(#top)")]}
+  function go(n,dir){
+    if(busy)return;
+    const rm=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if(rm||!Element.prototype.animate){n.click();return}
+    busy=true;
+    const out=kids().map(k=>k.animate([{transform:"none",opacity:1},{transform:`translateX(${-dir*36}px)`,opacity:0}],{duration:110,easing:"cubic-bezier(.4,0,1,1)",fill:"forwards"}));
+    setTimeout(()=>{
+      n.click();
+      kids().forEach((k,i)=>k.animate([{transform:`translateX(${dir*44}px)`,opacity:0},{transform:"none",opacity:1}],{duration:240,delay:Math.min(i,4)*18,easing:"cubic-bezier(.22,1,.36,1)",fill:"backwards"}));
+      setTimeout(()=>{busy=false},200);
+    },105);
+  }
   document.addEventListener("touchstart",e=>{
     const ov=document.getElementById("libOv");
     ok=e.touches.length===1&&document.documentElement.dataset.view==="sheet"&&!(ov&&!ov.hidden)&&!document.querySelector(".ov:not([hidden]),dialog[open]")&&!blocked(e.target);
@@ -5751,9 +5765,7 @@ new MutationObserver(decorateRows).observe(document.getElementById("app"),{child
     const i=tabs.findIndex(b=>b.getAttribute("aria-current")==="page");
     const n=tabs[i+(dx<0?1:-1)];
     if(i<0||!n)return;
-    n.click();
-    const a=document.getElementById("app");
-    if(a&&a.animate)a.animate([{transform:`translateX(${dx<0?28:-28}px)`,opacity:.35},{transform:"none",opacity:1}],{duration:180,easing:"ease-out"});
+    go(n,dx<0?1:-1);
   },{passive:true});
 })();
 
