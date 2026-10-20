@@ -576,6 +576,8 @@ label.prow{display:block;cursor:pointer}
 [data-skin="astral"] .nb[aria-current="page"] i{background:rgba(180,155,255,.22);color:#d6c8ff;filter:drop-shadow(0 0 6px rgba(180,155,255,.7))}
 [data-skin="astral"] .rline .rtot{text-shadow:0 0 18px rgba(180,155,255,.7)}
 [data-skin="astral"] .ov{background:rgba(5,4,20,.55)}
+select.rk,.row select{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:4px 6px;width:auto;min-width:0}
+.row input.cell{min-width:0}
 </style>
 
 <div class="skinbg" aria-hidden="true"></div>
@@ -626,6 +628,10 @@ label.prow{display:block;cursor:pointer}
       </div>
       <textarea id="outBox" readonly placeholder="Exported text appears here" aria-label="Exported JSON"></textarea>
       <p>Large characters can be too big to copy on a phone, so use the Save buttons to get a file instead. A full backup holds every campaign and character and can be imported back into Ledger on any device. The Roll20 option writes basic stats using the D&amp;D 5e Roll20 sheet's attribute names; check the character in Roll20 afterwards to confirm the fields landed where you expect.</p>
+    </section>
+    <section><h3>About and licenses</h3>
+      <p>D&amp;D 5e and 5.5e content is from the SRD 5.1 and SRD 5.2 under their Creative Commons licenses. Pathfinder 2e (Remaster) content comes from the open data of the Foundry VTT Pathfinder 2e system, limited to entries published under the ORC License or the Open Game License.</p>
+      <p>This app uses trademarks and copyrights owned by Paizo Inc., used under Paizo's Community Use Policy (paizo.com/communityuse). It is not published, endorsed, or specifically approved by Paizo. Pathfinder is a trademark of Paizo Inc.</p>
     </section>
     <div class="msg" id="syncMsg" role="status"></div>
   </div>
@@ -678,9 +684,9 @@ function normLib(p){
 }
 let LIB=normLib({});
 try{const r=localStorage.getItem(LIBLS);if(r)LIB=normLib(JSON.parse(r))}catch(e){}
-const libClass=n=>{const k=lc(n);return k?LIB.classes.find(x=>lc(x.name)===k&&!x.addOn):undefined};
+const libClass=n=>{const k=lc(n);return k?LIB.classes.find(x=>lc(x.name)===k&&!x.addOn&&sysOf(x)==='dnd5e'):undefined};
 function withAddOns(d,name){
-  const ad=LIB.classes.filter(x=>x.addOn&&lc(x.name)===lc(name)&&(x.subclasses||[]).length);
+  const ad=LIB.classes.filter(x=>x.addOn&&sysOf(x)==='dnd5e'&&lc(x.name)===lc(name)&&(x.subclasses||[]).length);
   if(!ad.length)return d;
   const subs=(d&&d.subclasses||[]).slice(), seen=new Set(subs.map(x=>lc(x.name)));
   ad.forEach(a=>a.subclasses.forEach(x=>{if(!seen.has(lc(x.name))){seen.add(lc(x.name));subs.push(x)}}));
@@ -1502,7 +1508,7 @@ function runBook(B,opts){
 
 /* ---------- character model ---------- */
 function blankChar(camp,rules){
-  const o={id:uid(),campaign:camp||"",rules:rules==="2024"?"2024":"2014",name:"New character",cls:"",subclass:"",level:1,race:"",background:"",originFeat:"",alignment:"",
+  const o={id:uid(),system:"dnd5e",campaign:camp||"",rules:rules==="2024"?"2024":"2014",name:"New character",cls:"",subclass:"",level:1,race:"",background:"",originFeat:"",alignment:"",
     ac:10,speed:30,hp:8,hpMax:8,hpTemp:0,initExtra:0,roll20Id:"",heroic:false,exhaustion:0,
     abilities:{str:10,dex:10,con:10,int:10,wis:10,cha:10},saveProf:{},skills:{},
     attacks:[],resources:[],features:[],spells:[],classes:[mkClassRow("","",1)],conditions:[],deathSaves:{s:0,f:0},hdUsed:{},inventory:[],coins:{cp:0,sp:0,ep:0,gp:0,pp:0},spellcasting:{ability:"",slots:{},auto:true,pact:{max:0,level:0,used:0}},mastery:{slots:0,picks:[]},
@@ -1520,6 +1526,7 @@ function migList(v,mk){
   return [];
 }
 function normChar(c){
+  if(c&&c.system==="pf2e")return pfNorm(c);
   const b=blankChar(c.campaign);
   const o=Object.assign(b,c);
   o.abilities=Object.assign(b.abilities,c.abilities||{});
@@ -1527,7 +1534,7 @@ function normChar(c){
   o.features=migList(c.features,mkFeat); o.spells=migList(c.spells,mkSpell); o.resources=migList(c.resources,mkRes);
   o.features.forEach(f=>{if(f.uses){f.desc="Uses: "+f.uses+(f.desc?"\n\n"+f.desc:"")}delete f.uses});
   o.spellcasting=normSpellcasting(o);
-  o.rules=c.rules==="2024"?"2024":"2014";
+  o.rules=c.rules==="2024"?"2024":"2014"; o.system="dnd5e";
   o.mastery=Object.assign({slots:0,picks:[]},c.mastery||{}); o.mastery.picks=migList(c.mastery&&c.mastery.picks,mkPick);
   o.bastion=Object.assign({name:"",location:"",desc:"",defenders:0,gold:0,log:"",facilities:[]},c.bastion||{});
   o.bastion.facilities=migList(c.bastion&&c.bastion.facilities,mkFacility);
@@ -1575,6 +1582,86 @@ function seed(){
   return {campaigns:[k],characters:[c],updated:0};
 }
 
+/* ---------- systems: D&D 5e / 5.5e and Pathfinder 2e ---------- */
+const sysOf=x=>x&&x.system==="pf2e"?"pf2e":"dnd5e";
+const isPf=c=>!!c&&c.system==="pf2e";
+const EDL={"2014":"5e","2024":"5.5e"};
+const edLabel=e=>EDL[e]||"5e / 5.5e";
+const PFABIL=[["str","Strength"],["dex","Dexterity"],["con","Constitution"],["int","Intelligence"],["wis","Wisdom"],["cha","Charisma"]];
+const PFSKILLS=[["acrobatics","Acrobatics","dex"],["arcana","Arcana","int"],["athletics","Athletics","str"],["crafting","Crafting","int"],["deception","Deception","cha"],["diplomacy","Diplomacy","cha"],["intimidation","Intimidation","cha"],["medicine","Medicine","wis"],["nature","Nature","wis"],["occultism","Occultism","int"],["performance","Performance","cha"],["religion","Religion","wis"],["society","Society","int"],["stealth","Stealth","dex"],["survival","Survival","wis"],["thievery","Thievery","dex"]];
+const PFRANKS=["Untrained","Trained","Expert","Master","Legendary"];
+const PFSAVE={fortitude:"con",reflex:"dex",will:"wis"};
+const PFSIZE={tiny:"Tiny",sm:"Small",med:"Medium",lg:"Large",huge:"Huge",grg:"Gargantuan"};
+const PFCATS=[["classfeature","Class features"],["ancestryfeature","Ancestry and heritage features"],["ancestry","Ancestry feats"],["class","Class feats"],["skill","Skill feats"],["general","General feats"],["bonus","Archetype and other feats"]];
+function pfSlots(){const o={};for(let i=1;i<=10;i++)o[i]={max:0,used:0};return o}
+function pfBlankPf(){
+  return {heritage:"",size:"Medium",deity:"",keyAbility:"str",classHp:8,ancHp:8,langs:"",senses:"",
+    mods:{str:0,dex:0,con:0,int:0,wis:0,cha:0},
+    rank:{perception:1,fortitude:1,reflex:1,will:1,classDC:1,spell:0,simple:1,martial:0,advanced:0,unarmed:1,unarmored:1,light:0,medium:0,heavy:0},
+    skills:{},lores:[],misc:{},
+    armor:{name:"",cat:"unarmored",ac:0,dx:99,ck:0,sp:0,st:0,pot:0},
+    shield:{name:"",ac:0,hd:0,hp:0,hpMax:0,raised:false},
+    strikes:[],heroPoints:1,dying:0,wounded:0,doomed:0,cond:[],
+    cast:{trad:"",abl:"int",kind:"prepared",slots:pfSlots(),focusMax:0,focusCur:0},
+    spells:[],feats:[],inv:[],coins:{pp:0,gp:0,sp:0,cp:0}};
+}
+function pfBlank(camp){
+  return {id:uid(),system:"pf2e",campaign:camp||"",rules:"2014",name:"New character",race:"",cls:"",subclass:"",level:1,background:"",alignment:"",
+    ac:10,speed:25,hp:8,hpMax:8,hpTemp:0,resources:[],notes:"",updated:Date.now(),pf:pfBlankPf()};
+}
+function pfNorm(c){
+  const o=Object.assign(pfBlank(c.campaign),c), p=c.pf&&typeof c.pf==="object"?c.pf:{}, D=pfBlankPf();
+  o.system="pf2e"; o.rules="2014";
+  o.level=Math.max(1,Math.min(20,num(c.level,1)));
+  o.pf=Object.assign(D,p);
+  ["mods","rank","skills","misc","armor","shield","coins"].forEach(k=>{o.pf[k]=Object.assign(pfBlankPf()[k],p[k]&&typeof p[k]==="object"?p[k]:{})});
+  const cs=Object.assign(pfBlankPf().cast,p.cast&&typeof p.cast==="object"?p.cast:{});
+  cs.slots=Object.assign(pfSlots(),cs.slots&&typeof cs.slots==="object"?cs.slots:{});
+  for(let i=1;i<=10;i++)cs.slots[i]=Object.assign({max:0,used:0},cs.slots[i]||{});
+  o.pf.cast=cs;
+  const arr=v=>Array.isArray(v)?v.filter(x=>x&&typeof x==="object").map(x=>Object.assign({},x,{id:x.id||uid()})):[];
+  ["lores","strikes","spells","feats","inv","cond"].forEach(k=>{o.pf[k]=arr(p[k])});
+  o.resources=migList(c.resources,mkRes);
+  return o;
+}
+/* derived values */
+const pfLvl=c=>Math.max(1,Math.min(20,num(c.level,1)));
+const pfMod=(c,k)=>num(c.pf.mods[k]);
+const pfProf=(c,r)=>num(r)>0?pfLvl(c)+2*Math.min(4,num(r)):0;
+const pfMisc=(c,k)=>num(c.pf.misc[k]);
+function pfVal(c,key){
+  const p=c.pf, i=key.indexOf("."), k=i<0?key:key.slice(0,i), id=i<0?"":key.slice(i+1);
+  switch(k){
+    case "perception": return pfMod(c,"wis")+pfProf(c,p.rank.perception)+pfMisc(c,"perception");
+    case "fortitude": case "reflex": case "will": return pfMod(c,PFSAVE[k])+pfProf(c,p.rank[k])+pfMisc(c,k);
+    case "classDC": return 10+pfMod(c,p.keyAbility)+pfProf(c,p.rank.classDC)+pfMisc(c,"classDC");
+    case "ac": {const a=p.armor,s=p.shield;return 10+Math.min(pfMod(c,"dex"),num(a.dx,99))+pfProf(c,p.rank[a.cat]||0)+num(a.ac)+num(a.pot)+(s.raised?num(s.ac):0)+pfMisc(c,"ac")}
+    case "spellAtk": return pfMod(c,p.cast.abl)+pfProf(c,p.rank.spell)+pfMisc(c,"spell");
+    case "spellDC": return 10+pfVal(c,"spellAtk");
+    case "skill": {const s=PFSKILLS.find(x=>x[0]===id);return s?pfMod(c,s[2])+pfProf(c,p.skills[id])+pfMisc(c,"skill."+id):0}
+    case "lore": {const l=p.lores[num(id)];return l?pfMod(c,l.abl||"int")+pfProf(c,l.rank)+num(l.misc):0}
+    case "atk": {const s=p.strikes[num(id)];return s?pfMod(c,s.abl||"str")+pfProf(c,p.rank[s.cat]||0)+num(s.pot)+num(s.misc):0}
+  }
+  return 0;
+}
+function pfDmg(c,s){
+  const m=String(s.dmg||"").match(/^\s*(\d*)d(\d+)/i), mod=(s.dm?pfMod(c,"str"):0)+num(s.dbonus);
+  const extra=String(s.extra||"").trim(), type=String(s.type||"").trim();
+  if(!m)return {expr:"",text:String(s.dmg||"-")+(type?" "+type:"")};
+  const n=(m[1]===""?1:num(m[1]))+Math.max(0,Math.min(3,num(s.str))), die=num(m[2]);
+  const base=n+"d"+die+(mod?sgn(mod):"");
+  return {expr:base+(/^\d*d\d+|^\d+/.test(extra)?"+"+extra.match(/^[\dd+\-\s]+/)[0].trim():""),text:base+(type?" "+type:"")+(extra?" + "+extra:"")};
+}
+const pfBulkNum=b=>{b=String(b==null?"":b).trim().toUpperCase();return b==="L"?0.1:(b==="-"||b==="")?0:(parseFloat(b)||0)};
+function pfBulkText(t){const full=Math.floor(t+1e-9),l=Math.round((t-full)*10);return (full||!l?String(full):"")+(l?(full?" and ":"")+l+" L":"")}
+const pfCondVal=(c,n)=>{const x=c.pf.cond.find(k=>lc(k.n)===n);return x?Math.max(1,num(x.v,1)):0};
+function pfPen(c,abl){
+  let m=Math.max(pfCondVal(c,"frightened"),pfCondVal(c,"sickened"));
+  const by={dex:"clumsy",str:"enfeebled",con:"drained",int:"stupefied",wis:"stupefied",cha:"stupefied"}[abl];
+  if(by)m=Math.max(m,pfCondVal(c,by));
+  return -m;
+}
+
 /* ---------- derived values ---------- */
 const abMod=(c,k)=>Math.floor((num(c.abilities[k],10)-10)/2);
 const prof=c=>Math.ceil(Math.max(1,num(c.level,1))/4)+1;
@@ -1596,7 +1683,7 @@ function setStatus(){
 }
 function save(){
   dirty=true; S.updated=Date.now();
-  const c=cur(); if(c)c.updated=S.updated;
+  const c=cur(); if(c){c.updated=S.updated;if(isPf(c)){try{c.ac=pfVal(c,"ac")}catch(e){}}}
   try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
   setStatus();
   clearTimeout(saveTimer); saveTimer=setTimeout(pushDb,700);
@@ -1669,7 +1756,7 @@ function setChrome(top,nav,fab){
 const HOMENAV=[["home","Characters","users","nav-home"],["lib","Library","book","lib-open"],["sync","Import","swap","sync-open"],["theme","Themes","palette","theme-open"]];
 const AVC=["#2e5d55","#4b3a6b","#6b4a2a","#2f4a6b","#6b2f3f","#4a5a2a"];
 const hpPct=c=>c.hpMax>0?Math.max(0,Math.min(100,num(c.hp)/num(c.hpMax)*100)):0;
-const subOf=c=>[c.race,c.cls&&(c.cls+" "+num(c.level,1)),c.rules==="2024"?"5.5e":"5e"].filter(Boolean).join(" · ");
+const subOf=c=>[c.race,c.cls&&(c.cls+" "+num(c.level,1)),isPf(c)?"PF2e":c.rules==="2024"?"5.5e":"5e"].filter(Boolean).join(" \u00b7 ");
 
 function renderHome(){
   ui.view="home";
@@ -1684,9 +1771,10 @@ function renderHome(){
 
   let strip="";
   if(ui.newChar){
-    strip=`<div class="rulepick"><b>Which rules does this character use?</b>
+    strip=`<div class="rulepick"><b>Which game is this character for?</b>
       <button class="btn pri" type="button" data-act="create-char" data-rules="2014">D&amp;D 5e (2014)</button>
       <button class="btn pri" type="button" data-act="create-char" data-rules="2024">D&amp;D 5.5e (2024)</button>
+      <button class="btn pri" type="button" data-act="create-char" data-sys="pf2e">Pathfinder 2e (Remaster)</button>
       <button class="btn" type="button" data-act="cancel-new">Cancel</button></div>`;
   }else if(ui.addCamp){
     strip=`<div class="strip"><label class="fld"><span>New campaign name</span><input id="newCampName" type="text" maxlength="60" placeholder="Curse of Strahd"></label>
@@ -1701,14 +1789,14 @@ function renderHome(){
     .sort((a,b)=>a.name.localeCompare(b.name));
   const cards=list.map(c=>{
     const pct=hpPct(c);
-    const sub=[c.race,c.cls&&(c.cls+" "+num(c.level,1))].filter(Boolean).join(" · ")||"No class yet";
+    const sub=[c.race,c.cls&&(c.cls+" "+num(c.level,1))].filter(Boolean).join(" \u00b7 ")||"No class yet";
     const ini=String(c.name||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";
     const av=AVC[[...String(c.id)].reduce((a,ch)=>a+ch.charCodeAt(0),0)%AVC.length];
     return `<button class="card" type="button" data-act="open" data-id="${esc(c.id)}">
       <span class="avatar" style="--av:${av}" aria-hidden="true">${esc(ini)}</span>
       <span class="card-main">
-        <span class="card-t"><span class="card-n">${esc(c.name||"Unnamed")}</span><span class="tag">${c.rules==="2024"?"5.5e":"5e"}</span>${c.example?'<span class="tag ex">Example</span>':""}</span>
-        <span class="sub">${esc(sub)}${ui.camp==="all"&&c.campaign?" · "+esc(campName(c.campaign)):""}</span>
+        <span class="card-t"><span class="card-n">${esc(c.name||"Unnamed")}</span><span class="tag">${isPf(c)?"PF2e":c.rules==="2024"?"5.5e":"5e"}</span>${c.example?'<span class="tag ex">Example</span>':""}</span>
+        <span class="sub">${esc(sub)}${ui.camp==="all"&&c.campaign?" \u00b7 "+esc(campName(c.campaign)):""}</span>
         <span class="card-hp"><span class="hpbar${pct<34?" low":""}" aria-hidden="true"><i style="width:${pct}%"></i></span><b>${num(c.hp)} / ${num(c.hpMax)}</b></span>
       </span>
       <span class="actile"><span>AC</span><b>${num(c.ac)}</b></span>
@@ -1716,7 +1804,7 @@ function renderHome(){
   const label=ui.camp==="all"?"All characters":ui.camp==="none"?"Unassigned":campName(ui.camp);
 
   app.innerHTML=`<div class="chips" role="group" aria-label="Filter by campaign">${chips}</div>${strip}
-    ${cards?`<div class="sec-h">${esc(label)} · ${list.length}</div><div class="cards">${cards}</div>`:`<div class="empty">No characters here yet. Tap New character, or bring one in from Roll20 or D&amp;D Beyond with Import.</div>`}`;
+    ${cards?`<div class="sec-h">${esc(label)} \u00b7 ${list.length}</div><div class="cards">${cards}</div>`:`<div class="empty">No characters here yet. Tap New character, or bring one in from Roll20 or D&amp;D Beyond with Import.</div>`}`;
   if(ui.addCamp){const i=$("#newCampName");if(i)i.focus()}
   setStatus();
 }
@@ -1745,6 +1833,7 @@ const LV=["Cantrips","1st level","2nd level","3rd level","4th level","5th level"
 const SCHOOLS=["Abjuration","Conjuration","Divination","Enchantment","Evocation","Illusion","Necromancy","Transmutation"];
 const MORE=["feats","details","mastery","bastion"];
 function tabsFor(c){
+  if(isPf(c))return [["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["feats","Feats ("+c.pf.feats.length+")"],["details","Details"]];
   const t=[["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["feats","Features"],["details","Details"]];
   if(c.rules==="2024")t.push(["mastery","Mastery"],["bastion","Bastion"]);
   return t;
@@ -1769,13 +1858,13 @@ function barHTML(c){
   setChrome(top,nav,"");
   updVitals(c);
   if(!inMore)return "";
-  return `<div class="chips subnav" role="group" aria-label="More sections">${tabsFor(c).filter(t=>MORE.includes(t[0])).map(t=>`<button class="chip" type="button" data-act="tab" data-tab="${t[0]}" aria-pressed="${ui.tab===t[0]}">${t[1]}</button>`).join("")}</div>`;
+  return `<div class="chips subnav" role="group" aria-label="More sections">${tabsFor(c).filter(t=>MORE.includes(t[0])).map(t=>`<button class="chip" type="button" data-act="tab" data-tab="${t[0]}" aria-pressed="${ui.tab===t[0]}">${t[1]}</button>`).join("")}<button class="chip" type="button" data-act="lib-open">Library</button></div>`;
 }
 function updVitals(c){
   const T=$("#top"); if(!T||!c)return;
   const q=k=>T.querySelector('[data-v="'+k+'"]'), set=(k,v)=>{const el=q(k);if(el)el.textContent=v};
   set("hp",num(c.hp)); set("hpMax",num(c.hpMax)); set("tmp",num(c.hpTemp)?"+"+num(c.hpTemp):"");
-  set("ac",num(c.ac)); set("init",sgn(initB(c))); set("speed",num(c.speed));
+  set("ac",num(c.ac)); set("init",sgn(isPf(c)?pfVal(c,"perception"):initB(c))); set("speed",num(c.speed));
   const pct=hpPct(c), bar=q("bar"); if(bar){bar.style.width=pct+"%";bar.parentNode.classList.toggle("low",pct<34)}
   const sub=T.querySelector(".who-sub"); if(sub)sub.textContent=subOf(c);
 }
@@ -1933,18 +2022,19 @@ function renderBastion(c){
 
 /* ---------- SRD spell picker ---------- */
 const SPELLDATA={};
-const libSpellRec=x=>({n:x.name,l:num(x.level),s:x.school||"",t:x.time||"",r:x.range||"",c:x.components||"",d:x.duration||"",k:!!x.conc,ri:!!x.ritual,cl:x.classes||[],desc:x.desc||"",hi:x.higher||"",lib:1});
-const spellList=r=>(SPELLDATA[r]||[]).concat(LIB.spells.map(libSpellRec));
+const dndLib=k=>LIB[k].filter(x=>sysOf(x)==='dnd5e');
+const libSpellRec=x=>({ed:x.ed||"",n:x.name,l:num(x.level),s:x.school||"",t:x.time||"",r:x.range||"",c:x.components||"",d:x.duration||"",k:!!x.conc,ri:!!x.ritual,cl:x.classes||[],desc:x.desc||"",hi:x.higher||"",lib:1});
+const spellList=r=>(SPELLDATA[r]||[]).concat(SPELLDATA[r==="2024"?"2014":"2024"]||[],dndLib("spells").map(libSpellRec));
 async function loadSpells(rules){
   if(SPELLDATA[rules])return SPELLDATA[rules];
   const r=await fetch("spells-"+rules+".json");
   if(!r.ok)throw new Error("HTTP "+r.status);
-  SPELLDATA[rules]=await r.json();
+  const j=await r.json(); j.forEach(x=>{x.ed=rules}); SPELLDATA[rules]=j;
   return SPELLDATA[rules];
 }
 function pickRow(s,i,have){
   const open=ui.pick.open.has(i);
-  const meta=[s.l===0?"Cantrip":"Level "+s.l,s.s,s.k?"Concentration":"",s.ri?"Ritual":"",s.cl.join(", ")].filter(Boolean).join(" \u00b7 ");
+  const meta=[edLabel(s.ed),s.l===0?"Cantrip":"Level "+s.l,s.s,s.k?"Concentration":"",s.ri?"Ritual":"",s.cl.join(", ")].filter(Boolean).join(" \u00b7 ");
   const det=open?`<div class="pdesc"><div class="kvs">${kv("Casting time",s.t)}${kv("Range",s.r)}${kv("Components",s.c)}${kv("Duration",s.d)}</div>
     <div class="prose">${esc(s.desc)}</div>${s.hi?`<div class="kv"><span>At higher levels</span><div class="prose">${esc(s.hi)}</div></div>`:""}</div>`:"";
   return `<div class="prow"><div class="pmain"><button class="plink" type="button" data-act="pick-toggle" data-i="${i}" aria-expanded="${open}"><b>${esc(s.n)}</b><span>${esc(meta)}</span></button>
@@ -1954,6 +2044,7 @@ function pickFiltered(){
   const P=ui.pick, D=spellList(P.rules), q=P.q.trim().toLowerCase(), out=[];
   for(let i=0;i<D.length;i++){
     const s=D[i];
+    if(P.ed&&s.ed&&s.ed!==P.ed)continue;
     if(P.lvl!==""&&s.l!==num(P.lvl))continue;
     if(P.cls&&!s.cl.includes(P.cls))continue;
     if(q&&!(s.n.toLowerCase().includes(q)||s.s.toLowerCase().includes(q)))continue;
@@ -1963,7 +2054,7 @@ function pickFiltered(){
 }
 function renderPickList(){
   const P=ui.pick, box=$("#pickList"); if(!P||!box)return;
-  const D=SPELLDATA[P.rules]?spellList(P.rules):null;
+  const D=(SPELLDATA["2014"]||SPELLDATA["2024"])?spellList(P.rules):null;
   if(P.err){box.innerHTML=`<div class="empty">The spell list could not be loaded here. You can still add spells with Add by hand.</div>`;return}
   if(!D){box.innerHTML=`<div class="empty">Loading spells...</div>`;return}
   const idx=pickFiltered(), c=cur();
@@ -1981,28 +2072,29 @@ function fillPickClasses(D){
 function openPicker(){
   const c=cur(); if(!c)return;
   const r=c.rules;
-  ui.pick={rules:r,q:"",lvl:"",cls:"",limit:60,open:new Set(),err:false};
+  ui.pick={rules:r,ed:"",q:"",lvl:"",cls:"",limit:60,open:new Set(),err:false};
   const lv=`<option value="">Any level</option><option value="0">Cantrips</option>`+[1,2,3,4,5,6,7,8,9].map(l=>`<option value="${l}">Level ${l}</option>`).join("");
   $("#pickOv").innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="pickT">
     <div class="bar" style="margin:0"><h2 id="pickT">Add spells</h2><button class="btn sm pri" type="button" data-act="pick-close">Done</button></div>
-    <p>${r==="2024"?"The 5.5e (2024) spell list from the SRD.":"The 5e (2014) spell list from the SRD 5.1."} Spells from your Library are included. Anything else, add by hand or import it in the Library.</p>
+    <p>D&amp;D spells from both SRDs, each marked 5e (2014) or 5.5e (2024). Spells from your D&amp;D Library are included. Pathfinder content never appears here.</p>
     <div class="listbar">
       <label class="fld"><span>Search</span><input id="pickQ" type="search" placeholder="Spell name or school"></label>
       <label class="fld" style="flex:0 1 150px"><span>Level</span><select id="pickLvl">${lv}</select></label>
+      <label class="fld" style="flex:0 1 130px"><span>Edition</span><select id="pickEd"><option value="">5e and 5.5e</option><option value="2014">5e only</option><option value="2024">5.5e only</option></select></label>
       <label class="fld" style="flex:0 1 170px"><span>Class</span><select id="pickCls"><option value="">Any class</option></select></label>
     </div>
     <div id="pickList"></div>
     <p class="hint">${ATTR[r]}</p></div>`;
   $("#pickOv").hidden=false;
   renderPickList();
-  loadSpells(r).then(()=>{fillPickClasses(spellList(r));renderPickList()}).catch(()=>{if(ui.pick){ui.pick.err=true;renderPickList()}});
+  ["2014","2024"].forEach(k=>loadSpells(k).then(()=>{if(ui.pick){fillPickClasses(spellList(r));renderPickList()}}).catch(()=>{if(ui.pick&&!SPELLDATA["2014"]&&!SPELLDATA["2024"]){ui.pick.err=true;renderPickList()}}));
 }
 function closePicker(){
   $("#pickOv").hidden=true; $("#pickOv").innerHTML=""; ui.pick=null;
   const c=cur(); if(c&&ui.view==="sheet"&&ui.tab==="spells"){rerender("spell");updTabs(c)}
 }
 function addFromSrd(i,btn){
-  const c=cur(), P=ui.pick, s=P&&SPELLDATA[P.rules]&&spellList(P.rules)[i]; if(!c||!s)return;
+  const c=cur(), P=ui.pick, s=P&&spellList(P.rules)[i]; if(!c||!s)return;
   if(c.spells.some(x=>String(x.name).toLowerCase()===s.n.toLowerCase()))return;
   c.spells.push(Object.assign(mkSpell(s.n),{level:s.l,school:s.s,time:s.t,range:s.r,components:s.c,duration:s.d,conc:s.k,ritual:s.ri,desc:s.desc,higher:s.hi}));
   save(); updTabs(c);
@@ -2013,6 +2105,7 @@ function renderSheet(){
   const c=cur(); ui.view="sheet";
   if(!tabsFor(c).some(t=>t[0]===ui.tab))ui.tab="sheet";
   if(MORE.includes(ui.tab))ui.lastMore=ui.tab;
+  if(isPf(c)){renderPf(c);return}
   if(ui.tab==="spells"){renderSpells(c);return}
   if(ui.tab==="gear"){renderGear(c);return}
   if(ui.tab==="play"){renderPlay(c);return}
@@ -2092,7 +2185,7 @@ function renderDetails(c){
     <section class="panel span2"><h3>Classes and level</h3><div id="clsBox">${classesHTML(c)}</div></section>
     <section class="panel span2"><label class="fld"><span>Notes</span><textarea data-f="notes" placeholder="Backstory, session notes, goals">${esc(c.notes)}</textarea></label></section>
   </div>
-  <div class="foot"><span class="status">Last edited ${new Date(c.updated||Date.now()).toLocaleString()} · <span id="status" role="status"></span></span>
+  <div class="foot"><span class="status">Last edited ${new Date(c.updated||Date.now()).toLocaleString()} \u00b7 <span id="status" role="status"></span></span>
     <button class="btn danger" type="button" data-act="del-char">Delete character</button></div>`;
   recompute(); refreshSubLists(c); setStatus();
 }
@@ -2101,6 +2194,7 @@ function setDot(key,v){const el=$(`[data-prof="${key}"]`);if(!el)return;el.class
 function recompute(){
   const c=cur(); if(!c||ui.view!=="sheet")return;
   updVitals(c);
+  if(isPf(c)){pfRecompute(c);return}
   if(ui.tab==="feats"||ui.tab==="details")return;
   if(ui.tab==="mastery"){
     const m=$("[data-mcount]");
@@ -2163,11 +2257,11 @@ document.addEventListener("toggle",e=>{
 },true);
 document.addEventListener("change",e=>{
   const t=e.target;
-  if(t.id==="pickLvl"||t.id==="pickCls"){
-    if(ui.pick){if(t.id==="pickLvl")ui.pick.lvl=t.value;else ui.pick.cls=t.value;ui.pick.limit=60;renderPickList()}
+  if(t.id==="pickLvl"||t.id==="pickCls"||t.id==="pickEd"){
+    if(ui.pick){if(t.id==="pickLvl")ui.pick.lvl=t.value;else if(t.id==="pickEd")ui.pick.ed=t.value;else ui.pick.cls=t.value;ui.pick.limit=60;renderPickList()}
     return;
   }
-  if(t.id==="gearPC"){if(ui.gp){ui.gp.cat=t.value;ui.gp.limit=60;renderGearList()}return}
+  if(t.id==="gearPC"||t.id==="gearEd"){if(ui.gp){if(t.id==="gearPC")ui.gp.cat=t.value;else ui.gp.ed=t.value;ui.gp.limit=60;renderGearList()}return}
   if(t.id==="pdfFile"&&t.files&&t.files[0]){readPdfFile(t.files[0]);t.value="";return}
   if(t.id==="bookFile"&&t.files&&t.files[0]){scanBookFile(t.files[0]);t.value="";return}
   if(t.dataset&&t.dataset.bkc!=null&&BOOK){const ch=BOOK.chapters[num(t.dataset.bkc)];if(ch){ch.type=t.value;ch.found=null}return}
@@ -2377,7 +2471,7 @@ document.addEventListener("click",e=>{
     case "lib-del": if(confirmTwice(b,"Tap again to delete")){LIB[ui.lib.tab].splice(num(b.dataset.i),1);saveLib();renderLib()} break;
     case "lib-save": commitDraft(); break;
     case "lib-cancel": ui.lib.draft=null; ui.lib.msg=""; renderLib(); break;
-    case "lib-addfeat": if(c){const x=LIB.sections[num(b.dataset.i)];if(x){const f=mkFeat(x.name);f.source=x.source||"Library";f.desc=x.text||"";c.features.push(f);save();if(ui.view==="sheet"&&ui.tab==="feats")rerender("feat");b.textContent="Added";b.disabled=true}} break;
+    case "lib-addfeat": if(c){const x=LIB.sections[num(b.dataset.i)];if(x&&sysOf(x)!==sysOf(c)){}else if(x&&isPf(c)){pfAddFeat(c,{n:x.name,lvl:"",d:x.text,src:x.source||"Library"},"bonus");save();b.textContent="Added";b.disabled=true}else if(x){const f=mkFeat(x.name);f.source=x.source||"Library";f.desc=x.text||"";c.features.push(f);save();if(ui.view==="sheet"&&ui.tab==="feats")rerender("feat");b.textContent="Added";b.disabled=true}} break;
     case "bk-run": bookRun(); break;
     case "bk-add": bookAdd(); break;
     case "bk-sel": {const e=bookState().entries&&bookState().entries[num(b.dataset.i)];if(e){e.sel=b.checked;const bt=document.querySelector('[data-act="bk-add"]');if(bt)bt.textContent="Add "+bookState().entries.filter(x=>x.sel).length+" selected to library"}break;}
@@ -2400,7 +2494,7 @@ document.addEventListener("click",e=>{
     case "new-char": ui.newChar=true; ui.addCamp=false; renderHome(); break;
     case "cancel-new": ui.newChar=false; renderHome(); break;
     case "create-char": {
-      const ch=blankChar(S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"",b.dataset.rules);
+      const camp0=S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"", ch=b.dataset.sys==="pf2e"?pfBlank(camp0):blankChar(camp0,b.dataset.rules);
       ui.newChar=false; S.characters.push(ch); ui.sel=ch.id; ui.tab="details"; ui.q=""; save(); renderSheet(); window.scrollTo(0,0);
       const n=$('[data-f="name"]'); if(n){n.focus();n.select()} break;}
     case "del-char":
@@ -2438,12 +2532,12 @@ async function loadClasses(r){
 async function findClass(c,name){
   const l=libClass(name); if(l)return withAddOns(l,name);
   let d=null;
-  try{const D=await loadClasses(c.rules);d=D.find(x=>lc(x.name)===lc(name))||null}catch(e){}
+  try{const D=await loadClasses(c.rules);d=D.find(x=>lc(x.name)===lc(name))||null;if(!d){const D2=await loadClasses(c.rules==="2024"?"2014":"2024");d=D2.find(x=>lc(x.name)===lc(name))||null}}catch(e){}
   return withAddOns(d,name)||d;
 }
 function classOptions(){
   const seen=new Set(), out=[];
-  SRDCLASSES.concat(LIB.classes.filter(x=>!x.addOn).map(x=>x.name)).forEach(n=>{const k=lc(n);if(k&&!seen.has(k)){seen.add(k);out.push(n)}});
+  SRDCLASSES.concat(LIB.classes.filter(x=>!x.addOn&&sysOf(x)==='dnd5e').map(x=>x.name)).forEach(n=>{const k=lc(n);if(k&&!seen.has(k)){seen.add(k);out.push(n)}});
   return out;
 }
 function classesHTML(c){
@@ -2592,22 +2686,24 @@ async function loadItems(r){
   if(!a.ok||!b.ok)throw new Error("HTTP");
   const eq=await a.json(), mg=await b.json();
   ITEMDATA[r]=eq.concat(mg.map(m=>({n:m.n,cat:"Magic item",rar:m.rar,att:m.att,desc:m.desc})));
+  ITEMDATA[r].forEach(x=>{x.ed=r});
   return ITEMDATA[r];
 }
-const libItemRec=x=>({n:x.name,cat:x.cat||"Library",cost:x.cost,w:x.w,dmg:x.dmg,props:x.props,ac:x.ac,rar:x.rar,att:x.att,desc:x.desc,source:x.source||"Library",lib:1});
-const gearList=r=>(ITEMDATA[r]||[]).concat(LIB.items.map(libItemRec));
-function gearRowMeta(s){return [s.cat,s.rar,s.cost,Number(s.w)?fmtW(s.w)+" lb":"",s.dmg,s.ac?"AC "+s.ac:"",s.att?"attunement":"",s.source].filter(Boolean).join(" \u00b7 ")}
+const libItemRec=x=>({ed:x.ed||"",n:x.name,cat:x.cat||"Library",cost:x.cost,w:x.w,dmg:x.dmg,props:x.props,ac:x.ac,rar:x.rar,att:x.att,desc:x.desc,source:x.source||"Library",lib:1});
+const gearList=r=>(ITEMDATA[r]||[]).concat(ITEMDATA[r==="2024"?"2014":"2024"]||[],dndLib("items").map(libItemRec));
+function gearRowMeta(s){return [edLabel(s.ed),s.cat,s.rar,s.cost,Number(s.w)?fmtW(s.w)+" lb":"",s.dmg,s.ac?"AC "+s.ac:"",s.att?"attunement":"",s.source].filter(Boolean).join(" \u00b7 ")}
 function renderGearList(){
   const P=ui.gp, box=$("#gearPList"); if(!P||!box)return;
-  if(P.err&&!ITEMDATA[P.rules]&&!LIB.items.length){box.innerHTML=`<div class="empty">The equipment list could not be loaded here. You can still add items by hand.</div>`;return}
+  if(P.err&&!ITEMDATA["2014"]&&!ITEMDATA["2024"]&&!dndLib("items").length){box.innerHTML=`<div class="empty">The equipment list could not be loaded here. You can still add items by hand.</div>`;return}
   const D=gearList(P.rules); P.D=D; const q=lc(P.q), idx=[];
   D.forEach((s,i)=>{
+    if(P.ed&&s.ed&&s.ed!==P.ed)return;
     if(P.cat&&s.cat!==P.cat&&!(P.cat==="Library"&&s.lib))return;
     if(q&&!(lc(s.n).includes(q)||lc(s.cat).includes(q)))return;
     idx.push(i);
   });
   const c=cur(), have=new Set(c.inventory.map(x=>lc(x.name)));
-  if(!idx.length){box.innerHTML=`<div class="empty">${ITEMDATA[P.rules]||P.err?"No items match those filters.":"Loading items..."}</div>`;return}
+  if(!idx.length){box.innerHTML=`<div class="empty">${ITEMDATA["2014"]||ITEMDATA["2024"]||P.err?"No items match those filters.":"Loading items..."}</div>`;return}
   const shown=idx.slice(0,P.limit);
   box.innerHTML=`<p class="hint" style="margin:0 0 8px">${idx.length} item${idx.length===1?"":"s"}</p><div class="items">`+shown.map(i=>{
     const s=D[i], open=P.open.has(i);
@@ -2618,16 +2714,17 @@ function renderGearList(){
 }
 function openGear(){
   const c=cur(); if(!c)return;
-  const r=c.rules; ui.gp={rules:r,q:"",cat:"",limit:60,open:new Set(),err:false,D:[]};
+  const r=c.rules; ui.gp={rules:r,ed:"",q:"",cat:"",limit:60,open:new Set(),err:false,D:[]};
   const cats=["Weapon","Armor","Adventuring Gear","Tools","Mounts and Vehicles","Magic item","Library"];
   $("#gearOv").innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="gearT">
     <div class="bar" style="margin:0"><h2 id="gearT">Add gear</h2><button class="btn sm pri" type="button" data-act="gear-close">Done</button></div>
-    <p>${r==="2024"?"Equipment and magic items from the 5.5e (2024) SRD.":"Equipment and magic items from the 5e (2014) SRD 5.1."} Items from your Library appear here too.</p>
+    <p>D&amp;D equipment and magic items from both SRDs, each marked 5e (2014) or 5.5e (2024). Items from your D&amp;D Library appear here too. Pathfinder items never appear here.</p>
     <div class="listbar"><label class="fld"><span>Search</span><input id="gearPQ" type="search" placeholder="Item name"></label>
+      <label class="fld" style="flex:0 1 130px"><span>Edition</span><select id="gearEd"><option value="">5e and 5.5e</option><option value="2014">5e only</option><option value="2024">5.5e only</option></select></label>
       <label class="fld" style="flex:0 1 200px"><span>Category</span><select id="gearPC"><option value="">All</option>${cats.map(x=>`<option>${x}</option>`).join("")}</select></label></div>
     <div id="gearPList"></div><p class="hint">${ATTR[r]}</p></div>`;
   $("#gearOv").hidden=false; renderGearList();
-  loadItems(r).then(()=>renderGearList()).catch(()=>{if(ui.gp){ui.gp.err=true;renderGearList()}});
+  ["2014","2024"].forEach(k=>loadItems(k).then(()=>renderGearList()).catch(()=>{if(ui.gp&&!ITEMDATA["2014"]&&!ITEMDATA["2024"]){ui.gp.err=true;renderGearList()}}));
 }
 function closeGear(){
   $("#gearOv").hidden=true; $("#gearOv").innerHTML=""; ui.gp=null;
@@ -2683,13 +2780,37 @@ const LIBSCHEMA={
   items:[["name","Name"],["cat","Category"],["cost","Cost"],["w","Weight each (lb)","f"],["dmg","Damage"],["props","Properties"],["ac","Armor class"],["rar","Rarity"],["att","Requires attunement","b"],["desc","Description","t"],["source","Source book"]],
   sections:[["name","Title"],["source","Source book"],["text","Text","t"]]
 };
+const LIBSCHEMA_PF={
+  spells:[["name","Name"],["level","Rank (1 to 10)","n"],["cantrip","This is a cantrip","b"],["traditions","Traditions (comma separated)"],["traits","Traits (comma separated)"],["time","Actions (for example 2)"],["range","Range"],["area","Area"],["targets","Targets"],["duration","Duration"],["desc","Description","t"],["source","Source"]],
+  items:[["name","Name"],["ty","Type (weapon, armor, equipment, consumable)"],["level","Level","n"],["price","Price (for example 5 gp)"],["bulk","Bulk (L, 1, 2 or -)"],["traits","Traits (comma separated)"],["desc","Description","t"],["source","Source"]],
+  sections:[["name","Title"],["source","Source"],["text","Text","t"]]
+};
+const SCH=kind=>ui.lib&&ui.lib.sys==="pf2e"&&LIBSCHEMA_PF[kind]?LIBSCHEMA_PF[kind]:LIBSCHEMA[kind];
 const LIBKIND={classes:"class",spells:"spell",items:"item",sections:"text entry"};
-function openLib(){
-  if(!ui.lib)ui.lib={tab:"classes",draft:null,kind:null,editId:null,msg:"",imp:{kind:"spells",source:"",text:"",found:null,sel:new Set(),cname:"",busy:""}};
-  ui.lib.draft=null; renderLib(); $("#libOv").hidden=false;
+function libFixTab(want){
+  const L=ui.lib, pf=L.sys==="pf2e", custom=["spells","items","sections"];
+  const ok=t=>pf?(t.indexOf("pf-")===0||custom.includes(t)):(t.indexOf("pf-")!==0);
+  if(want&&ok(want))L.tab=want; else if(!ok(L.tab))L.tab=pf?"pf-spells":"classes";
 }
-function closeLib(){$("#libOv").hidden=true; const c=cur(); if(c&&ui.view==="sheet"&&ui.tab==="sheet"){const b=$("#clsBox");if(b){b.innerHTML=classesHTML(c);refreshSubLists(c)}}}
+function openLib(tab){
+  const c=cur(), inSheet=!!(c&&ui.view==="sheet");
+  if(!ui.lib)ui.lib={tab:"classes",draft:null,kind:null,editId:null,msg:"",sys:"dnd5e",ed:"",imp:{kind:"spells",source:"",text:"",found:null,sel:new Set(),cname:"",busy:""}};
+  const L=ui.lib, prevSys=L.sys; L.sys=inSheet?sysOf(c):(L.sys||"dnd5e"); L.locked=inSheet;
+  if(prevSys!==L.sys)L.tab=L.sys==="pf2e"?"pf-spells":"classes";
+  if(inSheet&&!isPf(c))L.ed=c.rules;
+  L.draft=null; L.view=null; libFixTab(tab);
+  renderLib(); $("#libOv").hidden=false;
+}
+function closeLib(){$("#libOv").hidden=true; const c=cur(); if(c&&ui.view==="sheet"){if(isPf(c))renderSheet();else if(ui.tab==="sheet"){const b=$("#clsBox");if(b){b.innerHTML=classesHTML(c);refreshSubLists(c)}}}}
 function libMeta(kind,x){
+  if(sysOf(x)==="pf2e"){
+    if(kind==="spells")return [x.cantrip?"Cantrip":"Rank "+num(x.level,1),x.traditions,x.source].filter(Boolean).join(" \u00b7 ");
+    if(kind==="items")return ["Level "+num(x.level),x.price,x.source].filter(Boolean).join(" \u00b7 ");
+    return [x.source,String(x.text||"").length+" characters"].filter(Boolean).join(" \u00b7 ");
+  }
+  return edLabel(x.ed)+" \u00b7 "+libMeta0(kind,x);
+}
+function libMeta0(kind,x){
   if(kind==="classes"&&x.addOn)return ["Extra subclasses for "+x.name,(x.subclasses||[]).length+" subclasses",x.source].filter(Boolean).join(" \u00b7 ");
   if(kind==="classes")return ["d"+(x.hd||"?"),KINDS[x.caster||"none"],(x.features||[]).length+" features",(x.subclasses||[]).length+" subclasses",x.source].filter(Boolean).join(" \u00b7 ");
   if(kind==="spells")return [num(x.level)===0?"Cantrip":"Level "+num(x.level),x.school,(x.classes||[]).join(", "),x.source].filter(Boolean).join(" \u00b7 ");
@@ -2720,34 +2841,39 @@ function libClassViewHTML(x){
   return h;
 }
 function libListHTML(kind){
-  const A=LIB[kind], c=cur();
-  const intro={classes:"Add a class from a third-party book once and it works like an SRD class: pick it on the Sheet tab, apply its features, and get spell slots automatically.",
-    spells:"Spells here show up in the spell picker next to the SRD list.",items:"Items here show up in the gear picker next to the SRD lists.",
+  const A=LIB[kind], c=cur(), L=ui.lib, pf=L.sys==="pf2e";
+  const intro=pf?{spells:"Your own Pathfinder spells. They also appear in the Spells browse tab.",items:"Your own Pathfinder items. They also appear in the Items browse tab.",sections:"Your own Pathfinder feats, rules and notes. Add any entry to a character as a feat."}[kind]
+    :{classes:"Add a class from a third-party book once and it works like an SRD class: pick it on the Sheet tab, apply its features, and get spell slots automatically.",
+    spells:"Spells here show up in the D&D spell picker next to the SRD list.",items:"Items here show up in the D&D gear picker next to the SRD lists.",
     sections:"Feats, species, rules and other text. Add any entry to a character as a feature."}[kind];
   const head=`<p>${intro}</p><div class="btns"><button class="btn pri" type="button" data-act="lib-new">New ${LIBKIND[kind]}</button></div>`;
-  if(!A.length)return head+`<div class="empty">Nothing here yet. Create one by hand or use the Import tab.</div>`;
-  return head+`<div class="items">`+A.map((x,i)=>`<div class="prow"><div class="pmain"><div class="plink"><b>${esc(x.name)}</b><span>${esc(libMeta(kind,x))}</span></div>
-    ${kind==="sections"&&c?`<button class="btn sm" type="button" data-act="lib-addfeat" data-i="${i}">Add to character</button>`:""}
+  const rows=[]; A.forEach((x,i)=>{if(sysOf(x)===L.sys)rows.push([x,i])});
+  if(!rows.length)return head+`<div class="empty">Nothing here yet. Create one by hand${pf?"":" or use the Import tab"}.</div>`;
+  return head+`<div class="items">`+rows.map(([x,i])=>`<div class="prow"><div class="pmain"><div class="plink"><b>${esc(x.name)}</b><span>${esc(libMeta(kind,x))}</span></div>
+    ${kind==="sections"&&c&&sysOf(c)===sysOf(x)?`<button class="btn sm" type="button" data-act="lib-addfeat" data-i="${i}">Add to character</button>`:""}
     ${kind==="classes"?`<button class="btn sm pri" type="button" data-act="lib-view" data-i="${i}">View</button>`:""}
     <button class="btn sm" type="button" data-act="lib-edit" data-i="${i}">Edit</button>
     <button class="btn sm danger" type="button" data-act="lib-del" data-i="${i}">Delete</button></div></div>`).join("")+`</div>`;
 }
 function draftFrom(kind,x){
   if(kind==="classes"){
-    const d=x||{}; const o={name:d.name||"",source:d.source||"",hd:d.hd||8,caster:d.caster||"none",ability:d.ability||"",slotsText:slotsToText(d.slots),masteryText:masteryText(d.mastery),dsl:x?dslFromClass(d):"",saves:(d.saves||[]).map(lc),tableText:d.tableText||"",infoText:d.info||""};
+    const d=x||{}; const o={ed:d.ed||ui.lib.ed||"",name:d.name||"",source:d.source||"",hd:d.hd||8,caster:d.caster||"none",ability:d.ability||"",slotsText:slotsToText(d.slots),masteryText:masteryText(d.mastery),dsl:x?dslFromClass(d):"",saves:(d.saves||[]).map(lc),tableText:d.tableText||"",infoText:d.info||""};
     ABIL.forEach(([k])=>{o["save_"+k]=o.saves.includes(k)}); return o;
   }
   const o=Object.assign({},x||{});
   if(kind==="spells")o.classesText=(o.classes||[]).join(", ");
-  if(!x){LIBSCHEMA[kind].forEach(f=>{o[f[0]]=f[2]==="b"?false:(f[2]==="n"||f[2]==="f")?0:""})}
+  if(!x){SCH(kind).forEach(f=>{o[f[0]]=f[2]==="b"?false:(f[2]==="n"||f[2]==="f")?0:""})}
+  if(ui.lib.sys!=="pf2e"&&o.ed===undefined)o.ed=ui.lib.ed||"";
   return o;
 }
+const edSelHTML=d=>`<label class="fld"><span>Edition</span><select data-lf="ed">${[["","5e and 5.5e"],["2014","5e (2014)"],["2024","5.5e (2024)"]].map(([v,t])=>`<option value="${v}"${String(d.ed||"")===v?" selected":""}>${t}</option>`).join("")}</select></label>`;
 function libFormHTML(){
   const L=ui.lib, kind=L.kind, d=L.draft;
   if(kind==="classes"){
     const sel=(f,opts)=>`<select data-lf="${f}">${opts.map(([v,t])=>`<option value="${v}"${String(d[f])===String(v)?" selected":""}>${t}</option>`).join("")}</select>`;
     return `<div class="igrid"><label class="fld"><span>Class name</span><input data-lf="name" value="${esc(d.name)}"></label>
       <label class="fld"><span>Source book</span><input data-lf="source" value="${esc(d.source)}" placeholder="Book title"></label>
+      ${edSelHTML(d)}
       <label class="fld"><span>Hit die</span>${sel("hd",[[6,"d6"],[8,"d8"],[10,"d10"],[12,"d12"]])}</label>
       <label class="fld"><span>Spellcasting</span>${sel("caster",Object.keys(KINDS).map(k=>[k,KINDS[k]]))}</label>
       <label class="fld"><span>Casting ability</span>${sel("ability",[["","None"]].concat(ABIL.map(([k,n])=>[k,n])))}</label></div>
@@ -2761,9 +2887,9 @@ function libFormHTML(){
       <label class="fld"><span>Features</span><textarea data-lf="dsl" style="min-height:260px" placeholder="# 1 | Feature name&#10;What it does.&#10;&#10;# 3 | Another feature&#10;Text...&#10;&#10;@sub Subclass name&#10;# 3 | Subclass feature&#10;Text...">${esc(d.dsl)}</textarea></label>
       <p class="hint" style="margin:0">Format: a line starting with # then the level, a bar and the feature name, followed by its text. A line starting with @sub begins a subclass; add | third (or half, full, pact) after its name if that subclass casts spells, like an Eldritch Knight. The Import tab fills this in from pasted book text.</p>`;
   }
-  return `<div class="igrid">`+LIBSCHEMA[kind].filter(f=>f[2]!=="t"&&f[2]!=="b").map(f=>`<label class="fld"><span>${f[1]}</span><input data-lf="${f[0]}" ${f[2]==="n"||f[2]==="f"?`type="number" step="any" data-lt="${f[2]}"`:'type="text"'} value="${esc(d[f[0]])}"></label>`).join("")+`</div>`+
-    `<div class="checks">`+LIBSCHEMA[kind].filter(f=>f[2]==="b").map(f=>`<label class="chk"><input type="checkbox" data-lt="b" data-lf="${f[0]}"${d[f[0]]?" checked":""}>${f[1]}</label>`).join("")+`</div>`+
-    LIBSCHEMA[kind].filter(f=>f[2]==="t").map(f=>`<label class="fld"><span>${f[1]}</span><textarea data-lf="${f[0]}">${esc(d[f[0]])}</textarea></label>`).join("");
+  return `<div class="igrid">`+(L.sys==="pf2e"?"":edSelHTML(d))+SCH(kind).filter(f=>f[2]!=="t"&&f[2]!=="b").map(f=>`<label class="fld"><span>${f[1]}</span><input data-lf="${f[0]}" ${f[2]==="n"||f[2]==="f"?`type="number" step="any" data-lt="${f[2]}"`:'type="text"'} value="${esc(d[f[0]])}"></label>`).join("")+`</div>`+
+    `<div class="checks">`+SCH(kind).filter(f=>f[2]==="b").map(f=>`<label class="chk"><input type="checkbox" data-lt="b" data-lf="${f[0]}"${d[f[0]]?" checked":""}>${f[1]}</label>`).join("")+`</div>`+
+    SCH(kind).filter(f=>f[2]==="t").map(f=>`<label class="fld"><span>${f[1]}</span><textarea data-lf="${f[0]}">${esc(d[f[0]])}</textarea></label>`).join("");
 }
 function libImportHTML(){
   const m=ui.lib.imp, kinds=[["spells","Spells"],["items","Magic items"],["class","Class and subclass features"],["sections","Feats, species and other text"]];
@@ -2790,17 +2916,24 @@ function libImportHTML(){
 }
 function renderLib(){
   const L=ui.lib, ov=$("#libOv");
-  const tabs=[["classes","Classes ("+LIB.classes.length+")"],["spells","Spells ("+LIB.spells.length+")"],["items","Items ("+LIB.items.length+")"],["sections","Text ("+LIB.sections.length+")"],["book","Import a book"],["import","Import text"]];
+  const pf=L.sys==="pf2e", cnt=k=>LIB[k].filter(x=>sysOf(x)===L.sys).length;
+  const tabs=pf?PFLIBTABS.concat([["spells","My spells ("+cnt("spells")+")"],["items","My items ("+cnt("items")+")"],["sections","My text ("+cnt("sections")+")"]])
+    :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["book","Import a book"],["import","Import text"]];
+  const sysBar=L.locked?`<div class="tags"><span class="tag ex">${pf?"Pathfinder 2e only":"D&amp;D 5e and 5.5e only"}</span></div>`
+    :`<div class="seg" role="group" aria-label="Game system">${[["dnd5e","D&amp;D 5e and 5.5e"],["pf2e","Pathfinder 2e"]].map(([v,t])=>`<button class="btn sm${L.sys===v?" pri":""}" type="button" data-act="lib-sys" data-s="${v}" aria-pressed="${L.sys===v}">${t}</button>`).join("")}</div>`;
+  const edBar=!pf&&!L.draft&&!L.view?`<label class="fld" style="max-width:260px"><span>Edition for new entries</span><select data-lined>${[["","5e and 5.5e (both)"],["2014","5e (2014)"],["2024","5.5e (2024)"]].map(([v,t])=>`<option value="${v}"${String(L.ed||"")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:"";
   let body;
   if(L.draft){
     body=`<h3>${L.editId?"Edit":"New"} ${LIBKIND[L.kind]}</h3>${libFormHTML()}<div class="msg err" role="alert">${esc(L.msg)}</div>
       <div class="btns"><button class="btn pri" type="button" data-act="lib-save">Save to library</button><button class="btn" type="button" data-act="lib-cancel">Cancel</button></div>`;
-  }else if(L.view&&LIB.classes[L.view.i]){
+  }else if(!pf&&L.view&&LIB.classes[L.view.i]){
     body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-vback">Back to classes</button><button class="btn sm" type="button" data-act="lib-vedit">Edit</button></div>`+libClassViewHTML(LIB.classes[L.view.i]);
-  }else body=L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():libListHTML(L.tab);
+  }else body=L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():libListHTML(L.tab);
   ov.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="libT">
     <div class="bar" style="margin:0"><h2 id="libT">Library</h2><span class="status" id="libStatus">${esc(libStatusText())}</span><button class="btn sm pri" type="button" data-act="lib-close">Done</button></div>
-    <p>Your own classes, spells, items and book text. It is stored privately for you, apart from your characters, and it is left out of character backups. Only add content you have the right to use, and keep it to yourself.</p>
+    ${sysBar}
+    <p>${pf?"Pathfinder 2e content. Your own additions are stored privately for you, apart from your characters, and are left out of character backups.":"Your own D&amp;D classes, spells, items and book text. It is stored privately for you, apart from your characters, and it is left out of character backups. Only add content you have the right to use, and keep it to yourself."}</p>
+    ${edBar}
     ${L.draft||L.view?"":`<div class="tabs" role="tablist" style="flex-wrap:wrap;overflow:visible">${tabs.map(t=>`<button class="tab" role="tab" type="button" data-act="lib-tab" data-tab="${t[0]}" aria-selected="${L.tab===t[0]}">${t[1]}</button>`).join("")}</div>`}
     ${body}</div>`;
 }
@@ -2824,10 +2957,12 @@ function commitDraft(){
     if(rec.caster==="custom"&&!Object.keys(rec.slots).length){L.msg="Enter at least one line in the slot table.";renderLib();return}
   }else{
     rec=Object.assign({},d); delete rec.classesText;
-    if(kind==="spells"){rec.classes=String(d.classesText||"").split(",").map(s=>s.trim()).filter(Boolean);rec.level=Math.max(0,Math.min(9,num(d.level)))}
+    if(kind==="spells"&&L.sys==="pf2e"){rec.level=Math.max(1,Math.min(10,num(d.level)||1))}
+    else if(kind==="spells"){rec.classes=String(d.classesText||"").split(",").map(s=>s.trim()).filter(Boolean);rec.level=Math.max(0,Math.min(9,num(d.level)))}
     rec.name=String(rec.name).trim();
   }
   if(L.editId&&kind==="classes"){const old=LIB.classes.find(x=>x.id===L.editId);if(old&&old.addOn){rec.addOn=true;rec.hd=0;rec.caster="none"}}
+  rec.system=L.sys==='pf2e'?'pf2e':'dnd5e'; if(rec.system==='pf2e')delete rec.ed; else rec.ed=d.ed||'';
   rec.id=L.editId||uid();
   const A=LIB[kind], i=A.findIndex(x=>x.id===rec.id);
   if(i>=0)A[i]=rec;else A.push(rec);
@@ -2900,9 +3035,9 @@ function bookAdd(){
     if(!e.sel)return;
     const x=Object.assign({},e.x), kind=e.g==="classes"||e.g==="addon"?"classes":e.g==="spells"?"spells":e.g==="items"?"items":"sections";
     delete x.chapter; delete x.group; if(kind==="sections"&&e.g!=="text")x.kind=e.g; if(!x.source)x.source=src;
-    const same=y=>lc(y.name)===lc(x.name)&&lc(y.source)===lc(x.source)&&!!y.addOn===!!x.addOn;
+    const same=y=>sysOf(y)==='dnd5e'&&lc(y.name)===lc(x.name)&&lc(y.source)===lc(x.source)&&!!y.addOn===!!x.addOn;
     if(LIB[kind].some(same)){dup++;return}
-    x.id=uid(); LIB[kind].push(x); added++;
+    x.id=uid(); x.system='dnd5e'; x.ed=ui.lib.ed||''; LIB[kind].push(x); added++;
   });
   if(added)saveLib();
   bk.entries=null; bk.ran=false;
@@ -2970,9 +3105,9 @@ function importAdd(){
   let added=0;
   m.found.forEach((x,i)=>{
     if(!m.sel.has(i))return;
-    const dup=LIB[kind].some(y=>lc(y.name)===lc(x.name)&&lc(y.source)===lc(x.source));
+    const dup=LIB[kind].some(y=>sysOf(y)==='dnd5e'&&lc(y.name)===lc(x.name)&&lc(y.source)===lc(x.source));
     if(dup)return;
-    LIB[kind].push(Object.assign({},x,{id:uid()})); added++;
+    LIB[kind].push(Object.assign({},x,{id:uid(),system:'dnd5e',ed:ui.lib.ed||''})); added++;
   });
   if(added)saveLib();
   m.found=null; m.busy="Added "+added+" to your library"+(added?"":" (they were already there)")+".";
@@ -3051,6 +3186,7 @@ function exportBackup(asFile){
 const fileSafe=n=>String(n||"character").replace(/[^A-Za-z0-9 _-]+/g,"").trim().replace(/\s+/g,"-")||"character";
 function exportCharFile(kind){
   const c=cur(); if(!c){msg("Open a character first.",true);return}
+  if(kind==="r20"&&isPf(c)){msg("Roll20 export uses the D&D 5e sheet, so it is only for D&D characters. Use Save open character as a file instead.",true);return}
   if(kind==="r20")saveTextFile(fileSafe(c.name)+"-roll20.json",JSON.stringify({name:c.name,attribs:r20Attribs(c)},null,2),"Roll20 file for "+c.name+" saved.");
   else saveTextFile(fileSafe(c.name)+"-ledger.json",JSON.stringify(Object.assign(backupObj(),{campaigns:S.campaigns.filter(k=>k.id===c.campaign),characters:[c]}),null,2),c.name+" saved.");
 }
@@ -3082,6 +3218,7 @@ function r20Attribs(c){
 }
 function exportR20(){
   const c=cur(); if(!c){msg("Open a character first.",true);return}
+  if(isPf(c)){msg("Roll20 export uses the D&D 5e sheet, so it is only for D&D characters. Use Save open character as a file instead.",true);return}
   giveText(JSON.stringify({name:c.name,attribs:r20Attribs(c)},null,2),"Roll20 attributes for "+c.name+" ready.");
 }
 function fromR20(name,attribs,camp){
@@ -3607,6 +3744,7 @@ function renderLevelUp(c){
 }
 function levelDone(c){
   const L=ui.lvl; if(!L)return;
+  if(L.pf){pfLevelDone(c);return}
   const g=Math.max(0,num(L.gain));
   c.classes[L.i].level=L.nl; c.hpMax=num(c.hpMax)+g; c.hp=num(c.hp)+g;
   syncClassFields(c); syncSlots(c);
@@ -3621,7 +3759,7 @@ document.addEventListener("click",e=>{
   if(a==="lvl-roll"&&ui.lvl&&c){const L=ui.lvl;L.gain=Math.max(1,rd(L.die)+L.mod);L.rolled=true;renderLevelUp(c);return}
   if(a==="lvl-ok"&&ui.lvl&&c){levelDone(c);return}
   if(a==="lvl-cancel"){$("#lvlOv").hidden=true;ui.lvl=null;return}
-  if(c&&ui.view==="sheet"&&ui.tab==="play")playClick(c,b);
+  if(c&&!isPf(c)&&ui.view==="sheet"&&ui.tab==="play")playClick(c,b);
 });
 document.addEventListener("input",e=>{if(e.target.id==="lvlGain"&&ui.lvl)ui.lvl.gain=num(e.target.value)});
 document.addEventListener("keydown",e=>{
@@ -3629,6 +3767,724 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Enter"&&e.target.id==="rollExpr"){const c=cur();if(c)doRoll(c,{dataset:{k:"expr"}})}
 });
 $("#lvlOv").addEventListener("click",e=>{if(e.target.id==="lvlOv"){e.target.hidden=true;ui.lvl=null}});
+
+/* ---------- Pathfinder 2e: data and sheet ---------- */
+const PFD={};
+async function pfLoad(k){
+  if(PFD[k])return PFD[k];
+  const r=await fetch("pf2e-"+k+".json"); if(!r.ok)throw new Error("HTTP "+r.status);
+  PFD[k]=await r.json(); return PFD[k];
+}
+const pfCap=s=>String(s||"").replace(/(^|[\s-])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
+const pfRankSel=(path,val,label)=>`<select class="rk" data-f="${path}" data-t="n" aria-label="${esc(label)} proficiency" title="Untrained, Trained, Expert, Master, Legendary">${PFRANKS.map((n,i)=>`<option value="${i}"${num(val)===i?" selected":""}>${n[0]}</option>`).join("")}</select>`;
+const pfAbSel=(path,val,label)=>`<select data-f="${path}" aria-label="${esc(label||"Ability")}">${PFABIL.map(([k])=>`<option value="${k}"${val===k?" selected":""}>${k.toUpperCase()}</option>`).join("")}</select>`;
+const pfNumF=(label,path,val,extra)=>`<label class="fld"><span>${label}</span><input type="number" inputmode="numeric" data-t="n" data-f="${path}" value="${esc(val)}"${extra||""}></label>`;
+function pfActText(a){
+  a=String(a==null?"":a).toLowerCase();
+  if(a==="1")return "1 action"; if(a==="2"||a==="3")return a+" actions";
+  if(a==="reaction")return "Reaction"; if(a==="free")return "Free action"; if(a==="passive"||a==="")return "";
+  return a;
+}
+function pfRows(c){
+  const p=c.pf;
+  const skills=PFSKILLS.map(s=>`<div class="row"><span class="nm">${s[1]}</span><span class="ab-tag">${s[2].toUpperCase()}</span>${pfRankSel("pf.skills."+s[0],p.skills[s[0]],s[1])}<span class="val" data-pfv="skill.${s[0]}">+0</span></div>`).join("");
+  const lores=p.lores.map((l,i)=>`<div class="row"><input class="cell" style="flex:1;min-width:0" type="text" data-f="pf.lores.${i}.name" value="${esc(l.name)}" placeholder="Lore name" aria-label="Lore name">${pfAbSel("pf.lores."+i+".abl",l.abl||"int","Lore ability")}${pfRankSel("pf.lores."+i+".rank",l.rank,"Lore")}<span class="val" data-pfv="lore.${i}">+0</span><button class="btn sm danger" type="button" data-act="pf-del-lore" data-i="${i}" aria-label="Remove lore">x</button></div>`).join("");
+  return {skills,lores};
+}
+function pfStrikeHTML(c,s,i){
+  const k="st"+s.id, ed=ui.edit.has(k);
+  const view=`<div class="atkv"><b>${esc(s.name||"Unnamed strike")}</b><span class="atkn" data-pfv="atk.${i}">+0</span><span class="atkn" data-pfv="dmg.${i}"></span>
+    <span class="abtns" style="margin-left:auto"><button class="btn sm" type="button" data-act="pf-st-edit" data-i="${i}">${ed?"Done":"Edit"}</button><button class="btn sm danger" type="button" data-act="pf-del-strike" data-i="${i}">Delete</button></span></div>`;
+  if(!ed)return view;
+  const sel=(f,opts,val)=>`<select data-f="pf.strikes.${i}.${f}"${typeof opts[0][0]==="number"?' data-t="n"':""}>${opts.map(([v,t])=>`<option value="${v}"${String(val)===String(v)?" selected":""}>${t}</option>`).join("")}</select>`;
+  return view+`<div class="igrid" style="margin:6px 0 10px">
+    <label class="fld"><span>Name</span><input type="text" data-f="pf.strikes.${i}.name" value="${esc(s.name)}"></label>
+    <label class="fld"><span>Attack ability</span>${pfAbSel("pf.strikes."+i+".abl",s.abl,"Attack ability")}</label>
+    <label class="fld"><span>Proficiency group</span>${sel("cat",[["simple","Simple"],["martial","Martial"],["advanced","Advanced"],["unarmed","Unarmed"]],s.cat)}</label>
+    <label class="fld"><span>Damage dice</span><input type="text" data-f="pf.strikes.${i}.dmg" value="${esc(s.dmg)}" placeholder="1d8"></label>
+    <label class="fld"><span>Damage type</span><input type="text" data-f="pf.strikes.${i}.type" value="${esc(s.type)}" placeholder="slashing"></label>
+    <label class="fld"><span>Potency rune</span>${sel("pot",[[0,"None"],[1,"+1"],[2,"+2"],[3,"+3"]].map(a=>[a[0],a[1]]),num(s.pot))}</label>
+    <label class="fld"><span>Striking rune</span>${sel("str",[[0,"None"],[1,"Striking"],[2,"Greater"],[3,"Major"]],num(s.str))}</label>
+    ${pfNumF("Other attack bonus","pf.strikes."+i+".misc",s.misc)}${pfNumF("Other damage bonus","pf.strikes."+i+".dbonus",s.dbonus)}
+    <label class="fld"><span>Extra damage</span><input type="text" data-f="pf.strikes.${i}.extra" value="${esc(s.extra)}" placeholder="1d6 fire"></label>
+    <label class="fld"><span>Traits</span><input type="text" data-f="pf.strikes.${i}.traits" value="${esc(s.traits)}" placeholder="agile, finesse"></label>
+    <label class="chk" style="align-self:end"><input type="checkbox" data-t="b" data-f="pf.strikes.${i}.dm"${s.dm?" checked":""}>Add Strength to damage</label></div>`;
+}
+const pfStrikesHTML=c=>c.pf.strikes.length?c.pf.strikes.map((s,i)=>pfStrikeHTML(c,s,i)).join(""):`<p class="hint" style="margin:0">No strikes yet. Add one by hand, or use Strike on a weapon in the Gear tab.</p>`;
+function pfBarsHP(c){
+  return `<div class="hp"><div class="hprow">
+    <label class="fld"><span>Current HP</span><input type="number" inputmode="numeric" data-t="n" data-f="hp" value="${esc(c.hp)}"></label>
+    <label class="fld"><span>Max HP</span><input type="number" inputmode="numeric" data-t="n" data-f="hpMax" value="${esc(c.hpMax)}"></label>
+    <label class="fld"><span>Temp HP</span><input type="number" inputmode="numeric" data-t="n" data-f="hpTemp" value="${esc(c.hpTemp)}"></label></div>
+    <div class="hpbar" aria-hidden="true"><i data-hpbar></i></div>
+    <div class="hpbtns"><button class="btn" type="button" data-act="hp" data-d="-5">-5</button><button class="btn" type="button" data-act="hp" data-d="-1">-1</button>
+      <button class="btn" type="button" data-act="hp" data-d="1">+1</button><button class="btn" type="button" data-act="hp" data-d="5">+5</button><button class="btn" type="button" data-act="hp-full">Full HP</button></div></div>`;
+}
+function renderPf(c){
+  const t=ui.tab;
+  if(t==="play")return renderPfPlay(c);
+  if(t==="spells")return renderPfSpells(c);
+  if(t==="gear")return renderPfGear(c);
+  if(t==="feats")return renderPfFeats(c);
+  if(t==="details")return renderPfDetails(c);
+  renderPfSheet(c);
+}
+function renderPfDetails(c){
+  const p=c.pf;
+  const campOpts=`<option value="">Unassigned</option>`+S.campaigns.map(k=>`<option value="${esc(k.id)}"${k.id===c.campaign?" selected":""}>${esc(k.name)}</option>`).join("");
+  app.innerHTML=`${barHTML(c)}
+  <div class="grid">
+    <section class="panel span2"><div class="ident">
+      <div class="fld name"><span>Character name</span><input data-f="name" type="text" value="${esc(c.name)}"></div>
+      <label class="fld"><span>Ancestry</span><input data-f="race" type="text" list="pfAncList" value="${esc(c.race)}"></label>
+      <label class="fld"><span>Heritage</span><input data-f="pf.heritage" type="text" list="pfHerList" value="${esc(p.heritage)}"></label>
+      <label class="fld"><span>Background</span><input data-f="background" type="text" list="pfBgList" value="${esc(c.background)}"></label>
+      <label class="fld"><span>Class</span><input data-f="cls" type="text" list="pfClsList" value="${esc(c.cls)}"></label>
+      <label class="fld"><span>Subclass or path</span><input data-f="subclass" type="text" value="${esc(c.subclass)}"></label>
+      <label class="fld"><span>Level</span><input type="number" inputmode="numeric" min="1" max="20" data-t="n" data-f="level" value="${esc(c.level)}"></label>
+      <label class="fld"><span>Deity</span><input data-f="pf.deity" type="text" value="${esc(p.deity)}"></label>
+      <label class="fld"><span>Alignment</span><input data-f="alignment" type="text" value="${esc(c.alignment)}"></label>
+      <label class="fld"><span>Campaign</span><select data-f="campaign">${campOpts}</select></label>
+      <label class="fld"><span>Key ability</span>${pfAbSel("pf.keyAbility",p.keyAbility,"Key ability")}</label>
+      <datalist id="pfAncList"></datalist><datalist id="pfHerList"></datalist><datalist id="pfBgList"></datalist><datalist id="pfClsList"></datalist>
+    </div>
+    <div class="btns" style="margin-top:12px"><button class="btn sm" type="button" data-act="pf-apply" data-w="class">Apply class</button><button class="btn sm" type="button" data-act="pf-apply" data-w="ancestry">Apply ancestry</button><button class="btn sm" type="button" data-act="pf-apply" data-w="background">Apply background</button>
+      <button class="btn sm" type="button" data-act="pf-autohp">Recalculate max HP</button><button class="btn sm pri" type="button" data-act="pf-levelup">Level up</button></div>
+    <div class="msg" id="pfMsg" role="status"></div>
+    <p class="hint">Type a class, ancestry or background from the Pathfinder list and use Apply to fill in what it grants: key ability, hit points, proficiencies and features. Enter your ability modifiers yourself (your boosts and flaws already added up).</p></section>
+
+    <section class="panel span2"><h3>Languages and senses</h3><div class="igrid">
+      <label class="fld"><span>Languages</span><textarea data-f="pf.langs" style="min-height:70px">${esc(p.langs)}</textarea></label>
+      <label class="fld"><span>Senses</span><textarea data-f="pf.senses" style="min-height:70px">${esc(p.senses)}</textarea></label></div></section>
+
+    <section class="panel span2"><label class="fld"><span>Notes</span><textarea data-f="notes" placeholder="Backstory, session notes, goals">${esc(c.notes)}</textarea></label></section>
+  </div>
+  <div class="foot"><span class="status">Last edited ${new Date(c.updated||Date.now()).toLocaleString()} \u00b7 <span id="status" role="status"></span></span>
+    <button class="btn danger" type="button" data-act="del-char">Delete character</button></div>`;
+  pfRecompute(c); pfFillLists(c); setStatus();
+}
+function renderPfSheet(c){
+  const p=c.pf, R=pfRows(c);
+  const campOpts=`<option value="">Unassigned</option>`+S.campaigns.map(k=>`<option value="${esc(k.id)}"${k.id===c.campaign?" selected":""}>${esc(k.name)}</option>`).join("");
+  const abs=PFABIL.map(([k,n])=>`<div class="ab"><span class="ab-n">${k.toUpperCase()}</span><input class="ab-s" style="width:68px;font:700 22px/1.1 var(--display)" type="number" inputmode="numeric" data-t="n" data-f="pf.mods.${k}" value="${esc(p.mods[k])}" aria-label="${n} modifier"><span class="ab-n">${n.slice(0,3)}</span></div>`).join("");
+  const saves=["fortitude","reflex","will"].map(k=>`<div class="row"><span class="nm">${pfCap(k)}</span><span class="ab-tag">${PFSAVE[k].toUpperCase()}</span>${pfRankSel("pf.rank."+k,p.rank[k],k)}<span class="val" data-pfv="${k}">+0</span></div>`).join("");
+  const miscKeys=[["perception","Perception"],["fortitude","Fortitude"],["reflex","Reflex"],["will","Will"],["classDC","Class DC"],["ac","Armor Class"],["spell","Spell attack and DC"]].concat(PFSKILLS.map(s=>["skill."+s[0],s[1]]));
+  const armorCats=[["unarmored","Unarmored"],["light","Light"],["medium","Medium"],["heavy","Heavy"]];
+  app.innerHTML=`${barHTML(c)}
+  <div class="grid">
+    <section class="panel"><h3>Ability modifiers</h3><div class="abs">${abs}</div></section>
+
+    <section class="panel"><h3>Defense</h3>
+      <div class="stats">
+        <div class="stat"><span>Armor class</span><b data-pfv="ac">10</b></div>
+        <div class="stat"><span>Perception</span><b data-pfv="perception">+0</b></div>
+        <div class="stat"><span>Class DC</span><b data-pfv="classDC">10</b></div>
+        <div class="stat"><span>Speed (ft)</span><input type="number" inputmode="numeric" data-t="n" data-f="speed" value="${esc(c.speed)}" aria-label="Speed in feet"></div>
+      </div>${pfBarsHP(c)}
+      <div class="igrid" style="margin-top:12px">
+        <label class="fld"><span>Size</span><input type="text" data-f="pf.size" value="${esc(p.size)}"></label>
+        <label class="fld"><span>Ancestry HP</span><input type="number" inputmode="numeric" data-t="n" data-f="pf.ancHp" value="${esc(p.ancHp)}"></label>
+        <label class="fld"><span>Class HP per level</span><input type="number" inputmode="numeric" data-t="n" data-f="pf.classHp" value="${esc(p.classHp)}"></label></div></section>
+
+    <section class="panel"><h3>Perception and saving throws</h3><div class="rows">
+      <div class="row"><span class="nm">Perception</span><span class="ab-tag">WIS</span>${pfRankSel("pf.rank.perception",p.rank.perception,"Perception")}<span class="val" data-pfv="perception">+0</span></div>${saves}
+      <div class="row"><span class="nm">Class DC</span><span class="ab-tag">KEY</span>${pfRankSel("pf.rank.classDC",p.rank.classDC,"Class DC")}<span class="val" data-pfv="classDC">10</span></div></div>
+      <p class="hint">Rank letters: U untrained, T trained, E expert, M master, L legendary. Your level is added once you are trained.</p></section>
+
+    <section class="panel"><h3>Skills</h3><div class="rows">${R.skills}${R.lores}</div>
+      <div class="btns" style="margin-top:10px"><button class="btn sm" type="button" data-act="pf-add-lore">Add a Lore skill</button></div></section>
+
+    <section class="panel"><h3>Armor and shield</h3>
+      <div class="igrid">
+        <label class="fld"><span>Armor worn</span><input type="text" data-f="pf.armor.name" value="${esc(p.armor.name)}" placeholder="None"></label>
+        <label class="fld"><span>Armor group</span><select data-f="pf.armor.cat">${armorCats.map(([v,n])=>`<option value="${v}"${p.armor.cat===v?" selected":""}>${n}</option>`).join("")}</select></label>
+        ${pfNumF("Armor AC bonus","pf.armor.ac",p.armor.ac)}${pfNumF("Dex cap","pf.armor.dx",p.armor.dx)}${pfNumF("Potency rune","pf.armor.pot",p.armor.pot)}
+        ${pfNumF("Check penalty","pf.armor.ck",p.armor.ck)}${pfNumF("Speed penalty","pf.armor.sp",p.armor.sp)}${pfNumF("Strength needed","pf.armor.st",p.armor.st)}</div>
+      <div class="rows" style="margin-top:10px">${["unarmored","light","medium","heavy"].map(k=>`<div class="row"><span class="nm">${pfCap(k)} armor</span>${pfRankSel("pf.rank."+k,p.rank[k],k+" armor")}</div>`).join("")}</div>
+      <div class="igrid" style="margin-top:12px">
+        <label class="fld"><span>Shield</span><input type="text" data-f="pf.shield.name" value="${esc(p.shield.name)}" placeholder="None"></label>
+        ${pfNumF("Shield AC bonus","pf.shield.ac",p.shield.ac)}${pfNumF("Hardness","pf.shield.hd",p.shield.hd)}${pfNumF("Shield HP","pf.shield.hp",p.shield.hp)}${pfNumF("Shield max HP","pf.shield.hpMax",p.shield.hpMax)}</div>
+      <p class="hint">Armor class counts the shield only while it is raised (Play tab). Wear armor from the Gear tab to fill these in.</p></section>
+
+    <section class="panel"><h3>Weapon proficiency</h3><div class="rows">${["unarmed","simple","martial","advanced"].map(k=>`<div class="row"><span class="nm">${pfCap(k)}</span>${pfRankSel("pf.rank."+k,p.rank[k],k)}</div>`).join("")}</div></section>
+
+    <section class="panel span2"><h3>Strikes</h3>
+      <div class="listbar"><button class="btn pri" type="button" data-act="pf-add-strike">Add strike</button></div>
+      <div id="pfStrikeBox">${pfStrikesHTML(c)}</div></section>
+
+    <section class="panel span2"><h3>Resources</h3>
+      <div class="listbar"><button class="btn pri" type="button" data-act="add-res">Add resource</button></div>
+      <div id="resBox">${resHTML(c)}</div>
+      <p class="hint">Resources set to a long rest refill when you use Rest on the Play tab.</p></section>
+
+    <section class="panel span2"><details class="item"><summary><span class="sum-t">Item and other bonuses</span><span class="sum-m">added to the totals above</span></summary><div class="ibody"><div class="igrid">
+      ${miscKeys.map(([k,n])=>pfNumF(n,"pf.misc."+k,p.misc[k]||0)).join("")}</div></div></details></section>
+
+  </div>`;
+  pfRecompute(c); pfFillLists(c);
+}
+async function pfFillLists(c){
+  try{
+    const [cl,og]=await Promise.all([pfLoad("classes"),pfLoad("origins")]);
+    const set=(id,arr)=>{const e=$("#"+id);if(e)e.innerHTML=arr.map(n=>`<option value="${esc(n)}">`).join("")};
+    set("pfClsList",cl.map(x=>x.n)); set("pfAncList",og.ancestries.map(x=>x.n)); set("pfBgList",og.backgrounds.map(x=>x.n));
+    const a=og.ancestries.find(x=>lc(x.n)===lc(c.race));
+    set("pfHerList",og.heritages.filter(h=>!a||h.anc===a.slug).map(h=>h.n));
+  }catch(e){}
+}
+function pfRecompute(c){
+  const set=(k,txt)=>document.querySelectorAll(`[data-pfv="${k}"]`).forEach(e=>{e.textContent=txt});
+  const p=c.pf;
+  if(ui.tab==="sheet"){
+    ["perception","fortitude","reflex","will"].forEach(k=>set(k,sgn(pfVal(c,k))));
+    set("classDC",String(pfVal(c,"classDC"))); set("ac",String(pfVal(c,"ac")));
+    PFSKILLS.forEach(s=>set("skill."+s[0],sgn(pfVal(c,"skill."+s[0]))));
+    p.lores.forEach((l,i)=>set("lore."+i,sgn(pfVal(c,"lore."+i))));
+    p.strikes.forEach((s,i)=>{set("atk."+i,sgn(pfVal(c,"atk."+i))+" to hit");set("dmg."+i,pfDmg(c,s).text)});
+  }
+  if(ui.tab==="spells"){set("spellAtk",sgn(pfVal(c,"spellAtk")));set("spellDC",String(pfVal(c,"spellDC")))}
+  if(ui.tab==="gear")pfGearTotals(c);
+  const bar=$("[data-hpbar]"); if(bar)bar.style.width=(c.hpMax>0?Math.max(0,Math.min(100,c.hp/c.hpMax*100)):0)+"%";
+}
+function pfSay(t,err){ui.pfLast=t;const m=$("#pfMsg");if(m){m.textContent=t;m.className="msg"+(err?" err":"")}}
+/* ---------- Pathfinder 2e: Play tab ---------- */
+const PFNOVAL=["dying","wounded","doomed"];
+const PFVALUED=["clumsy","drained","enfeebled","frightened","sickened","slowed","stunned","stupefied","quickened"];
+function pfCondValued(n){const r=PFD.rules&&PFD.rules.conditions.find(x=>lc(x.n)===lc(n));return r?!!r.v:PFVALUED.includes(lc(n))}
+function pfD20(label,bonus,pen,flatDC){
+  const a=ui.adv, r1=rd(20), r2=a?rd(20):null, pick=a===1?Math.max(r1,r2):a===-1?Math.min(r1,r2):r1;
+  const dcEl=$("#pfDC"), dc=flatDC!=null?flatDC:(dcEl&&String(dcEl.value).trim()!==""?num(dcEl.value):null);
+  const tot=pick+bonus+pen, det="d20 ["+(a?r1+", "+r2+"] "+(a===1?"higher":"lower"):r1+"]")+" "+sgn(bonus)+(pen?" "+sgn(pen)+" status":"");
+  let tag=pick===20?"Natural 20":pick===1?"Natural 1":"", deg=null;
+  if(dc!=null){
+    deg=tot>=dc+10?3:tot>=dc?2:tot<=dc-10?0:1;
+    if(pick===20)deg=Math.min(3,deg+1); else if(pick===1)deg=Math.max(0,deg-1);
+    tag=["Critical failure","Failure","Success","Critical success"][deg]+" vs DC "+dc;
+  }
+  showRoll(label+(a===1?" (fortune)":a===-1?" (misfortune)":""),det,tot,tag);
+  return deg;
+}
+function pfRollKey(c,k){
+  const parts=k.split("."), kind=parts[0], a=parts[1];
+  if(k==="perception"||k==="init")return [k==="init"?"Initiative (Perception)":"Perception",pfVal(c,"perception"),"wis"];
+  if(kind==="save")return [pfCap(a)+" save",pfVal(c,a),PFSAVE[a]];
+  if(kind==="skill"){const s=PFSKILLS.find(x=>x[0]===a);return [s[1],pfVal(c,k),s[2]]}
+  if(kind==="lore"){const l=c.pf.lores[num(a)];return [(l&&l.name||"Lore"),pfVal(c,k),l&&l.abl||"int"]}
+  if(kind==="spell")return ["Spell attack",pfVal(c,"spellAtk"),c.pf.cast.abl];
+  if(kind==="atk"){const s=c.pf.strikes[num(a)],n=num(parts[2]);if(!s)return ["Strike",0,"str"];const agile=/\bagile\b/i.test(s.traits||"");return [(s.name||"Strike")+(n?" (attack "+(n+1)+")":""),pfVal(c,"atk."+a)-n*(agile?4:5),s.abl||"str"]}
+  return ["Check",0,""];
+}
+function doPfRoll(c,b){
+  const k=b.dataset.k||"";
+  if(k==="expr"){const v=($("#rollExpr")||{}).value||"",r=parseDice(v);if(!r){showRoll("Custom roll","Use dice like 2d6+3 or d20-1","");return}showRoll(v.trim(),esc(r.text),r.total,"");return}
+  if(k==="flat"){const dcEl=$("#pfDC");if(!dcEl||String(dcEl.value).trim()===""){showRoll("Flat check","Enter a DC in the DC box first","");return}pfD20("Flat check",0,0);return}
+  if(/^die\./.test(k)){const n=num(k.split(".")[1]),r=rd(n);showRoll("d"+n,"d"+n+" ["+r+"]",r,n===20&&r===20?"Natural 20":n===20&&r===1?"Natural 1":"");return}
+  if(/^(dmg|crit)\./.test(k)){
+    const [kind,i]=k.split("."), s=c.pf.strikes[num(i)]; if(!s)return;
+    const d=pfDmg(c,s), r=d.expr&&parseDice(d.expr);
+    if(!r){showRoll(s.name||"Damage","Set the damage dice on the Sheet tab, like 1d8.","");return}
+    const x=kind==="crit"?2:1;
+    showRoll((s.name||"Strike")+(x>1?" critical damage":" damage"),esc(r.text)+(x>1?" x2":""),r.total*x,(x>1?"Crit ":"")+esc(String(s.type||"")));return;
+  }
+  const [label,bonus,abl]=pfRollKey(c,k), pen=pfPen(c,abl);
+  pfD20(label,bonus,pen);
+}
+function pfDyingMax(c){return Math.max(1,4-num(c.pf.doomed))}
+function pfRest(c){
+  const p=c.pf, heal=Math.max(1,pfMod(c,"con"))*pfLvl(c);
+  if(num(p.dying)>0)return "You cannot rest while dying. Stabilize first.";
+  c.hp=Math.min(num(c.hpMax),num(c.hp)+heal); c.hpTemp=0;
+  for(let i=1;i<=10;i++)p.cast.slots[i].used=0;
+  c.resources.forEach(r=>{if(r.reset==="short"||r.reset==="long")r.cur=num(r.max)});
+  p.doomed=Math.max(0,num(p.doomed)-1);
+  p.cond=p.cond.filter(x=>lc(x.n)!=="fatigued");
+  const dr=p.cond.find(x=>lc(x.n)==="drained"); if(dr){dr.v=num(dr.v,1)-1;if(dr.v<=0)p.cond=p.cond.filter(x=>x!==dr)}
+  save();
+  return "Rested: regained "+heal+" HP (Con modifier times level, at least 1 per level), spell slots and long-rest resources, and doomed went down by 1. Focus Points need Refocus.";
+}
+function pfCondsHTML(c){
+  const p=c.pf, all=PFD.rules?PFD.rules.conditions.map(x=>x.n).filter(n=>!PFNOVAL.includes(lc(n))):PFVALUED.map(pfCap);
+  const act=p.cond.map((x,i)=>{
+    const val=pfCondValued(x.n), r=PFD.rules&&PFD.rules.conditions.find(y=>lc(y.n)===lc(x.n));
+    return `<details class="item" data-id="cond${esc(x.id)}"${ui.open.has("cond"+x.id)?" open":""}><summary><span class="sum-t">${esc(x.n)}${val?" "+num(x.v,1):""}</span><span class="sum-m">
+      ${val?`<button class="btn sm" type="button" data-act="pf-cond-d" data-i="${i}" data-d="-1" aria-label="Lower value">-</button><button class="btn sm" type="button" data-act="pf-cond-d" data-i="${i}" data-d="1" aria-label="Raise value">+</button>`:""}
+      <button class="btn sm danger" type="button" data-act="pf-cond-del" data-i="${i}">Remove</button></span></summary>
+      <div class="ibody">${r?`<div class="prose">${esc(r.d)}</div>`:`<p class="hint" style="margin:0">Open the Library rules tab for the full text.</p>`}</div></details>`}).join("");
+  return `<div class="listbar"><label class="fld"><span>Add a condition</span><select id="pfCondSel"><option value="">Choose...</option>${all.map(n=>`<option>${esc(n)}</option>`).join("")}</select></label><button class="btn pri" type="button" data-act="pf-cond-add">Add</button></div>
+    <div class="items">${act||`<p class="hint" style="margin:0">No conditions.</p>`}</div>`;
+}
+function pfPips(n,on,act,extra){return pips(n,on,act,extra)}
+function pfCastRows(c){
+  const p=c.pf, sp=p.spells;
+  if(!sp.length)return `<p class="hint" style="margin:0">No spells yet. Add them on the Spells tab.</p>`;
+  const rk=s=>s.k==="cantrip"?0:s.k==="focus"?-1:num(s.hr||s.lv,1);
+  return sp.map((s,i)=>({s,i,r:rk(s)})).sort((a,b)=>a.r-b.r||a.s.name.localeCompare(b.s.name)).map(({s,i,r})=>{
+    const cost=r===0?"Cantrip":r===-1?"Focus spell":"Rank "+r;
+    return `<div class="atkv"><b>${esc(s.name)}</b><span class="atkn">${esc(cost)}${s.ac?" \u00b7 "+esc(pfActText(s.ac)):""}</span><span class="abtns" style="margin-left:auto"><button class="btn sm pri" type="button" data-act="pf-cast" data-i="${i}">Cast</button></span></div>`}).join("");
+}
+function renderPfPlay(c){
+  const p=c.pf, a=ui.adv, pct=c.hpMax>0?Math.max(0,Math.min(100,c.hp/c.hpMax*100)):0;
+  if(!PFD.rules)pfLoad("rules").then(()=>{if(cur()===c&&ui.tab==="play"&&ui.view==="sheet")renderPfPlay(c)}).catch(()=>{});
+  const pen=ab=>pfPen(c,ab), rb=(label,key,val,abl,prof)=>{const pn=pen(abl);return `<button class="btn sm rb wide${prof?" prof":""}" type="button" data-act="roll" data-k="${key}"><span>${esc(label)}</span><b>${sgn(val+pn)}</b></button>`};
+  const skills=PFSKILLS.map(s=>rb(s[1],"skill."+s[0],pfVal(c,"skill."+s[0]),s[2],num(p.skills[s[0]])>0)).join("")+p.lores.map((l,i)=>rb(l.name||"Lore","lore."+i,pfVal(c,"lore."+i),l.abl||"int",num(l.rank)>0)).join("");
+  const saves=["fortitude","reflex","will"].map(k=>rb(pfCap(k),"save."+k,pfVal(c,k),PFSAVE[k],true)).join("");
+  const atk=p.strikes.length?p.strikes.map((s,i)=>{const d=pfDmg(c,s),agile=/\bagile\b/i.test(s.traits||""),b=pfVal(c,"atk."+i)+pen(s.abl||"str");
+    return `<div class="atkv"><b>${esc(s.name||"Strike")}</b><span class="atkn">${sgn(b)} / ${sgn(b-(agile?4:5))} / ${sgn(b-(agile?8:10))}</span><span class="atkn">${esc(d.text)}</span>
+    <span class="abtns" style="margin-left:auto"><button class="btn sm pri" type="button" data-act="roll" data-k="atk.${i}.0">Strike</button><button class="btn sm" type="button" data-act="roll" data-k="atk.${i}.1">2nd</button><button class="btn sm" type="button" data-act="roll" data-k="atk.${i}.2">3rd</button><button class="btn sm" type="button" data-act="roll" data-k="dmg.${i}">Damage</button><button class="btn sm" type="button" data-act="roll" data-k="crit.${i}">Crit</button></span></div>`}).join(""):`<p class="hint" style="margin:0">No strikes yet. Add them on the Sheet tab.</p>`;
+  const slotRows=[1,2,3,4,5,6,7,8,9,10].filter(l=>num(p.cast.slots[l].max)>0).map(l=>{const s=p.cast.slots[l],m=num(s.max),left=Math.max(0,m-num(s.used));return `<div class="srow"><span>Rank ${l}</span><div class="pips">${pips(m,left,"pf-slot",`data-l="${l}"`)}</div><small>${left} of ${m}</small></div>`}).join("");
+  const fm=num(p.cast.focusMax), fc=Math.max(0,Math.min(fm,num(p.cast.focusCur)));
+  const focusRow=fm>0?`<div class="srow"><span>Focus</span><div class="pips">${pips(fm,fc,"pf-focus","")}</div><small>${fc} of ${fm}</small><button class="btn sm" type="button" data-act="pf-refocus">Refocus (+1)</button></div>`:"";
+  const dMax=pfDyingMax(c), dead=num(p.dying)>=dMax;
+  const stepper=(label,f,v,max,hint)=>`<div class="srow"><span>${label}</span><button class="btn sm" type="button" data-act="pf-step" data-f="${f}" data-d="-1" data-max="${max}" aria-label="Less ${label}">-</button><b>${v}</b><button class="btn sm" type="button" data-act="pf-step" data-f="${f}" data-d="1" data-max="${max}" aria-label="More ${label}">+</button>${hint?`<small>${hint}</small>`:""}</div>`;
+  const pens=[["Frightened","frightened"],["Sickened","sickened"],["Clumsy","clumsy"],["Enfeebled","enfeebled"],["Stupefied","stupefied"],["Drained","drained"]].filter(x=>pfCondVal(c,x[1])).map(x=>x[0]+" "+pfCondVal(c,x[1]));
+  app.innerHTML=barHTML(c)+`<div class="grid">
+    <section class="panel span2"><h3>Rolls</h3>
+      <div class="rollout" id="rollOut" aria-live="polite">${ui.rolls[0]||"Tap anything below to roll it. Type a DC in the DC box to see the degree of success."}</div>
+      <div class="seg" role="group" aria-label="Fortune or misfortune">${[[0,"Normal"],[1,"Fortune"],[-1,"Misfortune"]].map(([v,t])=>`<button class="btn sm${a===v?" pri":""}" type="button" data-act="adv" data-v="${v}" aria-pressed="${a===v}">${t}</button>`).join("")}
+        <label class="fld" style="flex:0 1 90px;margin-left:6px"><span>DC</span><input id="pfDC" type="number" inputmode="numeric" placeholder="none"></label></div>
+      <div class="seg" style="margin-top:10px"><button class="btn sm" type="button" data-act="roll" data-k="init">Initiative ${sgn(pfVal(c,"perception")+pen("wis"))}</button><button class="btn sm" type="button" data-act="roll" data-k="flat">Flat check</button>${[4,6,8,10,12,20,100].map(n=>`<button class="btn sm" type="button" data-act="roll" data-k="die.${n}">d${n}</button>`).join("")}</div>
+      <div class="listbar" style="margin-top:10px"><label class="fld"><span>Custom roll</span><input id="rollExpr" type="text" placeholder="2d6+3"></label><button class="btn" type="button" data-act="roll" data-k="expr">Roll</button></div>
+      ${pens.length?`<p class="hint">Status penalties applied to rolls: ${esc(pens.join(", "))}. The worst applicable one counts, because status penalties do not stack.</p>`:""}
+      <div class="rolllog" id="rollLog">${ui.rolls.slice(1).join("")}</div></section>
+
+    <section class="panel"><h3>Hit points</h3>
+      <div class="hpbig"><b>${num(c.hp)}</b><span>/ ${num(c.hpMax)}</span>${num(c.hpTemp)?`<em>+${num(c.hpTemp)} temp</em>`:""}</div>
+      <div class="hpbar" aria-hidden="true"><i style="width:${pct}%"></i></div>
+      <div class="listbar" style="margin-top:12px"><label class="fld"><span>Amount</span><input id="hpAmt" type="number" inputmode="numeric" min="0"></label>
+        <button class="btn danger" type="button" data-act="pf-dmg">Damage</button><button class="btn pri" type="button" data-act="pf-heal">Heal</button><button class="btn" type="button" data-act="pf-temp">Set temp HP</button></div>
+      <div class="kv" style="margin-top:8px"><span>Dying, wounded and doomed</span>
+        ${stepper("Dying","dying",num(p.dying),dMax,dead?"Dead":"You die at "+dMax)}${stepper("Wounded","wounded",num(p.wounded),3,"")}${stepper("Doomed","doomed",num(p.doomed),3,"")}
+        <div class="btns"><button class="btn sm" type="button" data-act="pf-recover">Recovery check</button><button class="btn sm" type="button" data-act="pf-drop">Drop to 0 HP</button></div>
+        <p class="hint" style="margin:6px 0 0">Recovery check is a flat check against DC 10 plus your dying value. Dropping to 0 HP sets dying to 1 plus your wounded value. Healing a dying character above 0 HP clears dying and adds 1 wounded.</p></div></section>
+
+    <section class="panel"><h3>Defense</h3>
+      <div class="stats"><div class="stat"><span>Armor class</span><b>${pfVal(c,"ac")+(pfPen(c,"dex")?pfPen(c,"dex"):0)}</b></div><div class="stat"><span>Perception</span><b>${sgn(pfVal(c,"perception")+pen("wis"))}</b></div><div class="stat"><span>Class DC</span><b>${pfVal(c,"classDC")+pen(p.keyAbility)}</b></div></div>
+      <div class="srow"><span>Shield</span>${p.shield.name||num(p.shield.ac)?`<button class="btn sm${p.shield.raised?" pri":""}" type="button" data-act="pf-raise" aria-pressed="${!!p.shield.raised}">${p.shield.raised?"Raised (+"+num(p.shield.ac)+" AC)":"Raise a shield"}</button><small>${esc(p.shield.name||"Shield")} \u00b7 HP ${num(p.shield.hp)}/${num(p.shield.hpMax)} \u00b7 hardness ${num(p.shield.hd)}</small>`:`<small>No shield set on the Sheet tab.</small>`}</div>
+      <div class="srow"><span>Hero Points</span><div class="pips">${pips(3,num(p.heroPoints),"pf-hero","")}</div><small>${num(p.heroPoints)} of 3</small></div>
+      <p class="hint">Hero Points: spend one to reroll a check (keep the new result), or all of them to avoid death. They reset each session.</p></section>
+
+    <section class="panel"><h3>Rests</h3>
+      <div class="btns"><button class="btn pri" type="button" data-act="pf-rest">Rest for the night</button></div>
+      <p class="hint">A night's rest restores HP equal to your Con modifier times your level (at least 1 per level), refills spell slots and long-rest resources, lowers doomed and drained by 1 and clears fatigued. Use Refocus on the spell panel to regain a Focus Point. Treat Wounds and other actions are in the Library under Rules.</p></section>
+
+    <section class="panel"><h3>Conditions</h3>${pfCondsHTML(c)}</section>
+
+    <section class="panel"><h3>Spell slots and focus</h3>${slotRows||focusRow?slotRows+focusRow:`<p class="hint" style="margin:0">No slots set. Enter them on the Spells tab.</p>`}
+      ${p.spells.length?`<div class="stats" style="margin-top:10px"><div class="stat"><span>Spell attack</span><b>${sgn(pfVal(c,"spellAtk")+pen(p.cast.abl))}</b></div><div class="stat"><span>Spell DC</span><b>${pfVal(c,"spellDC")+pen(p.cast.abl)}</b></div></div>
+      <div class="btns"><button class="btn sm" type="button" data-act="roll" data-k="spell">Roll spell attack</button></div>`:""}</section>
+
+    <section class="panel"><h3>Resources</h3><div id="resBox">${resHTML(c)}</div></section>
+    <section class="panel span2"><h3>Strikes (attack 1 / 2 / 3)</h3>${atk}</section>
+    <section class="panel span2"><h3>Spells</h3>${pfCastRows(c)}</section>
+    <section class="panel"><h3>Perception and saves</h3><div class="rbs">${rb("Perception","perception",pfVal(c,"perception"),"wis",true)}${saves}</div></section>
+    <section class="panel"><h3>Skills</h3><div class="rbs">${skills}</div></section>
+  </div>`;
+}
+function pfPlayClick(c,b){
+  const a=b.dataset.act, p=c.pf;
+  if(a==="adv"){ui.adv=num(b.dataset.v);renderPfPlay(c);return true}
+  if(a==="roll"){doPfRoll(c,b);return true}
+  if(a==="pf-dmg"||a==="pf-heal"||a==="pf-temp"){
+    const n=Math.max(0,num(($("#hpAmt")||{}).value)); if(!n)return true;
+    const was=num(c.hp); let note="";
+    if(a==="pf-dmg"){applyHp(-n);if(was>0&&num(c.hp)===0&&num(p.dying)===0){p.dying=1+num(p.wounded);note="Dropped to 0 HP. Dying "+p.dying+"."}}
+    else if(a==="pf-heal"){applyHp(n);if(was===0&&num(c.hp)>0&&num(p.dying)>0){p.dying=0;p.wounded=Math.min(3,num(p.wounded)+1);note="Back on your feet. Wounded "+p.wounded+"."}}
+    else{c.hpTemp=Math.max(num(c.hpTemp),n);save()}
+    save(); renderPfPlay(c); if(note)showRoll("Hit points",note,"");return true;
+  }
+  if(a==="pf-step"){const f=b.dataset.f;p[f]=Math.max(0,Math.min(num(b.dataset.max,3),num(p[f])+num(b.dataset.d)));save();renderPfPlay(c);return true}
+  if(a==="pf-drop"){c.hp=0;p.dying=Math.max(num(p.dying),1+num(p.wounded));save();renderPfPlay(c);return true}
+  if(a==="pf-recover"){
+    if(num(p.dying)<=0){showRoll("Recovery check","You are not dying.","");return true}
+    const dc=10+num(p.dying), deg=pfD20("Recovery check",0,0,dc);
+    p.dying=Math.max(0,num(p.dying)+(deg===3?-2:deg===2?-1:deg===1?1:2));
+    let note=""; if(p.dying===0){p.wounded=Math.min(3,num(p.wounded)+1);note=" Stabilized. Wounded "+p.wounded+"."} else if(p.dying>=pfDyingMax(c))note=" You have died.";
+    save(); renderPfPlay(c); if(note)showRoll("Recovery check",note,"");return true;
+  }
+  if(a==="pf-raise"){p.shield.raised=!p.shield.raised;save();renderPfPlay(c);return true}
+  if(a==="pf-hero"){const n=num(b.dataset.n);p.heroPoints=num(p.heroPoints)===n?n-1:n;save();renderPfPlay(c);return true}
+  if(a==="pf-rest"){const t=pfRest(c);renderPfPlay(c);showRoll("Rest",esc(t),"");return true}
+  if(a==="pf-slot"){const s=p.cast.slots[num(b.dataset.l)],m=num(s.max),left=Math.max(0,m-num(s.used)),n=num(b.dataset.n);s.used=m-(left===n?n-1:n);save();renderPfPlay(c);return true}
+  if(a==="pf-focus"){const m=num(p.cast.focusMax),n=num(b.dataset.n);p.cast.focusCur=num(p.cast.focusCur)===n?n-1:n;p.cast.focusCur=Math.max(0,Math.min(m,p.cast.focusCur));save();renderPfPlay(c);return true}
+  if(a==="pf-refocus"){p.cast.focusCur=Math.min(num(p.cast.focusMax),num(p.cast.focusCur)+1);save();renderPfPlay(c);showRoll("Refocus","10 minutes spent regaining 1 Focus Point","");return true}
+  if(a==="pf-cast"){
+    const s=p.spells[num(b.dataset.i)]; if(!s)return true;
+    let msg2="";
+    if(s.k==="cantrip")msg2="Cantrip, no slot used";
+    else if(s.k==="focus"){if(num(p.cast.focusCur)<=0){showRoll(s.name,"No Focus Points left","");return true}p.cast.focusCur=num(p.cast.focusCur)-1;msg2="Focus Point spent ("+p.cast.focusCur+" left)"}
+    else{const r=Math.max(1,Math.min(10,num(s.hr||s.lv,1))),sl=p.cast.slots[r];
+      if(s.k==="ritual"){msg2="Ritual, no slot used"}
+      else if(!sl||num(sl.max)-num(sl.used)<=0){showRoll(s.name,"No rank "+r+" slots left","");return true}
+      else{sl.used=num(sl.used)+1;msg2="Rank "+r+" slot used ("+(num(sl.max)-num(sl.used))+" left)"}}
+    save(); renderPfPlay(c); showRoll(s.name,esc(msg2),""); return true;
+  }
+  if(a==="pf-cond-add"){
+    const sel=$("#pfCondSel"), n=sel&&sel.value; if(!n)return true;
+    if(!p.cond.some(x=>lc(x.n)===lc(n)))p.cond.push({id:uid(),n:n,v:1});
+    save(); renderPfPlay(c); return true;
+  }
+  if(a==="pf-cond-d"){const x=p.cond[num(b.dataset.i)];if(x){x.v=Math.max(1,Math.min(9,num(x.v,1)+num(b.dataset.d)));save();renderPfPlay(c)}return true}
+  if(a==="pf-cond-del"){p.cond.splice(num(b.dataset.i),1);save();renderPfPlay(c);return true}
+  return false;
+}
+/* ---------- Pathfinder 2e: spells, gear, feats ---------- */
+const pfTrimD=s=>String(s||"");
+function pfEntry(kind,x,i,c){
+  const k=kind+x.id, ed=ui.edit.has(k), open=ui.open.has(k);
+  const meta=kind==="spells"?[x.k==="cantrip"?"Cantrip":x.k==="focus"?"Focus "+x.lv:x.k==="ritual"?"Ritual "+x.lv:"Rank "+(x.hr||x.lv),pfActText(x.ac)].filter(Boolean).join(" \u00b7 ")
+    :kind==="feats"?[x.lvl!=null&&x.lvl!==""?"Level "+x.lvl:"",pfActText(x.ac)].filter(Boolean).join(" \u00b7 ")
+    :[num(x.qty,1)>1?"x"+num(x.qty,1):"",x.b!==""&&x.b!=null?"Bulk "+x.b:"",x.eq?"carried ready":""].filter(Boolean).join(" \u00b7 ");
+  const tf=(f,l,ph)=>`<label class="fld"><span>${l}</span><input type="text" data-f="pf.${kind}.${i}.${f}" value="${esc(x[f])}"${ph?` placeholder="${esc(ph)}"`:""}></label>`;
+  const nf=(f,l)=>`<label class="fld"><span>${l}</span><input type="number" inputmode="numeric" data-t="n" data-f="pf.${kind}.${i}.${f}" value="${esc(x[f])}"></label>`;
+  let body="";
+  if(ed){
+    if(kind==="spells")body=`<div class="igrid">${tf("name","Name")}${nf("lv","Rank")}<label class="fld"><span>Type</span><select data-f="pf.spells.${i}.k">${[["spell","Spell"],["cantrip","Cantrip"],["focus","Focus spell"],["ritual","Ritual"]].map(([v,t])=>`<option value="${v}"${x.k===v?" selected":""}>${t}</option>`).join("")}</select></label>${nf("hr","Cast at rank (0 = base)")}${tf("ac","Actions","2")}${tf("tr","Traditions")}${tf("t","Traits")}${tf("rg","Range")}${tf("ar","Area")}${tf("tg","Targets")}${tf("du","Duration")}${tf("df","Defense")}</div>
+      <label class="fld"><span>Description</span><textarea data-f="pf.spells.${i}.d">${esc(x.d)}</textarea></label>`;
+    else if(kind==="feats")body=`<div class="igrid">${tf("name","Name")}<label class="fld"><span>Category</span><select data-f="pf.feats.${i}.cat">${PFCATS.map(([v,t])=>`<option value="${v}"${x.cat===v?" selected":""}>${t}</option>`).join("")}</select></label>${nf("lvl","Level")}${tf("ac","Actions")}${tf("t","Traits")}${tf("pre","Prerequisites")}${tf("fr","Frequency")}${tf("src","Source")}</div>
+      <label class="fld"><span>Description</span><textarea data-f="pf.feats.${i}.d">${esc(x.d)}</textarea></label>`;
+    else body=`<div class="igrid">${tf("name","Name")}${nf("qty","Quantity")}${tf("b","Bulk","L, 1, 2 or -")}${tf("pr","Price","5 gp")}${nf("lv","Level")}${tf("t","Traits")}</div>
+      <label class="fld"><span>Description</span><textarea data-f="pf.inv.${i}.d">${esc(x.d)}</textarea></label>`;
+  }else{
+    if(kind==="spells")body=`<div class="kvs">${kv("Traditions",x.tr)}${kv("Traits",x.t)}${kv("Range",x.rg)}${kv("Area",x.ar)}${kv("Targets",x.tg)}${kv("Duration",x.du)}${kv("Defense",x.df)}${kv("Cost",x.cost)}</div>`+viewText(x.d,"No description.");
+    else if(kind==="feats")body=`<div class="kvs">${kv("Traits",x.t)}${kv("Prerequisites",x.pre)}${kv("Frequency",x.fr)}${kv("Source",x.src)}</div>`+viewText(x.d,"No description.");
+    else body=`<div class="kvs">${kv("Level",x.lv)}${kv("Price",x.pr)}${kv("Traits",x.t)}${x.ty==="weapon"?kv("Damage",x.dmg):""}${x.ty==="armor"?kv("AC bonus / Dex cap",x.ac+" / "+x.dx):""}${kv("Source",x.src)}</div>`+viewText(x.d,"No description.");
+  }
+  const btns=[];
+  if(kind==="spells"&&x.k!=="cantrip"&&x.k!=="focus"&&x.k!=="ritual"&&c.pf.cast.kind==="prepared")btns.push(`<label class="chk"><input type="checkbox" data-t="b" data-f="pf.spells.${i}.prep"${x.prep?" checked":""}>Prepared today</label>`);
+  if(kind==="inv"){
+    btns.push(`<button class="btn sm" type="button" data-act="pf-qty" data-i="${i}" data-d="-1">-1</button><button class="btn sm" type="button" data-act="pf-qty" data-i="${i}" data-d="1">+1</button>`);
+    btns.push(`<button class="btn sm${x.eq?" pri":""}" type="button" data-act="pf-equip" data-i="${i}" aria-pressed="${!!x.eq}">${x.eq?"Ready":"Stowed"}</button>`);
+    if(x.ty==="weapon")btns.push(`<button class="btn sm" type="button" data-act="pf-to-strike" data-i="${i}">Make a strike</button>`);
+    if(x.ty==="armor")btns.push(`<button class="btn sm" type="button" data-act="pf-wear" data-i="${i}">Wear</button>`);
+    if(x.ty==="shield")btns.push(`<button class="btn sm" type="button" data-act="pf-shield" data-i="${i}">Use shield</button>`);
+  }
+  btns.push(`<button class="btn sm" type="button" data-act="pf-edit" data-kind="${kind}" data-i="${i}">${ed?"Done editing":"Edit"}</button><button class="btn sm danger" type="button" data-act="pf-del" data-kind="${kind}" data-i="${i}">Delete</button>`);
+  return `<details class="item" data-id="${esc(k)}"${open?" open":""}><summary><span class="sum-t">${esc(x.name)}</span><span class="sum-m">${esc(meta)}</span></summary><div class="ibody">${body}<div class="btns" data-gmsg="${esc(x.id)}" style="align-items:center">${btns.join("")}</div><div class="msg" data-pmsg="${esc(x.id)}"></div></div></details>`;
+}
+function pfSpellListHTML(c){
+  const p=c.pf, q=lc(ui.q);
+  const list=p.spells.map((s,i)=>({s,i})).filter(({s})=>!q||lc(s.name).includes(q)||lc(s.tr).includes(q)||lc(s.t).includes(q));
+  const groups=[["focus","Focus spells"],["cantrip","Cantrips"]].map(([k,l])=>[l,list.filter(({s})=>s.k===k)]);
+  for(let r=1;r<=10;r++)groups.push(["Rank "+r+" spells",list.filter(({s})=>s.k!=="focus"&&s.k!=="cantrip"&&s.k!=="ritual"&&num(s.lv,1)===r)]);
+  groups.push(["Rituals",list.filter(({s})=>s.k==="ritual")]);
+  return groups.filter(g=>g[1].length).map(([l,arr])=>`<div class="lvlh"><span>${l}</span><span>${arr.length}</span></div><div class="items">${arr.sort((a,b)=>a.s.name.localeCompare(b.s.name)).map(({s,i})=>pfEntry("spells",s,i,c)).join("")}</div>`).join("")||`<div class="empty">No spells yet. Add them from the Pathfinder library.</div>`;
+}
+function renderPfSpells(c){
+  const p=c.pf, ca=p.cast;
+  const slots=Array.from({length:10},(_,i)=>i+1).map(l=>`<div class="slot"><span>RANK ${l}</span><div class="two"><input type="number" inputmode="numeric" min="0" data-t="n" data-f="pf.cast.slots.${l}.used" value="${esc(ca.slots[l].used)}" aria-label="Rank ${l} used"><span>/</span><input type="number" inputmode="numeric" min="0" data-t="n" data-f="pf.cast.slots.${l}.max" value="${esc(ca.slots[l].max)}" aria-label="Rank ${l} max"></div></div>`).join("");
+  app.innerHTML=barHTML(c)+`<div class="grid">
+    <section class="panel span2"><h3>Spellcasting</h3>
+      <div class="igrid">
+        <label class="fld"><span>Tradition</span><select data-f="pf.cast.trad">${[["","None"],["arcane","Arcane"],["divine","Divine"],["occult","Occult"],["primal","Primal"]].map(([v,t])=>`<option value="${v}"${ca.trad===v?" selected":""}>${t}</option>`).join("")}</select></label>
+        <label class="fld"><span>Style</span><select data-f="pf.cast.kind">${[["prepared","Prepared"],["spontaneous","Spontaneous"],["innate","Innate or other"]].map(([v,t])=>`<option value="${v}"${ca.kind===v?" selected":""}>${t}</option>`).join("")}</select></label>
+        <label class="fld"><span>Casting ability</span>${pfAbSel("pf.cast.abl",ca.abl,"Casting ability")}</label>
+        <label class="fld"><span>Spell proficiency</span>${pfRankSel("pf.rank.spell",p.rank.spell,"Spell")}</label>
+        ${pfNumF("Focus Points (max)","pf.cast.focusMax",ca.focusMax,' min="0" max="3"')}${pfNumF("Focus Points (now)","pf.cast.focusCur",ca.focusCur,' min="0" max="3"')}</div>
+      <div class="stats" style="margin-top:12px"><div class="stat"><span>Spell attack</span><b data-pfv="spellAtk">+0</b></div><div class="stat"><span>Spell DC</span><b data-pfv="spellDC">10</b></div></div></section>
+    <section class="panel span2"><h3>Spell slots (used / total)</h3><div class="slots">${slots}</div>
+      <p class="hint">Cantrips and focus spells do not use slots. Enter the slots your class table gives you; they refill on a night's rest.</p></section>
+    <section class="panel span2"><h3>Spell list</h3>
+      <div class="listbar"><button class="btn pri" type="button" data-act="pf-lib" data-tab="pf-spells">Add from Library</button><button class="btn" type="button" data-act="pf-add-hand" data-kind="spells">Add by hand</button>
+        <label class="fld"><span>Search</span><input id="pfSq" type="search" value="${esc(ui.q)}" placeholder="Name, tradition or trait"></label></div>
+      <div id="pfListBox">${pfSpellListHTML(c)}</div></section></div>`;
+  pfRecompute(c);
+}
+function pfGearTotals(c){
+  const p=c.pf, tot=p.inv.reduce((t,x)=>t+num(x.qty,1)*pfBulkNum(x.b),0), enc=5+pfMod(c,"str"), mx=10+pfMod(c,"str");
+  const e=$("#pfBulk"); if(!e)return;
+  e.textContent=pfBulkText(tot)+" Bulk";
+  const s=$("#pfBulkNote"); if(s)s.textContent=tot>mx?"Over your maximum of "+mx+" Bulk.":tot>enc?"Encumbered (more than "+enc+" Bulk). Limit "+mx+".":"Not encumbered (up to "+enc+" Bulk). Limit "+mx+".";
+}
+function pfGearListHTML(c){
+  const q=lc(ui.gq), list=c.pf.inv.map((x,i)=>({x,i})).filter(({x})=>!q||lc(x.name).includes(q));
+  return list.map(({x,i})=>pfEntry("inv",x,i,c)).join("")||`<div class="empty">Nothing carried yet.</div>`;
+}
+function renderPfGear(c){
+  const p=c.pf;
+  app.innerHTML=barHTML(c)+`<div class="grid">
+    <section class="panel"><h3>Coins</h3><div class="coins">${["pp","gp","sp","cp"].map(k=>`<label class="fld"><span>${k.toUpperCase()}</span><input type="number" inputmode="numeric" data-t="n" data-f="pf.coins.${k}" value="${esc(p.coins[k])}"></label>`).join("")}</div>
+      <p class="hint">10 cp = 1 sp, 10 sp = 1 gp, 10 gp = 1 pp.</p></section>
+    <section class="panel"><h3>Bulk</h3><div class="stats"><div class="stat"><span>Carried</span><b id="pfBulk">0</b></div></div><p class="hint" id="pfBulkNote"></p>
+      <p class="hint">10 Light (L) items make 1 Bulk.</p></section>
+    <section class="panel span2"><h3>Inventory</h3>
+      <div class="listbar"><button class="btn pri" type="button" data-act="pf-lib" data-tab="pf-items">Add from Library</button><button class="btn" type="button" data-act="pf-add-hand" data-kind="inv">Add by hand</button>
+        <label class="fld"><span>Search</span><input id="pfGq" type="search" value="${esc(ui.gq||"")}" placeholder="Item name"></label></div>
+      <div class="items" id="pfListBox">${pfGearListHTML(c)}</div></section></div>`;
+  pfGearTotals(c);
+}
+function pfFeatListHTML(c){
+  const q=lc(ui.q), list=c.pf.feats.map((x,i)=>({x,i})).filter(({x})=>!q||lc(x.name).includes(q)||lc(x.t).includes(q));
+  return PFCATS.map(([k,l])=>[l,list.filter(({x})=>x.cat===k)]).filter(g=>g[1].length).map(([l,arr])=>`<div class="lvlh"><span>${l}</span><span>${arr.length}</span></div><div class="items">${arr.sort((a,b)=>num(a.x.lvl)-num(b.x.lvl)||a.x.name.localeCompare(b.x.name)).map(({x,i})=>pfEntry("feats",x,i,c)).join("")}</div>`).join("")||`<div class="empty">No feats or features yet. Apply your class on the Sheet tab, or add feats from the Library.</div>`;
+}
+function renderPfFeats(c){
+  app.innerHTML=barHTML(c)+`<div class="grid"><section class="panel span2"><h3>Feats and features</h3>
+    <div class="listbar"><button class="btn pri" type="button" data-act="pf-lib" data-tab="pf-feats">Add from Library</button><button class="btn" type="button" data-act="pf-add-hand" data-kind="feats">Add by hand</button>
+      <label class="fld"><span>Search</span><input id="pfSq" type="search" value="${esc(ui.q)}" placeholder="Name or trait"></label></div>
+    <div id="pfListBox">${pfFeatListHTML(c)}</div></section></div>`;
+}
+/* ---------- Pathfinder 2e: adding things ---------- */
+function pfAddSpell(c,x){
+  const n=lc(x.n||x.name); if(c.pf.spells.some(s=>lc(s.name)===n))return false;
+  c.pf.spells.push({id:uid(),name:x.n||x.name,lv:num(x.lv,1),k:x.k||"spell",tr:Array.isArray(x.tr)?x.tr.join(", "):(x.tr||""),t:Array.isArray(x.t)?x.t.join(", "):(x.t||""),ac:x.ac||"",rg:x.rg||"",ar:x.ar||"",tg:x.tg||"",du:x.du||"",df:x.df||"",cost:x.cost||"",d:x.d||"",src:x.src||"",prep:false,hr:0});
+  return true;
+}
+function pfAddFeat(c,x,cat){
+  const n=lc(x.n||x.name), ct=cat||x.cat||"general";
+  if(c.pf.feats.some(f=>lc(f.name)===n&&f.cat===ct))return false;
+  c.pf.feats.push({id:uid(),name:x.n||x.name,cat:ct,lvl:x.lvl!=null?x.lvl:"",t:Array.isArray(x.t)?x.t.join(", "):(x.t||""),pre:x.pre||"",ac:x.ac||"",fr:x.fr||"",d:x.d||"",src:x.src||""});
+  return true;
+}
+function pfAddItem(c,x){
+  const n=lc(x.n||x.name), ex=c.pf.inv.find(i=>lc(i.name)===n);
+  if(ex){ex.qty=num(ex.qty,1)+1;return "more"}
+  c.pf.inv.push({id:uid(),name:x.n||x.name,qty:1,b:x.b==null?"":String(x.b),pr:x.pr||"",lv:x.lv!=null?x.lv:"",ty:x.ty||"equipment",t:Array.isArray(x.t)?x.t.join(", "):(x.t||""),d:x.d||"",src:x.src||"",eq:false,
+    dmg:x.dmg||"",cat:x.cat||"",grp:x.grp||"",rng:x.rng||"",ac:x.ac!=null?x.ac:"",dx:x.dx!=null?x.dx:"",ck:x.ck||0,sp:x.sp||0,st:x.st||0,hd:x.hd||0,hp:x.hp||0});
+  return "new";
+}
+function pfStrikeFromItem(c,it){
+  const m=String(it.dmg||"").match(/^\s*(\d*d\d+)\s*(.*)$/i), ranged=!!String(it.rng||"").trim();
+  c.pf.strikes.push({id:uid(),name:it.name,abl:ranged?"dex":"str",cat:it.cat==="unarmed"||it.cat==="martial"||it.cat==="advanced"?it.cat:"simple",dmg:m?m[1]:"",type:m?m[2]:"",pot:0,str:0,misc:0,dbonus:0,extra:"",traits:it.t||"",dm:!ranged});
+}
+async function pfApply(c,w){
+  const say=pfSay;
+  try{
+    if(w==="class"){
+      const D=await pfLoad("classes"), n=lc(c.cls), d=D.find(x=>lc(x.n)===n);
+      if(!d){say("No Pathfinder class named \""+c.cls+"\". Pick one from the suggestions in the Class box.",true);return}
+      const p=c.pf; c.cls=d.n; p.classHp=d.hp; if(d.key&&d.key.length&&!d.key.includes(p.keyAbility))p.keyAbility=d.key[0];
+      p.rank.perception=d.per; ["fortitude","reflex","will"].forEach(k=>{p.rank[k]=d.sv[k]});
+      p.rank.classDC=Math.max(1,num(p.rank.classDC)); ["simple","martial","advanced","unarmed"].forEach(k=>{p.rank[k]=d.at[k]});
+      ["unarmored","light","medium","heavy"].forEach(k=>{p.rank[k]=d.df[k]});
+      if(d.sc){p.rank.spell=Math.max(num(p.rank.spell),num(d.sc)); if(!p.cast.trad&&d.tr!=null){}}
+      (d.trs||[]).forEach(s=>{const id=lc(s);if(PFSKILLS.some(x=>x[0]===id))p.skills[id]=Math.max(1,num(p.skills[id]));else if(id&&!p.lores.some(l=>lc(l.name)===id))p.lores.push({id:uid(),name:pfCap(s),abl:"int",rank:1,misc:0})});
+      let added=0; (d.f||[]).filter(f=>num(f.lvl)<=pfLvl(c)).forEach(f=>{if(pfAddFeat(c,{n:f.name,lvl:f.lvl,d:f.desc,src:d.n},"classfeature"))added++});
+      pfHp(c); save(); renderSheet();
+      pfSay("Applied "+d.n+": key ability "+(d.key||[]).join(" or ").toUpperCase()+", "+d.hp+" HP per level, proficiencies"+(added?", and "+added+" features (see the Feats tab)":"")+". You also choose "+d.tr+" more trained skills (plus your Intelligence modifier); mark them in Skills. Spell slots are entered on the Spells tab.");
+    }else if(w==="ancestry"){
+      const D=(await pfLoad("origins")).ancestries, d=D.find(x=>lc(x.n)===lc(c.race));
+      if(!d){say("No Pathfinder ancestry named \""+c.race+"\". Pick one from the suggestions in the Ancestry box.",true);return}
+      const p=c.pf; c.race=d.n; p.ancHp=d.hp; p.size=PFSIZE[d.sz]||pfCap(d.sz); c.speed=d.sp;
+      p.langs=p.langs||(d.lg||[]).map(pfCap).join(", "); p.senses=p.senses||pfCap(String(d.vi||"").replace(/-/g," "));
+      let added=0; (d.f||[]).forEach(f=>{if(pfAddFeat(c,{n:f.name,lvl:1,d:f.desc,src:d.n},"ancestryfeature"))added++});
+      pfHp(c); save(); renderSheet();
+      pfSay("Applied "+d.n+": "+d.hp+" HP, "+p.size+", speed "+d.sp+" ft"+(added?", "+added+" ancestry features":"")+". Ancestry boosts: "+(d.bo||[]).map(b=>b.length>=6?"free":b.map(x=>x.toUpperCase()).join(" or ")).join(", ")+(d.fl&&d.fl.length?"; flaw: "+d.fl.map(b=>b.map(x=>x.toUpperCase()).join(" or ")).join(", "):"")+". Add them into your modifiers.");
+    }else{
+      const D=(await pfLoad("origins")).backgrounds, d=D.find(x=>lc(x.n)===lc(c.background));
+      if(!d){say("No Pathfinder background named \""+c.background+"\". Pick one from the suggestions in the Background box.",true);return}
+      const p=c.pf; c.background=d.n;
+      (d.sk||[]).forEach(s=>{const id=lc(s);if(PFSKILLS.some(x=>x[0]===id))p.skills[id]=Math.max(1,num(p.skills[id]))});
+      (d.lore||[]).forEach(s=>{if(s&&!p.lores.some(l=>lc(l.name)===lc(s)))p.lores.push({id:uid(),name:s,abl:"int",rank:1,misc:0})});
+      let ft=0; if(d.ft&&d.ft.length){const F=await pfLoad("feats");d.ft.forEach(nm=>{const f=F.find(x=>lc(x.n)===lc(nm));if(pfAddFeat(c,f||{n:nm,lvl:1,d:"See the Library for this feat."},"skill"))ft++})}
+      save(); renderSheet();
+      pfSay("Applied "+d.n+": trained in "+(d.sk||[]).concat(d.lore||[]).join(", ")+(ft?", and added the feat "+d.ft.join(", "):"")+". Background boosts: "+(d.bo||[]).map(b=>b.length>=6?"free":b.map(x=>x.toUpperCase()).join(" or ")).join(", ")+".");
+    }
+  }catch(e){say("The Pathfinder data could not be loaded here.",true)}
+}
+function pfHp(c){
+  const p=c.pf, mx=num(p.ancHp)+(num(p.classHp)+pfMod(c,"con"))*pfLvl(c), was=num(c.hpMax);
+  c.hpMax=Math.max(1,mx); if(num(c.hp)>=was||num(c.hp)>c.hpMax)c.hp=c.hpMax;
+}
+async function openPfLevelUp(c){
+  if(pfLvl(c)>=20){pfSay("Already at level 20.",true);return}
+  const nl=pfLvl(c)+1; let d=null;
+  try{const D=await pfLoad("classes");d=D.find(x=>lc(x.n)===lc(c.cls))||null}catch(e){}
+  const todo=[]; if(d){
+    const L=d.lvl||{}, has=a=>(a||[]).includes(nl);
+    if(has(L.anc))todo.push("An ancestry feat"); if(has(L.cls))todo.push("A class feat"); if(has(L.gen))todo.push("A general feat"); if(has(L.skf))todo.push("A skill feat"); if(has(L.ski))todo.push("A skill increase");
+  }
+  if([5,10,15,20].includes(nl))todo.push("Four attribute boosts (raise four different modifiers by 1, or by half a step above +4)");
+  const feats=d?(d.f||[]).filter(f=>num(f.lvl)===nl).map(f=>f.name):[];
+  const gain=Math.max(1,num(c.pf.classHp)+pfMod(c,"con"));
+  ui.lvl={pf:true,nl:nl,gain:gain,feats:feats,todo:todo,d:d};
+  $("#lvlOv").innerHTML=`<div class="sheet" role="dialog" aria-labelledby="lvlT"><div class="bar" style="margin:0"><h2 id="lvlT">Level up: ${esc(c.cls||"Character")} ${nl-1} to ${nl}</h2></div>
+    <section><h3>Hit points</h3><p><b>HP gained: ${gain}</b> (class HP ${num(c.pf.classHp)} plus Constitution ${sgn(pfMod(c,"con"))})</p></section>
+    <section><h3>What you gain</h3>
+      <p>${feats.length?"New class features: "+esc(feats.join(", "))+". They are added to your Feats tab.":(d?"No new class features are listed for this level.":"Set your class and use Apply class to get level details.")}</p>
+      ${todo.length?`<p><b>Choose at this level:</b></p><ul style="margin:0 0 0 18px;color:var(--muted);font-size:14px">${todo.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}
+      <p>Proficiency bonuses rise on their own because they use your level. Update spell slots and any new ranks on the Spells and Sheet tabs.</p></section>
+    <div class="btns"><button class="btn pri" type="button" data-act="lvl-ok">Level up</button><button class="btn" type="button" data-act="lvl-cancel">Cancel</button></div></div>`;
+  $("#lvlOv").hidden=false;
+}
+function pfLevelDone(c){
+  const L=ui.lvl; if(!L||!L.pf)return;
+  c.level=L.nl; c.hpMax=num(c.hpMax)+L.gain; c.hp=num(c.hp)+L.gain;
+  if(L.d)(L.d.f||[]).filter(f=>num(f.lvl)===L.nl).forEach(f=>pfAddFeat(c,{n:f.name,lvl:f.lvl,d:f.desc,src:L.d.n},"classfeature"));
+  $("#lvlOv").hidden=true; ui.lvl=null; save(); renderSheet();
+}
+/* ---------- Pathfinder 2e: library (only Pathfinder content) ---------- */
+const PFLIBTABS=[["pf-spells","Spells"],["pf-feats","Feats"],["pf-items","Items"],["pf-classes","Classes"],["pf-origins","Ancestries and backgrounds"],["pf-rules","Rules"]];
+const PFKIND={"pf-spells":"spells","pf-feats":"feats","pf-items":"items","pf-classes":"classes","pf-origins":"origins","pf-rules":"rules"};
+const PFB={};
+const PFCREDIT=`<details class="item"><summary><span class="sum-t">Credits and licenses</span></summary><div class="ibody">
+  <p>Pathfinder rules content in this app (Remaster) comes from the open data of the Foundry VTT Pathfinder 2e system (github.com/foundryvtt/pf2e). Only entries marked as published under the ORC License or the Open Game License are included. Source book names are shown on each entry.</p>
+  <p>This app uses trademarks and copyrights owned by Paizo Inc., used under Paizo's Community Use Policy (paizo.com/communityuse). It is not published, endorsed, or specifically approved by Paizo. For more information about Paizo Inc. and Paizo products, visit paizo.com. Pathfinder and its marks are trademarks of Paizo Inc.</p>
+  <p>Open content is used under the ORC License (paizo.com/orclicense) and, where marked, the Open Game License 1.0a. Always check the licensing of anything you share, and keep this notice with it.</p></div></details>`;
+function pfLibS(){const L=ui.lib;if(!L.pf)L.pf={tab:"",q:"",f1:"",f2:"",limit:60,open:new Set(),msg:""};if(L.pf.tab!==L.tab){L.pf.tab=L.tab;L.pf.q="";L.pf.f1="";L.pf.f2="";L.pf.limit=60;L.pf.open=new Set();L.pf.msg=""}return L.pf}
+function pfCustom(kind){
+  return LIB[kind].filter(x=>sysOf(x)==="pf2e").map(x=>kind==="spells"
+    ?{n:x.name,lv:num(x.level,1),k:x.cantrip?"cantrip":"spell",tr:String(x.traditions||"").split(",").map(s=>s.trim()).filter(Boolean),t:String(x.traits||"").split(",").map(s=>s.trim()).filter(Boolean),ac:x.time||"",rg:x.range||"",ar:x.area||"",tg:x.targets||"",du:x.duration||"",df:"",cost:"",src:x.source||"My library",d:x.desc||"",lib:1}
+    :{n:x.name,ty:x.ty||"equipment",lv:num(x.level),pr:x.price||"",b:x.bulk||"",t:String(x.traits||"").split(",").map(s=>s.trim()).filter(Boolean),src:x.source||"My library",d:x.desc||"",lib:1});
+}
+function pfBase(tab){
+  const k=PFKIND[tab], D=PFD[k]; if(!D)return null;
+  if(tab==="pf-origins")return PFB[tab]||(PFB[tab]=D.ancestries.map(x=>Object.assign({ty:"ancestry"},x)).concat(D.heritages.map(x=>Object.assign({ty:"heritage"},x)),D.backgrounds.map(x=>Object.assign({ty:"background"},x))));
+  if(tab==="pf-rules")return PFB[tab]||(PFB[tab]=D.conditions.map(x=>Object.assign({ty:"condition"},x)).concat(D.actions.map(x=>Object.assign({ty:"action"},x))));
+  if(tab==="pf-spells"||tab==="pf-items")return D.concat(pfCustom(k));
+  return D;
+}
+function pfFilters(tab,P){
+  const sel=(id,label,opts,val)=>`<label class="fld" style="flex:0 1 150px"><span>${label}</span><select data-pff="${id}">${opts.map(([v,t])=>`<option value="${v}"${String(val)===String(v)?" selected":""}>${t}</option>`).join("")}</select></label>`;
+  const L=(n,a)=>Array.from({length:n},(_,i)=>[i+a,String(i+a)]);
+  if(tab==="pf-spells")return sel("f1","Rank",[["","Any"],["c","Cantrip"]].concat(L(10,1)),P.f1)+sel("f2","Tradition",[["","Any"],["arcane","Arcane"],["divine","Divine"],["occult","Occult"],["primal","Primal"]],P.f2);
+  if(tab==="pf-feats")return sel("f1","Type",[["","Any"]].concat(PFCATS),P.f1)+sel("f2","Level",[["","Any"]].concat(L(21,0)),P.f2);
+  if(tab==="pf-items")return sel("f1","Type",[["","Any"],["weapon","Weapons"],["armor","Armor"],["shield","Shields"],["consumable","Consumables"],["equipment","Equipment"],["ammo","Ammunition"],["treasure","Treasure"],["backpack","Containers"],["kit","Kits"]],P.f1)+sel("f2","Up to level",[["","Any"]].concat(L(26,0)),P.f2);
+  if(tab==="pf-origins")return sel("f1","Type",[["","Any"],["ancestry","Ancestries"],["heritage","Heritages"],["background","Backgrounds"]],P.f1);
+  if(tab==="pf-rules")return sel("f1","Type",[["","Any"],["condition","Conditions"],["action","Actions"]],P.f1);
+  return "";
+}
+function pfPass(tab,x,P){
+  const q=lc(P.q);
+  if(q&&!(lc(x.n).includes(q)||(x.t||[]).some&&(x.t||[]).some(t=>lc(t).includes(q))||lc(x.src).includes(q)))return false;
+  if(tab==="pf-spells"){
+    if(P.f1&&(P.f1==="c"?x.k!=="cantrip":(x.k==="cantrip"||String(x.lv)!==String(P.f1))))return false;
+    if(P.f2&&!(x.tr||[]).includes(P.f2))return false;
+  }else if(tab==="pf-feats"){
+    if(P.f1&&x.cat!==P.f1)return false; if(P.f2!==""&&String(x.lv)!==String(P.f2))return false;
+  }else if(tab==="pf-items"){
+    if(P.f1&&x.ty!==P.f1)return false; if(P.f2!==""&&num(x.lv)>num(P.f2))return false;
+  }else if(tab==="pf-origins"||tab==="pf-rules"){if(P.f1&&x.ty!==P.f1)return false}
+  return true;
+}
+function pfMetaOf(tab,x){
+  const tr=a=>(a||[]).join(", ");
+  if(tab==="pf-spells")return [x.k==="cantrip"?"Cantrip":x.k==="focus"?"Focus "+x.lv:x.k==="ritual"?"Ritual "+x.lv:"Spell "+x.lv,tr(x.tr),pfActText(x.ac),x.src].filter(Boolean).join(" \u00b7 ");
+  if(tab==="pf-feats")return [(PFCATS.find(c=>c[0]===x.cat)||[0,x.cat])[1].replace(/ feats$/,"")+" "+(x.cat==="classfeature"?"":"feat"),"Level "+x.lv,pfActText(x.ac),x.src].filter(Boolean).join(" \u00b7 ");
+  if(tab==="pf-items")return [pfCap(x.ty),"Level "+num(x.lv),x.pr,x.b!=null&&x.b!==""?"Bulk "+x.b:"",x.src].filter(Boolean).join(" \u00b7 ");
+  if(tab==="pf-classes")return ["Key: "+tr(x.key).toUpperCase(),x.hp+" HP per level",x.src].filter(Boolean).join(" \u00b7 ");
+  if(tab==="pf-origins")return [pfCap(x.ty),x.ty==="ancestry"?x.hp+" HP, speed "+x.sp:x.ty==="background"?tr(x.sk).concat(x.lore||[]).join(", "):"",x.src].filter(Boolean).join(" \u00b7 ");
+  return [pfCap(x.ty),x.ty==="action"?pfActText(x.ac):"",x.src].filter(Boolean).join(" \u00b7 ");
+}
+function pfDetOf(tab,x){
+  const tr=a=>(a||[]).join(", ");
+  let k="";
+  if(tab==="pf-spells")k=kv("Traditions",tr(x.tr))+kv("Traits",tr(x.t))+kv("Cast",pfActText(x.ac))+kv("Range",x.rg)+kv("Area",x.ar)+kv("Targets",x.tg)+kv("Duration",x.du)+kv("Defense",x.df)+kv("Cost",x.cost);
+  else if(tab==="pf-feats")k=kv("Traits",tr(x.t))+kv("Prerequisites",x.pre)+kv("Actions",pfActText(x.ac))+kv("Frequency",x.fr);
+  else if(tab==="pf-items")k=kv("Traits",tr(x.t))+kv("Price",x.pr)+kv("Bulk",x.b)+(x.ty==="weapon"?kv("Damage",x.dmg)+kv("Group",x.grp)+kv("Range",x.rng)+kv("Reload",x.rl)+kv("Hands",x.hd):"")+(x.ty==="armor"?kv("AC bonus",x.ac)+kv("Dex cap",x.dx)+kv("Check penalty",x.ck)+kv("Speed penalty",x.sp)+kv("Strength",x.st):"")+(x.ty==="shield"?kv("AC bonus",x.ac)+kv("Hardness",x.hd)+kv("HP",x.hp):"");
+  else if(tab==="pf-classes"){
+    const f=(x.f||[]).slice().sort((a,b)=>num(a.lvl)-num(b.lvl));
+    return `<div class="pdesc"><div class="kvs">${kv("Key ability",tr(x.key).toUpperCase())}${kv("Hit points",x.hp+" per level")}${kv("Trained skills",x.tr+" plus Int modifier")}${kv("Perception",PFRANKS[x.per])}${kv("Fortitude / Reflex / Will",[x.sv.fortitude,x.sv.reflex,x.sv.will].map(r=>PFRANKS[r][0]).join(" / "))}</div>
+      <div class="prose">${esc(x.d)}</div>${f.map(q=>`<details class="item"><summary><span class="sum-t">${esc(q.name)}</span><span class="sum-m">Level ${num(q.lvl)}</span></summary><div class="ibody">${viewText(q.desc,"")}</div></details>`).join("")}</div>`;
+  }else if(tab==="pf-origins"){
+    if(x.ty==="ancestry")k=kv("Hit points",x.hp)+kv("Size",PFSIZE[x.sz]||x.sz)+kv("Speed",x.sp+" ft")+kv("Traits",tr(x.t))+kv("Languages",tr(x.lg))+kv("Vision",String(x.vi||"").replace(/-/g," "));
+    else if(x.ty==="background")k=kv("Skills",tr(x.sk))+kv("Lore",tr(x.lore))+kv("Feat",tr(x.ft));
+  }
+  const body=tab==="pf-classes"?"":(x.d?`<div class="prose">${esc(x.d)}</div>`:'<p class="hint" style="margin:0">No description.</p>');
+  const feats=tab==="pf-origins"&&x.ty==="ancestry"&&(x.f||[]).length?x.f.map(q=>`<details class="item"><summary><span class="sum-t">${esc(q.name)}</span></summary><div class="ibody">${viewText(q.desc,"")}</div></details>`).join(""):"";
+  return `<div class="pdesc"><div class="kvs">${k}</div>${body}${feats}</div>`;
+}
+function pfAddLabel(tab,x,c){
+  if(!c||!isPf(c)||ui.view!=="sheet")return null;
+  const n=lc(x.n);
+  if(tab==="pf-spells")return c.pf.spells.some(s=>lc(s.name)===n)?["Added",true]:["Add",false];
+  if(tab==="pf-feats")return c.pf.feats.some(s=>lc(s.name)===n&&s.cat===x.cat)?["Added",true]:["Add",false];
+  if(tab==="pf-items")return ["Add",false];
+  if(tab==="pf-classes")return ["Apply",false];
+  if(tab==="pf-origins")return x.ty==="heritage"?["Set heritage",false]:["Apply",false];
+  if(tab==="pf-rules")return x.ty==="condition"?["Add to character",false]:null;
+  return null;
+}
+function libPfHTML(){
+  const L=ui.lib, tab=L.tab, P=pfLibS(), c=cur();
+  const k=PFKIND[tab];
+  if(!PFD[k]){
+    pfLoad(k).then(()=>{if(ui.lib&&ui.lib.tab===tab&&!$("#libOv").hidden&&!ui.lib.draft)renderLib()}).catch(()=>{P.err=true;if(ui.lib&&ui.lib.tab===tab)renderLib()});
+    return P.err?`<div class="empty">The Pathfinder list could not be loaded here. It is fetched from the same place as this app, so check your connection and try again.</div>`:`<div class="empty">Loading the Pathfinder list...</div>`;
+  }
+  const base=pfBase(tab), idx=[];
+  base.forEach((x,i)=>{if(pfPass(tab,x,P))idx.push(i)});
+  const shown=idx.slice(0,P.limit);
+  const rows=shown.map(i=>{
+    const x=base[i], ad=pfAddLabel(tab,x,c), open=P.open.has(i);
+    return `<div class="prow"><div class="pmain"><button class="plink" type="button" data-act="pf-lib-toggle" data-i="${i}" aria-expanded="${open}"><b>${esc(x.n)}${x.lib?" (mine)":""}</b><span>${esc(pfMetaOf(tab,x))}</span></button>
+      ${ad?`<button class="btn sm${ad[1]?"":" pri"}" type="button" data-act="pf-lib-add" data-i="${i}"${ad[1]?" disabled":""}>${ad[0]}</button>`:""}</div>${open?pfDetOf(tab,x):""}</div>`}).join("");
+  return `<p>Pathfinder 2e (Remaster) content only. ${c&&isPf(c)&&ui.view==="sheet"?"Add things straight to "+esc(c.name||"your character")+".":"Open a Pathfinder character to add things to it."}</p>
+    <div class="listbar"><label class="fld"><span>Search</span><input data-pfq type="search" value="${esc(P.q)}" placeholder="Name, trait or book"></label>${pfFilters(tab,P)}</div>
+    <div class="msg" role="status">${esc(P.msg)}</div>
+    <p class="hint" style="margin:0 0 8px">${idx.length} found</p>
+    <div class="items">${rows||`<div class="empty">Nothing matches.</div>`}</div>
+    ${idx.length>shown.length?`<div class="btns" style="margin-top:10px"><button class="btn" type="button" data-act="pf-lib-more">Show more</button></div>`:""}
+    <div style="margin-top:14px">${PFCREDIT}</div>`;
+}
+async function pfLibAdd(i){
+  const L=ui.lib, tab=L.tab, P=pfLibS(), c=cur(), base=pfBase(tab), x=base&&base[i];
+  if(!c||!isPf(c)||!x)return;
+  if(tab==="pf-spells"){pfAddSpell(c,x);P.msg=x.n+" added to the Spells tab."}
+  else if(tab==="pf-feats"){pfAddFeat(c,x);P.msg=x.n+" added to the Feats tab."}
+  else if(tab==="pf-items"){const r=pfAddItem(c,x);P.msg=r==="more"?"Added another "+x.n+".":x.n+" added to the Gear tab."}
+  else if(tab==="pf-classes"){c.cls=x.n;await pfApply(c,"class");P.msg=ui.pfLast||""}
+  else if(tab==="pf-origins"){
+    if(x.ty==="ancestry"){c.race=x.n;await pfApply(c,"ancestry");P.msg=ui.pfLast||""}
+    else if(x.ty==="background"){c.background=x.n;await pfApply(c,"background");P.msg=ui.pfLast||""}
+    else{c.pf.heritage=x.n;pfAddFeat(c,{n:x.n,lvl:1,d:x.d,src:x.src},"ancestryfeature");P.msg="Heritage set to "+x.n+"."}
+  }else if(tab==="pf-rules"&&x.ty==="condition"){
+    if(!c.pf.cond.some(k=>lc(k.n)===lc(x.n)))c.pf.cond.push({id:uid(),n:x.n,v:1});P.msg=x.n+" added. Manage it on the Play tab.";
+  }
+  save(); renderLib();
+}
+/* ---------- Pathfinder 2e: events ---------- */
+const pfBlankEntry={
+  spells:()=>({id:uid(),name:"New spell",lv:1,k:"spell",tr:"",t:"",ac:"2",rg:"",ar:"",tg:"",du:"",df:"",cost:"",d:"",src:"",prep:false,hr:0}),
+  feats:()=>({id:uid(),name:"New feat",cat:"general",lvl:"",t:"",pre:"",ac:"",fr:"",d:"",src:""}),
+  inv:()=>({id:uid(),name:"New item",qty:1,b:"",pr:"",lv:"",ty:"equipment",t:"",d:"",src:"",eq:false})
+};
+function pfBoxFor(c){return ui.tab==="spells"?pfSpellListHTML(c):ui.tab==="feats"?pfFeatListHTML(c):pfGearListHTML(c)}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); if(!b)return;
+  const a=b.dataset.act, c=cur();
+  if(a==="lib-sys"){const L=ui.lib;if(L&&!L.locked){L.sys=b.dataset.s;L.draft=null;L.view=null;libFixTab("");renderLib()}return}
+  if(a==="pf-lib-toggle"){const P=pfLibS(),i=num(b.dataset.i);P.open.has(i)?P.open.delete(i):P.open.add(i);renderLib();return}
+  if(a==="pf-lib-more"){pfLibS().limit+=60;renderLib();return}
+  if(a==="pf-lib-add"){pfLibAdd(num(b.dataset.i));return}
+  if(!c||!isPf(c)||ui.view!=="sheet")return;
+  if(ui.tab==="play"&&pfPlayClick(c,b))return;
+  const p=c.pf, i=num(b.dataset.i);
+  switch(a){
+    case "pf-apply": pfApply(c,b.dataset.w); break;
+    case "pf-autohp": pfHp(c); save(); renderSheet(); pfSay("Max HP set to "+c.hpMax+": ancestry "+num(p.ancHp)+" plus (class "+num(p.classHp)+" "+sgn(pfMod(c,"con"))+" Con) x level "+pfLvl(c)+"."); break;
+    case "pf-levelup": openPfLevelUp(c); break;
+    case "pf-add-lore": p.lores.push({id:uid(),name:"",abl:"int",rank:1,misc:0}); save(); renderSheet(); break;
+    case "pf-del-lore": p.lores.splice(i,1); save(); renderSheet(); break;
+    case "pf-add-strike": {const s={id:uid(),name:"New strike",abl:"str",cat:"simple",dmg:"1d6",type:"",pot:0,str:0,misc:0,dbonus:0,extra:"",traits:"",dm:true};p.strikes.push(s);ui.edit.add("st"+s.id);save();$("#pfStrikeBox").innerHTML=pfStrikesHTML(c);pfRecompute(c);break;}
+    case "pf-st-edit": {const s=p.strikes[i];if(s){const k="st"+s.id;ui.edit.has(k)?ui.edit.delete(k):ui.edit.add(k);$("#pfStrikeBox").innerHTML=pfStrikesHTML(c);pfRecompute(c)}break;}
+    case "pf-del-strike": if(confirmTwice(b,"Tap again to delete")){const s=p.strikes.splice(i,1)[0];if(s)ui.edit.delete("st"+s.id);save();$("#pfStrikeBox").innerHTML=pfStrikesHTML(c);pfRecompute(c)} break;
+    case "pf-lib": openLib(b.dataset.tab); break;
+    case "pf-add-hand": {const k=b.dataset.kind,x=pfBlankEntry[k]();p[k].push(x);ui.open.add(k+x.id);ui.edit.add(k+x.id);ui.q="";ui.gq="";save();renderSheet();const d=document.querySelector(`details[data-id="${k+x.id}"]`);if(d){d.scrollIntoView({block:"nearest"});const f=d.querySelector('input[type="text"]');if(f){f.focus();f.select()}}break;}
+    case "pf-edit": {const k=b.dataset.kind,x=p[k][i];if(x){const id=k+x.id;ui.edit.has(id)?ui.edit.delete(id):ui.edit.add(id);ui.open.add(id);renderSheet()}break;}
+    case "pf-del": if(confirmTwice(b,"Tap again to delete")){const k=b.dataset.kind,x=p[k].splice(i,1)[0];if(x){ui.open.delete(k+x.id);ui.edit.delete(k+x.id)}save();renderSheet()} break;
+    case "pf-qty": {const x=p.inv[i];if(x){x.qty=Math.max(0,num(x.qty,1)+num(b.dataset.d));save();renderSheet()}break;}
+    case "pf-equip": {const x=p.inv[i];if(x){x.eq=!x.eq;save();renderSheet()}break;}
+    case "pf-to-strike": {const x=p.inv[i],m=x&&document.querySelector('[data-pmsg="'+x.id+'"]');if(x){pfStrikeFromItem(c,x);save();if(m){m.textContent="Added to your strikes on the Sheet tab. Check the ability and runes there.";m.className="msg"}}break;}
+    case "pf-wear": {const x=p.inv[i],m=x&&document.querySelector('[data-pmsg="'+x.id+'"]');if(x){p.armor={name:x.name,cat:["unarmored","light","medium","heavy"].includes(x.cat)?x.cat:"unarmored",ac:num(x.ac),dx:x.dx===""||x.dx==null?99:num(x.dx),ck:num(x.ck),sp:num(x.sp),st:num(x.st),pot:p.armor.pot&&p.armor.name===x.name?p.armor.pot:0};save();if(m){m.textContent="Now wearing it. Armor class updated on the Sheet tab; add any potency rune there.";m.className="msg"}}break;}
+    case "pf-shield": {const x=p.inv[i],m=x&&document.querySelector('[data-pmsg="'+x.id+'"]');if(x){p.shield={name:x.name,ac:num(x.ac),hd:num(x.hd),hp:num(x.hp),hpMax:num(x.hp),raised:false};save();if(m){m.textContent="Shield set. Raise it from the Play tab.";m.className="msg"}}break;}
+  }
+});
+document.addEventListener("input",e=>{
+  const t=e.target, c=cur();
+  if(t.dataset&&t.dataset.lined!=null&&ui.lib){ui.lib.ed=t.value;return}
+  if(t.dataset&&t.dataset.pfq!=null&&ui.lib){const P=pfLibS();P.q=t.value;P.limit=60;renderLib();const q=$("[data-pfq]");if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}return}
+  if(t.dataset&&t.dataset.pff&&ui.lib){const P=pfLibS();P[t.dataset.pff]=t.value;P.limit=60;P.open=new Set();renderLib();return}
+  if(!c||!isPf(c)||ui.view!=="sheet")return;
+  if(t.id==="pfSq"){ui.q=t.value;const bx=$("#pfListBox");if(bx)bx.innerHTML=pfBoxFor(c);return}
+  if(t.id==="pfGq"){ui.gq=t.value;const bx=$("#pfListBox");if(bx)bx.innerHTML=pfGearListHTML(c);return}
+});
+document.addEventListener("change",e=>{
+  const t=e.target, c=cur(); if(!c||!isPf(c)||ui.view!=="sheet")return;
+  const f=t.dataset&&t.dataset.f; if(!f)return;
+  if(/^pf\.(spells|feats|inv)\.\d+\.(k|lv|cat|hr|name|qty|prep|ty)$/.test(f)||f==="pf.cast.kind"||f==="race"){
+    if(f==="race"){pfFillLists(c);return}
+    renderSheet();
+  }
+});
 
 render(); setStatus();
 })();
