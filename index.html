@@ -5726,6 +5726,37 @@ function decorateRows(){
 }
 new MutationObserver(decorateRows).observe(document.getElementById("app"),{childList:true,subtree:true});
 
+
+/* swipe left/right between sheet sections */
+(function(){
+  let sx=0,sy=0,st=0,ok=false;
+  function blocked(el){
+    for(;el&&el!==document.body;el=el.parentElement){
+      const t=el.tagName;
+      if(t==="TEXTAREA"||t==="SELECT"||(t==="INPUT"&&(el.type==="range"||el===document.activeElement))||el.isContentEditable||el.hasAttribute("data-noswipe"))return true;
+      if(el.scrollWidth>el.clientWidth+4){const o=getComputedStyle(el).overflowX;if(o==="auto"||o==="scroll")return true}
+    }
+    return false;
+  }
+  document.addEventListener("touchstart",e=>{
+    const ov=document.getElementById("libOv");
+    ok=e.touches.length===1&&document.documentElement.dataset.view==="sheet"&&!(ov&&!ov.hidden)&&!document.querySelector(".ov:not([hidden]),dialog[open]")&&!blocked(e.target);
+    if(ok){sx=e.touches[0].clientX;sy=e.touches[0].clientY;st=Date.now()}
+  },{passive:true});
+  document.addEventListener("touchend",e=>{
+    if(!ok)return; ok=false;
+    const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
+    if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.6||Date.now()-st>800)return;
+    const tabs=[...document.querySelectorAll(".ttabs .tt")];
+    const i=tabs.findIndex(b=>b.getAttribute("aria-current")==="page");
+    const n=tabs[i+(dx<0?1:-1)];
+    if(i<0||!n)return;
+    n.click();
+    const a=document.getElementById("app");
+    if(a&&a.animate)a.animate([{transform:`translateX(${dx<0?28:-28}px)`,opacity:.35},{transform:"none",opacity:1}],{duration:180,easing:"ease-out"});
+  },{passive:true});
+})();
+
 render(); setStatus();
 })();
 </script>
