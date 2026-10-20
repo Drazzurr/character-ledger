@@ -1,10 +1,11 @@
 /* Importer storage (IndexedDB "ledger-importer"). Works in the page and in the worker.
    books: one record per PDF (id = pdf.js fingerprint + page count)
    pages: Stage 1 output per page, key [book, page]
-   files: the PDF itself, so an import can resume or re-run without choosing the file again */
+   files: the PDF itself, so an import can resume or re-run without choosing the file again
+   layout: Stage 2 and 3 output per page (blocks in reading order with roles), key [book, page] */
 
 const DB_NAME = "ledger-importer";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbP = null;
 
 export function openDb() {
@@ -16,6 +17,7 @@ export function openDb() {
         if (!db.objectStoreNames.contains("books")) db.createObjectStore("books", { keyPath: "id" });
         if (!db.objectStoreNames.contains("pages")) db.createObjectStore("pages", { keyPath: ["book", "page"] });
         if (!db.objectStoreNames.contains("files")) db.createObjectStore("files");
+        if (!db.objectStoreNames.contains("layout")) db.createObjectStore("layout", { keyPath: ["book", "page"] });
       };
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error || new Error("Could not open importer storage"));
@@ -56,10 +58,21 @@ export async function pageKeys(book) {
   return (keys || []).map((k) => k[1]);
 }
 
+export const getLayout = (book, page) => tx("layout", "readonly", (t) => t.objectStore("layout").get([book, page]));
+export function getLayouts(book, from = 1, to = 1e6) {
+  const range = IDBKeyRange.bound([book, from], [book, to]);
+  return tx("layout", "readonly", (t) => t.objectStore("layout").getAll(range));
+}
+/** Saves many page layouts in one transaction. */
+export function putLayouts(list) {
+  return tx("layout", "readwrite", (t) => { const st = t.objectStore("layout"); for (const L of list) st.put(L); return null; });
+}
+
 export async function deleteBook(book) {
   const range = IDBKeyRange.bound([book, 0], [book, 1e9]);
-  await tx(["books", "pages", "files"], "readwrite", (t) => {
+  await tx(["books", "pages", "files", "layout"], "readwrite", (t) => {
     t.objectStore("pages").delete(range);
+    t.objectStore("layout").delete(range);
     t.objectStore("files").delete(book);
     t.objectStore("books").delete(book);
   });

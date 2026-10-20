@@ -1,9 +1,12 @@
-/* Runs Stage 1 over a book and stores the result. Used by worker.js, and directly on the page
-   when a browser cannot run module workers. */
+/* Runs the importer over a book and stores the result: Stage 1 (text) page by page, then the book-wide
+   Stage 2 (layout) and Stage 3 (style sheet). Used by worker.js, and directly on the page when a browser
+   cannot run module workers. */
 
-import { getBook, putBook, putPage, putFile, getFile, pageKeys } from "./db.js";
+import { getBook, putBook, putPage, putFile, getFile, pageKeys, getPages, putLayouts } from "./db.js";
 import { extractPage, bookInfo, STAGE1_VERSION } from "./extract.js";
 import { loadVocab } from "./vocab.js";
+import { layoutPage, findFurniture, STAGE2_VERSION, eachBlock } from "./layout.js";
+import { buildStyleSheet, applyRoles, STAGE3_VERSION } from "./styles.js";
 
 let pdfjsP = null;
 export function loadPdfjs(appBase) {
@@ -15,6 +18,8 @@ export function loadPdfjs(appBase) {
       const opts = {
         cMapUrl: base + "cmaps/", cMapPacked: true, standardFontDataUrl: base + "standard_fonts/", wasmUrl: base + "wasm/",
         isEvalSupported: false, disableFontFace: true, fontExtraProperties: true, useSystemFonts: false, useWorkerFetch: true,
+        // images are not decoded: the importer needs text and shapes, and decoding art is most of the time on big books
+        maxImageSize: 1, verbosity: 0,
       };
       return { m, opts };
     })().catch((e) => { pdfjsP = null; const err = new Error("Could not load the PDF reader: " + (e && e.message || e)); err.stage = "load"; throw err; });
@@ -111,8 +116,67 @@ export async function run(opts) {
     book.complete = Object.keys(book.pageStatus).length >= n;
     book.updated = Date.now();
     await putBook(book);
-    return { id, stopped: !!(signal && signal.aborted) };
+    const stopped = !!(signal && signal.aborted);
+    if (!stopped) await analyse(id, { appBase, post, vocab, signal });
+    return { id, stopped };
   } finally {
     try { await doc.destroy(); } catch (e) { /* ignore */ }
   }
+}
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+/**
+ * Stages 2 and 3 over every page read so far: furniture, layout, style sheet, roles. Re-run after the
+ * user changes a style's role (overrides are kept on the book record).
+ */
+export async function analyse(id, opts = {}) {
+  const post = opts.post || (() => {});
+  const book = await getBook(id);
+  if (!book) throw new Error("Book not found");
+  const vocab = opts.vocab || await loadVocab(opts.appBase);
+  post({ type: "status", text: "Working out columns, tables and reading order..." });
+  const pages = (await getPages(id)).sort((a, b) => a.page - b.page);
+  if (!pages.length) return;
+  // pages with no text: in a book that is mostly digital text they are art or maps; in a book that is mostly
+  // without text, they are scans that need OCR
+  const ok = pages.filter((p) => p.quality.status === "ok" || p.quality.status === "garbled").length;
+  const scanned = ok < pages.length * 0.5;
+  for (const p of pages) {
+    if (p.quality.status !== "scan" && p.quality.status !== "empty" && p.quality.status !== "art") continue;
+    const st = scanned ? "scan" : "art";
+    p.quality.status = st; p.quality.needsOcr = scanned;
+    p.quality.why = scanned ? "No text layer: a scanned page" : "No text: art, a map or a blank page";
+    book.pageStatus[p.page] = st;
+  }
+  if (book.stats) { book.stats.status = {}; for (const k in book.pageStatus) book.stats.status[book.pageStatus[k]] = (book.stats.status[book.pageStatus[k]] || 0) + 1; }
+  const furn = findFurniture(pages);
+  const lays = [];
+  for (let i = 0; i < pages.length; i++) {
+    if (opts.signal && opts.signal.aborted) return;
+    const L = layoutPage(pages[i], { fonts: book.fonts || {}, furn, vocab });
+    L.book = id;
+    lays.push(L);
+    if (i % 25 === 24) { post({ type: "progress2", done: i + 1, total: pages.length }); await tick(); }
+  }
+  post({ type: "status", text: "Working out the book's styles..." });
+  await tick();
+  const sheet = buildStyleSheet(lays, book.styleOverrides || {});
+  applyRoles(lays, sheet);
+  for (let i = 0; i < lays.length; i += 50) await putLayouts(lays.slice(i, i + 50));
+  // a short summary for the report
+  const count = { heading: 0, para: 0, item: 0, table: 0, panel: 0, sub: 0 };
+  for (const L of lays) eachBlock(L.blocks, (B) => { const k = B.type === "table" || B.type === "panel" ? B.type : B.role; if (count[k] != null) count[k]++; });
+  Object.assign(book, { styles: sheet, layoutCount: count, stage2: STAGE2_VERSION, stage3: STAGE3_VERSION, laidOut: lays.length, updated: Date.now() });
+  await putBook(book);
+}
+
+/** Saves a role change for one style and re-runs the layout with it. */
+export async function setStyleRole(id, key, role, opts = {}) {
+  const book = await getBook(id);
+  if (!book) return;
+  book.styleOverrides = book.styleOverrides || {};
+  if (!role || role === "auto") delete book.styleOverrides[key]; else book.styleOverrides[key] = role;
+  await putBook(book);
+  await analyse(id, opts);
 }

@@ -32,8 +32,8 @@ table{border-collapse:collapse;width:100%;font-size:13px} td,th{border-bottom:1p
 <div id="out"></div>
 </main>
 <script type="module">
-import { run } from "./core.js";
-import { getBook, getPages, deleteBook } from "./db.js";
+import { run, setStyleRole } from "./core.js";
+import { getBook, getPages, deleteBook, getLayouts } from "./db.js";
 import { parseFontName } from "./extract.js";
 
 const $ = (s) => document.querySelector(s);
@@ -98,12 +98,49 @@ async function fixtureChecks() {
   check(results, "Text pages pass the quality check", p.slice(1).every((x) => x.quality.status === "ok"), p.map((x) => x.quality.status + " dict " + x.quality.dict).join("; "));
   check(results, "Fonts recorded for the book", Object.keys(b1.fonts).length >= 4, Object.values(b1.fonts).map((f) => f.name).join(", "));
 
+  // Stage 2 and 3: layout and styles (run by the worker after Stage 1)
+  const lays = await getLayouts(r1.id);
+  const flat = (bs, out = []) => { for (const B of bs) { out.push(B); if (B.blocks) flat(B.blocks, out); } return out; };
+  const L2 = flat(lays[1].blocks), L3 = flat(lays[2].blocks);
+  const hd = (t) => L2.concat(L3).find((B) => B.role === "heading" && B.t === t);
+  check(results, "Layout stored for every page", lays.length === 3, lays.length);
+  check(results, "Heading levels: chapter 1, section 2, spell 3", hd("Chapter 1: Spells") && hd("Chapter 1: Spells").level === 1 && hd("Spell Descriptions").level === 2 && hd("Emberlight Lance").level === 3,
+    ["Chapter 1: Spells", "Spell Descriptions", "Emberlight Lance"].map((t) => hd(t) && hd(t).level).join(","));
+  const sub = L2.find((B) => B.t === "2nd-level evocation");
+  check(results, "Italic line under a spell name is a sub-heading", sub && sub.role === "sub", sub && sub.role);
+  const dur = L2.find((B) => B.lead && B.lead.t === "Duration:");
+  check(results, "Field lines are their own blocks with labels", dur && dur.t === "Duration: Instantaneous" && dur.md.startsWith("**Duration:**"), dur && dur.t);
+  const hl = L2.find((B) => B.lead && B.lead.t === "At Higher Levels.");
+  check(results, "Run-in label kept as bold", hl && hl.md.startsWith("**At Higher Levels.**"), hl && hl.md.slice(0, 40));
+  const order = L2.filter((B) => B.role === "heading").map((B) => B.t);
+  check(results, "Reading order follows the columns", order.join("|") === "Chapter 1: Spells|Spell Descriptions|Emberlight Lance|Whisper of the Tidewell|Lattice of Stilled Hours", order.join(" | "));
+  check(results, "Line-end hyphens repaired", !L2.concat(L3).some((B) => /[a-z]- [a-z]/.test(B.t || "")), (L2.concat(L3).find((B) => /[a-z]- [a-z]/.test(B.t || "")) || {}).t);
+  const tb = L3.find((B) => B.type === "table");
+  check(results, "Table found with title, header and 4 rows", tb && tb.table.title === "Trail Gear" && tb.table.head[0].join("|") === "Item|Cost|Weight" && tb.table.rows.length === 4, tb && JSON.stringify(tb.table).slice(0, 160));
+  const pn = L3.find((B) => B.type === "panel");
+  check(results, "Sidebar found as boxed text", pn && pn.blocks.some((B) => /Worn Gear/.test(B.t || "")), pn && pn.blocks.length);
+  check(results, "Running head and page number left out", lays[2].furniture.some((f) => f.t === "CHAPTER 2 | EQUIPMENT") && lays[2].furniture.some((f) => f.t === "2"), lays[2].furniture.map((f) => f.t).join(" / "));
+  check(results, "Page 3 opens with its chapter heading, not the table", flat(lays[2].blocks)[0].t === "Chapter 2: Equipment", flat(lays[2].blocks)[0].t);
+  const b1s = await getBook(r1.id);
+  const styleOf = (k) => b1s.styles.styles.find((s) => s.key === k) || {};
+  check(results, "Style sheet: body and heading roles", b1s.styles.body === "Times|r|||9.5|k" && styleOf("Times|b|||22.0|c").role === "h1" && styleOf("Times|b|||9.5|k").role === "label", b1s.styles.body);
+  // changing a style's role is kept and re-runs the layout
+  await setStyleRole(r1.id, "Times|b|||12.0|c", "body", { appBase });
+  const lays2 = await getLayouts(r1.id);
+  const stillHeading = flat(lays2[1].blocks).some((B) => B.role === "heading" && B.t === "Emberlight Lance");
+  const b1o = await getBook(r1.id);
+  check(results, "Changing a style's role re-runs the layout and is kept", !stillHeading && b1o.styleOverrides["Times|b|||12.0|c"] === "body");
+  await setStyleRole(r1.id, "Times|b|||12.0|c", "auto", { appBase });
+  const lays3 = await getLayouts(r1.id);
+  check(results, "Back to automatic restores it", flat(lays3[1].blocks).some((B) => B.role === "heading" && B.t === "Emberlight Lance"));
+
   // 2. scanned page, read on the page itself (no worker) to cover the fallback path
   const f2 = await fixture("scanned-page.pdf");
   const r2 = await run({ file: f2, name: f2.name, appBase });
   const p2 = await getPages(r2.id);
-  check(results, "Scanned page flagged for OCR", p2[0].quality.status === "scan" && p2[0].quality.needsOcr, JSON.stringify(p2[0].quality));
-  check(results, "Scanned page image found", p2[0].images.length === 1 && p2[0].images[0].w > 600, JSON.stringify(p2[0].images));
+  const b2 = await getBook(r2.id);
+  check(results, "Page with no text found", p2[0].quality.chars === 0, JSON.stringify(p2[0].quality));
+  check(results, "A book of image-only pages is flagged for OCR", b2.pageStatus[1] === "scan", JSON.stringify(b2.pageStatus));
 
   // 3. scrambled text layer is sent to OCR
   const f3 = await fixture("garbled-text.pdf");
@@ -124,6 +161,7 @@ async function fixtureChecks() {
   check(results, "Second read resumes (skips pages already read)", skipped === 3, skipped);
 
   await deleteBook(r1.id); await deleteBook(r2.id);
+  check(results, "Delete removes layouts too", (await getLayouts(r1.id)).length === 0);
   const gone = await getBook(r1.id);
   check(results, "Delete removes the book", !gone);
 

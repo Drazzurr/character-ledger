@@ -3607,14 +3607,14 @@ function bookAdd(){
 let IMP2=null, IMP2open=false;
 function imp2Section(){
   return `<details class="item" id="imp2box"${IMP2open?" open":""}><summary><span class="sum-t">New importer preview</span></summary><div class="ibody">
-    <p class="hint">Reads a PDF with the new engine and reports what it found: bookmarks, printed page numbers, fonts, colours, and pages that will need OCR. It does not add anything to your Library yet. The page range above applies here too. The PDF is kept on this device so a long book can resume; you can delete it below.</p>
+    <p class="hint">Reads a PDF with the new engine: columns, reading order, tables, boxed text, headings and the book's own styles. Use the page viewer to check any page against the original. It does not add anything to your Library yet. The page range above applies here too. The PDF is kept on this device so a long book can resume; you can delete it below.</p>
     <div class="btns"><span class="btn filebtn">Inspect a PDF<input id="bookFile2" type="file" accept=".pdf,application/pdf,application/octet-stream,*/*" aria-label="Inspect a PDF with the new importer"></span><button class="btn" type="button" data-act="imp2-list">Books read so far</button></div>
     <div id="imp2">${IMP2?IMP2.html():""}</div></div></details>`;
 }
 async function imp2Mod(){
   if(IMP2)return IMP2;
   const M=await import("./importer/importer.js");
-  M.attach(()=>{const e=$("#imp2");if(e)e.innerHTML=M.html()});
+  M.attach(()=>{const e=$("#imp2");if(e)e.innerHTML=M.html()},document.baseURI);
   IMP2=M; return M;
 }
 async function imp2Run(file){

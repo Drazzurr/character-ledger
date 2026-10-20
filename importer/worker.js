@@ -1,11 +1,20 @@
 /* Background worker for the importer, so reading a whole book never freezes the app. */
-import { run } from "./core.js";
+import { run, analyse, setStyleRole } from "./core.js";
 
 let ctrl = null;
 
 self.onmessage = async (e) => {
   const d = e.data || {};
   if (d.cmd === "cancel") { if (ctrl) ctrl.abort(); return; }
+  if (d.cmd === "analyse" || d.cmd === "role") {
+    try {
+      const post = (m) => self.postMessage(m);
+      if (d.cmd === "role") await setStyleRole(d.id, d.key, d.role, { appBase: d.appBase, post });
+      else await analyse(d.id, { appBase: d.appBase, post });
+      self.postMessage({ type: "done", id: d.id });
+    } catch (err) { self.postMessage({ type: "error", message: String(err && err.message || err), stage: err && err.stage || "" }); }
+    return;
+  }
   if (d.cmd !== "run") return;
   ctrl = new AbortController();
   try {

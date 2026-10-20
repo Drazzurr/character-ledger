@@ -165,6 +165,7 @@ export function pageQuality(text, images, area, vocab) {
   const dict = words.length ? hits / words.length : 0;
   let status = "ok", why = "";
   if (n < 40) {
+    // whether this is art or a scan is decided for the whole book later (images are not decoded here)
     status = cover > 0.5 ? "scan" : "empty";
     why = cover > 0.5 ? "Page is an image with no text layer" : "Little or no text";
   } else if (printable < 0.9 || pua / n > 0.05) {
