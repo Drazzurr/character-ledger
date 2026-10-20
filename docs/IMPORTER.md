@@ -18,7 +18,7 @@ Design spec: https://claude.ai/code/artifact/5b29c98b-8fde-46ce-8de7-267e6ce544e
 - **pdf.js 6.4.299** (legacy build, Apache-2.0) lives in `vendor/pdfjs/`, so both importers work offline. The old CDN copy is only a fallback.
 - **Library storage** moved to IndexedDB (`ledger-library`). localStorage keeps a quick-start copy while it fits. On first run the old localStorage copy is saved inside IndexedDB as `backup-localstorage-v1`. The newest copy always wins.
 - **Full backup** now includes the Library, and restoring a backup adds any Library entries that are missing.
-- **Service worker** (`ledger-v5`) precaches the importer and pdf.js; pdf.js has its own cache that survives app updates.
+- **Service worker** (`ledger-v10`) precaches the importer and pdf.js; pdf.js has its own cache that survives app updates.
 - **New importer preview** under Library > Import a book. It reads a PDF and reports bookmarks, printed page numbers, fonts, colours and pages that need OCR. It adds nothing to the Library yet.
 
 ## Files
