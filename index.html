@@ -1118,6 +1118,9 @@ select.rk,.row select{background:var(--field);border:1px solid var(--line);borde
       <textarea id="outBox" readonly placeholder="Exported text appears here" aria-label="Exported JSON"></textarea>
       <p>Large characters can be too big to copy on a phone, so use the Save buttons to get a file instead. A full backup holds every campaign and character and can be imported back into Ledger on any device. The Roll20 option writes basic stats using the D&amp;D 5e Roll20 sheet's attribute names; check the character in Roll20 afterwards to confirm the fields landed where you expect.</p>
     </section>
+    <section><h3>Storage on this device</h3>
+      <p id="stoNote">Checking...</p><div class="btns" id="stoBtn"></div>
+      <p class="hint" style="margin:0">Your characters save automatically as you type, in two places on this device. If the browser ever loses one copy, the app restores it from the other.</p></section>
     <section><h3>About and licenses</h3>
       <p>D&amp;D 5e and 5.5e content is from the SRD 5.1 and SRD 5.2 under their Creative Commons licenses. Pathfinder 2e (Remaster) content comes from the open data of the Foundry VTT Pathfinder 2e system, limited to entries published under the ORC License or the Open Game License.</p>
       <p>This app uses trademarks and copyrights owned by Paizo Inc., used under Paizo's Community Use Policy (paizo.com/communityuse). It is not published, endorsed, or specifically approved by Paizo. Pathfinder is a trademark of Paizo Inc.</p>
@@ -2184,7 +2187,7 @@ function save(){
   dirty=true; S.updated=Date.now();
   const c=cur(); if(c){c.updated=S.updated;if(isPf(c)){try{c.ac=pfVal(c,"ac")}catch(e){}}}
   try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
-  setStatus();
+  mirror(); setStatus();
   clearTimeout(saveTimer); saveTimer=setTimeout(pushDb,700);
 }
 async function pushDb(){
@@ -5090,7 +5093,7 @@ document.addEventListener("change",e=>{
 const PLS="character-ledger-portraits-v1";
 let PORT={};
 try{const r=JSON.parse(localStorage.getItem(PLS)||"{}");if(r&&typeof r==="object")PORT=r}catch(e){}
-function savePort(){try{localStorage.setItem(PLS,JSON.stringify(PORT));return true}catch(e){return false}}
+function savePort(){let ok=true;try{localStorage.setItem(PLS,JSON.stringify(PORT))}catch(e){ok=false}idbPut("portraits",JSON.stringify(PORT));return ok}
 function portAv(c,ini,av,cls){
   const d=PORT[c.id];
   return d?`<span class="avatar has-img ${cls||""}" style="--img:url('${d}')" aria-hidden="true"></span>`:`<span class="avatar ${cls||""}" style="--av:${av}" aria-hidden="true">${esc(ini)}</span>`;
@@ -5158,6 +5161,51 @@ document.addEventListener("click",e=>{
   if(a==="port-clear"){const c=cur();if(c&&PORT[c.id]){delete PORT[c.id];savePort();render()}return}
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#portOv")&&!$("#portOv").hidden)closeCrop()});
+
+
+/* ---------- safety copy in IndexedDB, automatic recovery, storage protection ---------- */
+const IDBN="character-ledger-idb";
+function idb(){return new Promise((res,rej)=>{try{const r=indexedDB.open(IDBN,1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
+function idbPut(k,v){return idb().then(d=>new Promise(res=>{const t=d.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=()=>{d.close();res(true)};t.onerror=()=>{d.close();res(false)}})).catch(()=>false)}
+function idbGet(k){return idb().then(d=>new Promise(res=>{const q=d.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>{d.close();res(q.result)};q.onerror=()=>{d.close();res(undefined)}})).catch(()=>undefined)}
+let mirrorOn=false, mirrorT=null;
+function mirror(){if(!mirrorOn)return;clearTimeout(mirrorT);mirrorT=setTimeout(()=>{idbPut("state",JSON.stringify(S))},400)}
+(async function safetyCopy(){
+  try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}
+  let restored=false;
+  try{
+    const raw=await idbGet("state");
+    if(raw){
+      const p=JSON.parse(raw);
+      if(p&&Array.isArray(p.characters)){
+        let had=false; try{had=!!localStorage.getItem(LS)}catch(e){}
+        if(!had||num(p.updated)>num(S.updated)){S=norm(p);try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}restored=true}
+      }
+    }
+    const pr=await idbGet("portraits");
+    if(pr){const o=JSON.parse(pr);let n=0;for(const k in o){if(!PORT[k]&&S.characters.some(c=>c.id===k)){PORT[k]=o[k];n++}}if(n)savePort()}
+  }catch(e){}
+  mirrorOn=true; mirror();
+  if(restored){
+    if(ui.view==="sheet"&&!cur())ui.view="home";
+    render();
+    const m=document.createElement("div");m.className="msg";m.setAttribute("role","status");m.textContent="Your characters were restored from this device's safety copy.";app.prepend(m);
+  }
+})();
+async function stoCheck(){
+  const n=$("#stoNote"),b=$("#stoBtn"); if(!n)return;
+  let per=null,est=null;
+  try{if(navigator.storage&&navigator.storage.persisted)per=await navigator.storage.persisted()}catch(e){}
+  try{if(navigator.storage&&navigator.storage.estimate)est=await navigator.storage.estimate()}catch(e){}
+  const mb=v=>(v/1048576).toFixed(1)+" MB";
+  n.textContent=(per===true?"Protected: the browser will not clear your data to free up space.":per===false?"Not protected yet: if the device runs very low on space, the browser may clear this data.":"Your data saves on this device.")+(est&&est.usage!=null?" Using "+mb(est.usage)+(est.quota?" of about "+mb(est.quota)+" available":"")+".":"");
+  b.innerHTML=per===false?'<button class="btn pri" type="button" data-act="sto-persist">Protect my data</button>':"";
+}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-act]"); if(!b)return; const a=b.dataset.act;
+  if(a==="sync-open")setTimeout(stoCheck,80);
+  if(a==="sto-persist"){let ok=false;try{ok=await navigator.storage.persist()}catch(err){}await stoCheck();if(!ok){const n=$("#stoNote");if(n)n.textContent+=" The browser did not grant protection. Installing the app to your home screen usually makes it grant it."}}
+});
 
 render(); setStatus();
 })();
