@@ -1,5 +1,5 @@
 /* Character Ledger offline helper. Bump VERSION when the app files change. */
-const VERSION="ledger-v8";
+const VERSION="ledger-v9";
 const SHELL=["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "classes-2014.json", "classes-2024.json", "items-2014.json", "items-2024.json", "magic-2014.json", "magic-2024.json", "spells-2014.json", "spells-2024.json"];
 const PF=["pf2e-classes.json","pf2e-origins.json","pf2e-rules.json","pf2e-spells.json","pf2e-feats.json","pf2e-items.json"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL).then(()=>Promise.all(PF.map(f=>c.add(f).catch(()=>{}))))).then(()=>self.skipWaiting()))});

@@ -2624,9 +2624,9 @@ function renderSheet(){
   const is24=c.rules==="2024";
   const abs=ABIL.map(([k,n])=>`<div class="ab"><span class="ab-n">${k.toUpperCase()}</span><b class="ab-m" data-mod="${k}">+0</b>
     <input class="ab-s" type="number" inputmode="numeric" data-t="n" data-f="abilities.${k}" value="${esc(c.abilities[k])}" aria-label="${n} score"></div>`).join("");
-  const saves=ABIL.map(([k,n])=>`<button class="row" type="button"${ui.profEdit?"":" disabled"} data-prof="save.${k}" aria-label="${n} save proficiency"><span class="dot"></span>
+  const saves=ABIL.map(([k,n])=>`<button class="row" type="button"${ui.profEdit&&ui.profEdit.save?"":" disabled"} data-prof="save.${k}" aria-label="${n} save proficiency"><span class="dot"></span>
     <span class="nm">${k.toUpperCase()}</span><span class="val" data-save="${k}">+0</span></button>`).join("");
-  const skills=SKILLS.map(s=>`<button class="row" type="button"${ui.profEdit?"":" disabled"} data-prof="skill.${s[0]}" aria-label="${s[1]} proficiency"><span class="dot"></span>
+  const skills=SKILLS.map(s=>`<button class="row" type="button"${ui.profEdit&&ui.profEdit.skill?"":" disabled"} data-prof="skill.${s[0]}" aria-label="${s[1]} proficiency"><span class="dot"></span>
     <span class="nm">${s[1]}</span><span class="ab-tag">${s[2].toUpperCase()}</span><span class="val" data-skill="${s[0]}">+0</span></button>`).join("");
 
   app.innerHTML=`${barHTML(c)}
@@ -2658,10 +2658,10 @@ function renderSheet(){
       </div>
     </section>
 
-    <section class="panel pprof${ui.profEdit?" editing":""}"><h3>Saving throws<small>Proficiency <b data-pb>+2</b></small><button class="btn sm pedit-btn" type="button" data-act="prof-edit" aria-pressed="${!!ui.profEdit}">${ui.profEdit?"Done":"Edit"}</button></h3><div class="saves">${saves}</div>
+    <section class="panel pprof${ui.profEdit&&ui.profEdit.save?" editing":""}" data-pk="save"><h3>Saving throws<small>Proficiency <b data-pb>+2</b></small><button class="btn sm pedit-btn" type="button" data-act="prof-edit" data-pk="save" aria-pressed="${!!(ui.profEdit&&ui.profEdit.save)}">${ui.profEdit&&ui.profEdit.save?"Done":"Edit"}</button></h3><div class="saves">${saves}</div>
       <p class="hint"><span class="h-off">Tap Edit to change which saves you are proficient in.</span><span class="h-on">Tap a save to mark or clear proficiency, then tap Done.</span></p></section>
 
-    <section class="panel pprof${ui.profEdit?" editing":""}"><h3>Skills<small>Passive Perception <b data-pp>10</b></small><button class="btn sm pedit-btn" type="button" data-act="prof-edit" aria-pressed="${!!ui.profEdit}">${ui.profEdit?"Done":"Edit"}</button></h3><div class="rows">${skills}</div>
+    <section class="panel pprof${ui.profEdit&&ui.profEdit.skill?" editing":""}" data-pk="skill"><h3>Skills<small>Passive Perception <b data-pp>10</b></small><button class="btn sm pedit-btn" type="button" data-act="prof-edit" data-pk="skill" aria-pressed="${!!(ui.profEdit&&ui.profEdit.skill)}">${ui.profEdit&&ui.profEdit.skill?"Done":"Edit"}</button></h3><div class="rows">${skills}</div>
       <p class="hint"><span class="h-off">Tap Edit to change skill proficiency.</span><span class="h-on">Tap a skill once for proficient, twice for expertise, three times to clear. Tap Done when finished.</span></p></section>
   </div>`;
   recompute();
@@ -2844,7 +2844,7 @@ function applyHp(d){
 document.addEventListener("click",e=>{
   const pb=e.target.closest("[data-prof]");
   if(pb){
-    const c=cur(); if(!c||!ui.profEdit)return;
+    const c=cur(); if(!c||!ui.profEdit||!ui.profEdit[pb.dataset.prof.split(".")[0]])return;
     const [kind,k]=pb.dataset.prof.split(".");
     if(kind==="save"){c.saveProf[k]=c.saveProf[k]?0:1}
     else{c.skills[k]=(num(c.skills[k])+1)%3}
@@ -2853,12 +2853,11 @@ document.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]"); if(!b)return;
   const a=b.dataset.act, c=cur();
   switch(a){
-    case "prof-edit": {ui.profEdit=!ui.profEdit;
-      document.querySelectorAll(".pprof").forEach(p=>{p.classList.toggle("editing",ui.profEdit);p.querySelectorAll("[data-prof]").forEach(r=>{r.disabled=!ui.profEdit});
-        const eb=p.querySelector(".pedit-btn");if(eb){eb.textContent=ui.profEdit?"Done":"Edit";eb.setAttribute("aria-pressed",String(ui.profEdit))}});
+    case "prof-edit": {const pk=b.dataset.pk; ui.profEdit=ui.profEdit||{}; ui.profEdit[pk]=!ui.profEdit[pk]; const on=!!ui.profEdit[pk];
+      const p=b.closest(".pprof"); if(p){p.classList.toggle("editing",on);p.querySelectorAll("[data-prof]").forEach(r=>{r.disabled=!on});b.textContent=on?"Done":"Edit";b.setAttribute("aria-pressed",String(on))}
       break}
-    case "open": ui.profEdit=false; ui.sel=b.dataset.id; ui.view="sheet"; ui.tab="sheet"; ui.q=""; renderSheet(); window.scrollTo(0,0); break;
-    case "tab": if(ui.view!=="sheet")break; ui.profEdit=false; ui.tab=b.dataset.tab; renderSheet(); window.scrollTo(0,0); break;
+    case "open": ui.profEdit=null; ui.sel=b.dataset.id; ui.view="sheet"; ui.tab="sheet"; ui.q=""; renderSheet(); window.scrollTo(0,0); break;
+    case "tab": if(ui.view!=="sheet")break; ui.profEdit=null; ui.tab=b.dataset.tab; renderSheet(); window.scrollTo(0,0); break;
     case "nav-home": if(ui.view!=="home"||ui.newChar||ui.addCamp){ui.newChar=false;ui.addCamp=false;renderHome()} window.scrollTo({top:0,behavior:"smooth"}); break;
     case "heroic": if(c){c.heroic=!c.heroic;save();b.classList.toggle("pri",!!c.heroic);b.textContent=c.heroic?"Have it":"None";b.setAttribute("aria-pressed",String(!!c.heroic))} break;
     case "open-picker": openPicker(); break;
