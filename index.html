@@ -1056,6 +1056,13 @@ label.prow{display:block;cursor:pointer}
 [data-skin="rune"] .panel::before{content:'';position:absolute;inset:5px;pointer-events:none;background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%20viewBox%3D%270%200%2030%2030%27%20%3E%3Cg%20transform%3D%27%27%3E%3Cpath%20d%3D%27M2%2030V10C2%205%205%202%2010%202H30%27%20fill%3D%27none%27%20stroke%3D%27%2359636f%27%20stroke-width%3D%271.6%27%2F%3E%3Cg%20transform%3D%27translate%285%2C5%29%20scale%28.5%29%27%3E%3Cpath%20d%3D%27M11%202L19%2012%2011%2022%203%2012z%27%20fill%3D%27none%27%20stroke%3D%27%236fd6e6%27%20stroke-width%3D%272.4%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20stroke-opacity%3D%271%27%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E") left top/30px no-repeat,url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%20viewBox%3D%270%200%2030%2030%27%20%3E%3Cg%20transform%3D%27translate%2830%2C30%29%20scale%28-1%2C-1%29%27%3E%3Cpath%20d%3D%27M2%2030V10C2%205%205%202%2010%202H30%27%20fill%3D%27none%27%20stroke%3D%27%2359636f%27%20stroke-width%3D%271.6%27%2F%3E%3Cg%20transform%3D%27translate%285%2C5%29%20scale%28.5%29%27%3E%3Cpath%20d%3D%27M11%202L19%2012%2011%2022%203%2012z%27%20fill%3D%27none%27%20stroke%3D%27%236fd6e6%27%20stroke-width%3D%272.4%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20stroke-opacity%3D%271%27%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E") right bottom/30px no-repeat}
 [data-skin="rune"] .panel::after{content:'';position:absolute;inset:5px;pointer-events:none;background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%20viewBox%3D%270%200%2030%2030%27%20%3E%3Cg%20transform%3D%27translate%2830%2C0%29%20scale%28-1%2C1%29%27%3E%3Cpath%20d%3D%27M2%2030V10C2%205%205%202%2010%202H30%27%20fill%3D%27none%27%20stroke%3D%27%2359636f%27%20stroke-width%3D%271.6%27%2F%3E%3Cg%20transform%3D%27translate%285%2C5%29%20scale%28.5%29%27%3E%3Cpath%20d%3D%27M11%202L19%2012%2011%2022%203%2012z%27%20fill%3D%27none%27%20stroke%3D%27%236fd6e6%27%20stroke-width%3D%272.4%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20stroke-opacity%3D%271%27%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E") right top/30px no-repeat,url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%20viewBox%3D%270%200%2030%2030%27%20%3E%3Cg%20transform%3D%27translate%280%2C30%29%20scale%281%2C-1%29%27%3E%3Cpath%20d%3D%27M2%2030V10C2%205%205%202%2010%202H30%27%20fill%3D%27none%27%20stroke%3D%27%2359636f%27%20stroke-width%3D%271.6%27%2F%3E%3Cg%20transform%3D%27translate%285%2C5%29%20scale%28.5%29%27%3E%3Cpath%20d%3D%27M11%202L19%2012%2011%2022%203%2012z%27%20fill%3D%27none%27%20stroke%3D%27%236fd6e6%27%20stroke-width%3D%272.4%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20stroke-opacity%3D%271%27%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E") left bottom/30px no-repeat}
 
+.avatar.has-img{background:var(--img) center/cover no-repeat!important;color:transparent!important}
+.avatar.sm{width:40px;height:40px;font-size:15px;border-radius:12px;padding:0;border:0;cursor:pointer}
+.avatar.big{width:92px;height:92px;font-size:30px}
+.portrow{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.cropv{display:flex;flex-direction:column;align-items:center;gap:12px}
+.cropv canvas{width:min(280px,76vw);height:min(280px,76vw);border-radius:18px;touch-action:none;cursor:grab;background:#000;box-shadow:0 0 0 2px var(--line)}
+.cropv input[type=range]{width:min(280px,76vw)}
 select.rk,.row select{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:4px 6px;width:auto;min-width:0}
 .row input.cell{min-width:0}
 .plan{display:grid;gap:6px}.plv{display:flex;gap:10px;border:1px solid var(--line);border-radius:8px;padding:6px 8px}.plv.now{border-color:var(--accent)}.plv .pn{flex:0 0 26px;font:700 16px/1.4 var(--display);color:var(--muted)}.plv .pb{flex:1;min-width:0;display:grid;gap:2px}.prow{display:flex;justify-content:space-between;gap:8px;font-size:13px}.prow span{color:var(--muted)}.prow b{font-weight:600;text-align:right;min-width:0;overflow-wrap:anywhere}.prow b:empty{display:none}.prow em.open{color:var(--accent);font-style:normal}
@@ -1123,6 +1130,7 @@ select.rk,.row select{background:var(--field);border:1px solid var(--line);borde
 <div class="ov" id="gearOv" hidden></div>
 <div class="ov" id="libOv" hidden></div>
 <div class="ov" id="themeOv" hidden></div>
+<div class="ov" id="portOv" hidden></div>
 <div class="ov" id="lvlOv" hidden></div>
 
 <script>
@@ -2284,7 +2292,7 @@ function renderHome(){
     const ini=String(c.name||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";
     const av=AVC[[...String(c.id)].reduce((a,ch)=>a+ch.charCodeAt(0),0)%AVC.length];
     return `<button class="card" type="button" data-act="open" data-id="${esc(c.id)}">
-      <span class="avatar" style="--av:${av}" aria-hidden="true">${esc(ini)}</span>
+      ${portAv(c,ini,av,"")}
       <span class="card-main">
         <span class="card-t"><span class="card-n">${esc(c.name||"Unnamed")}</span><span class="tag">${isPf(c)?"PF2e":c.rules==="2024"?"5.5e":"5e"}</span>${c.example?'<span class="tag ex">Example</span>':""}</span>
         <span class="sub">${esc(sub)}${ui.camp==="all"&&c.campaign?" \u00b7 "+esc(campName(c.campaign)):""}</span>
@@ -2333,6 +2341,7 @@ function tabsFor(c){
 function barHTML(c){
   const top=`<div class="top-row">
       <button class="ibtn" type="button" data-act="back" aria-label="Back to characters">${ico("back")}</button>
+      ${PORT[c.id]?`<button class="avatar sm has-img" type="button" data-act="tab" data-tab="details" style="--img:url('${PORT[c.id]}')" aria-label="Edit character details and portrait"></button>`:""}
       <div class="who-box"><span class="who" data-live="name">${esc(c.name||"Untitled")}</span><span class="who-sub">${esc(subOf(c))}</span></div>
       <button class="ibtn" type="button" data-act="tab" data-tab="details" aria-label="Edit character details">${ico("edit")}</button>
     </div>
@@ -2666,7 +2675,7 @@ function renderFeats(c){
 function renderDetails(c){
   const is24=c.rules==="2024";
   const campOpts=`<option value="">Unassigned</option>`+S.campaigns.map(k=>`<option value="${esc(k.id)}"${k.id===c.campaign?" selected":""}>${esc(k.name)}</option>`).join("");
-  app.innerHTML=barHTML(c)+`<div class="grid">
+  app.innerHTML=barHTML(c)+`<div class="grid">${portraitPanel(c)}
     <section class="panel span2"><h3>Character</h3><div class="ident">
       <div class="fld name"><span>Character name</span><input data-f="name" type="text" value="${esc(c.name)}"></div>
       ${fld(c,is24?"Species":"Race","race")}${fld(c,"Background","background")}${is24?fld(c,"Origin feat","originFeat",{ph:"Feat granted by your background"}):""}${fld(c,"Alignment","alignment")}
@@ -2990,7 +2999,7 @@ document.addEventListener("click",e=>{
       const n=$('[data-f="name"]'); if(n){n.focus();n.select()} break;}
     case "del-char":
       if(confirmTwice(b,"Tap again to delete")){
-        S.characters=S.characters.filter(ch=>ch.id!==ui.sel); ui.sel=null; save(); renderHome(); window.scrollTo(0,0);
+        if(PORT[ui.sel]){delete PORT[ui.sel];savePort()} S.characters=S.characters.filter(ch=>ch.id!==ui.sel); ui.sel=null; save(); renderHome(); window.scrollTo(0,0);
       } break;
     case "add-atk": if(c){c.attacks.push({name:"",bonus:"",damage:""});ui.edit.add("atk"+(c.attacks.length-1));save();$("#atkBox").innerHTML=attacksHTML(c);const L=$("#atkBox").querySelectorAll(".atk");const last=L[L.length-1];if(last)last.querySelector("input").focus()} break;
     case "atk-edit": if(c){const k="atk"+num(b.dataset.i);ui.edit.has(k)?ui.edit.delete(k):ui.edit.add(k);$("#atkBox").innerHTML=attacksHTML(c)} break;
@@ -4342,7 +4351,7 @@ function renderPfDetails(c){
   const p=c.pf;
   const campOpts=`<option value="">Unassigned</option>`+S.campaigns.map(k=>`<option value="${esc(k.id)}"${k.id===c.campaign?" selected":""}>${esc(k.name)}</option>`).join("");
   app.innerHTML=`${barHTML(c)}
-  <div class="grid">
+  <div class="grid">${portraitPanel(c)}
     <section class="panel span2"><div class="ident">
       <div class="fld name"><span>Character name</span><input data-f="name" type="text" value="${esc(c.name)}"></div>
       <label class="fld"><span>Ancestry</span><input data-f="race" type="text" list="pfAncList" value="${esc(c.race)}"></label>
@@ -5075,6 +5084,80 @@ document.addEventListener("change",e=>{
     renderSheet();
   }
 });
+
+
+/* ---------- portraits: stored on this device only, kept out of the synced data ---------- */
+const PLS="character-ledger-portraits-v1";
+let PORT={};
+try{const r=JSON.parse(localStorage.getItem(PLS)||"{}");if(r&&typeof r==="object")PORT=r}catch(e){}
+function savePort(){try{localStorage.setItem(PLS,JSON.stringify(PORT));return true}catch(e){return false}}
+function portAv(c,ini,av,cls){
+  const d=PORT[c.id];
+  return d?`<span class="avatar has-img ${cls||""}" style="--img:url('${d}')" aria-hidden="true"></span>`:`<span class="avatar ${cls||""}" style="--av:${av}" aria-hidden="true">${esc(ini)}</span>`;
+}
+function portraitPanel(c){
+  const ini=String(c.name||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";
+  const av=AVC[[...String(c.id)].reduce((a,ch)=>a+ch.charCodeAt(0),0)%AVC.length];
+  return `<section class="panel span2"><h3>Portrait</h3><div class="portrow">${portAv(c,ini,av,"big")}
+    <div class="btns"><span class="btn pri filebtn">${PORT[c.id]?"Change picture":"Choose a picture"}<input id="portFile" type="file" accept="image/*" aria-label="Choose a portrait picture"></span>${PORT[c.id]?'<button class="btn danger" type="button" data-act="port-clear">Remove</button>':""}</div></div>
+    <p class="hint" style="margin:10px 0 0">Shown on the character list and at the top of the sheet. Pictures are shrunk and stored only on this device, so they do not sync or export.</p><div class="msg" id="portMsg" role="status"></div></section>`;
+}
+let CROP=null;
+function cropDraw(){
+  const k=CROP; if(!k)return; const cv=$("#cropCv"); if(!cv)return; const g=cv.getContext("2d"), N=cv.width;
+  const s=k.base*k.zoom, w=k.im.naturalWidth*s, h=k.im.naturalHeight*s;
+  k.x=Math.min(0,Math.max(N-w,k.x)); k.y=Math.min(0,Math.max(N-h,k.y));
+  g.fillStyle="#000"; g.fillRect(0,0,N,N); g.drawImage(k.im,k.x,k.y,w,h);
+}
+function openCrop(file){
+  const url=URL.createObjectURL(file), im=new Image();
+  im.onload=()=>{
+    const N=256, base=N/Math.min(im.naturalWidth,im.naturalHeight);
+    CROP={im,url,base,zoom:1,x:(N-im.naturalWidth*base)/2,y:(N-im.naturalHeight*base)/2,id:ui.sel};
+    $("#portOv").innerHTML=`<div class="sheet" role="dialog" aria-labelledby="cropT"><div class="bar" style="margin:0"><h2 id="cropT">Choose the part to show</h2></div>
+      <div class="cropv"><canvas id="cropCv" width="256" height="256" aria-label="Portrait preview. Drag to move the picture."></canvas>
+      <label class="fld" style="width:100%;align-items:center"><span>Zoom</span><input id="cropZoom" type="range" min="100" max="400" value="100" aria-label="Zoom"></label>
+      <p class="hint" style="margin:0;text-align:center">Drag the picture to move it. Use the slider to zoom.</p></div>
+      <div class="btns"><button class="btn pri" type="button" data-act="port-save">Use this picture</button><button class="btn" type="button" data-act="port-cancel">Cancel</button></div></div>`;
+    $("#portOv").hidden=false; cropDraw();
+  };
+  im.onerror=()=>{URL.revokeObjectURL(url);const m=$("#portMsg");if(m){m.textContent="That file could not be read as a picture.";m.className="msg err"}};
+  im.src=url;
+}
+function closeCrop(){if(CROP&&CROP.url)URL.revokeObjectURL(CROP.url);CROP=null;$("#portOv").hidden=true;$("#portOv").innerHTML=""}
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.id==="portFile"&&t.files&&t.files[0]){const f=t.files[0];t.value="";openCrop(f)}
+});
+document.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.id==="cropZoom"&&CROP){
+    const N=256, old=CROP.zoom, nz=num(t.value)/100, cx=(N/2-CROP.x)/old, cy=(N/2-CROP.y)/old;
+    CROP.zoom=nz; CROP.x=N/2-cx*nz; CROP.y=N/2-cy*nz; cropDraw();
+  }
+});
+let cropDrag=null;
+document.addEventListener("pointerdown",e=>{
+  if(e.target.id==="cropCv"&&CROP){cropDrag={x:e.clientX,y:e.clientY,ox:CROP.x,oy:CROP.y};e.target.setPointerCapture&&e.target.setPointerCapture(e.pointerId);e.preventDefault()}
+});
+document.addEventListener("pointermove",e=>{
+  if(!cropDrag||!CROP)return; const cv=$("#cropCv"); if(!cv)return; const r=cv.getBoundingClientRect(), f=256/r.width;
+  CROP.x=cropDrag.ox+(e.clientX-cropDrag.x)*f; CROP.y=cropDrag.oy+(e.clientY-cropDrag.y)*f; cropDraw();
+});
+const endDrag=()=>{cropDrag=null};
+document.addEventListener("pointerup",endDrag); document.addEventListener("pointercancel",endDrag);
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); if(!b)return; const a=b.dataset.act;
+  if(a==="port-cancel"){closeCrop();return}
+  if(a==="port-save"&&CROP){
+    const id=CROP.id, cv=$("#cropCv"), d=cv.toDataURL("image/jpeg",0.86), prev=PORT[id];
+    PORT[id]=d;
+    if(!savePort()){if(prev)PORT[id]=prev;else delete PORT[id];closeCrop();const m=$("#portMsg");if(m){m.textContent="That picture is too big to store on this device. Try a smaller one.";m.className="msg err"}return}
+    closeCrop(); render(); return;
+  }
+  if(a==="port-clear"){const c=cur();if(c&&PORT[c.id]){delete PORT[c.id];savePort();render()}return}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#portOv")&&!$("#portOv").hidden)closeCrop()});
 
 render(); setStatus();
 })();
