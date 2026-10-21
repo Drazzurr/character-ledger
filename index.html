@@ -4780,6 +4780,7 @@ const CFONTS=[
 const MAINS=["#14181f","#1b1426","#10201a","#241612","#1d1d1d","#e9e2d0","#e6ecef","#f4efe6"];
 const ACCS=["#3ccfb2","#e8742a","#b49bff","#e0b04a","#e0566b","#5aa0f0","#8fd16a","#c86b3c"];
 const CUSTOM0={main:"#14181f",accent:"#3ccfb2",font:"grotesk",bg:"none",scrim:55,pa:92};
+const SHOW_THEMED=false; /* flip to true to bring the built-in themed skins back */
 let TH={skin:"modern",mode:"system",fx:"on",snd:"off",acc:"",custom:Object.assign({},CUSTOM0)};
 let THIMG="";
 try{
@@ -4810,6 +4811,7 @@ function loadFonts(g){
 }
 const CVARS=["--bg","--bg2","--panel","--panel2","--field","--ink","--muted","--line","--accent","--accent-ink","--accent-soft","--display","--body","--fs","--hd-font","--pa"];
 function applyTheme(){
+  if(!SHOW_THEMED&&TH.skin!=="modern"&&TH.skin!=="custom")TH.skin="modern";
   const root=document.documentElement, sk=SKINS.find(s=>s.id===TH.skin);
   root.setAttribute("data-skin",sk?TH.skin:"custom"); root.setAttribute("data-fx",TH.fx==="off"?"off":"on");
   CVARS.forEach(k=>root.style.removeProperty(k));
@@ -4845,9 +4847,9 @@ function applyTheme(){
 if(window.matchMedia){const mq=window.matchMedia("(prefers-color-scheme: dark)");(mq.addEventListener?mq.addEventListener.bind(mq,"change"):mq.addListener.bind(mq))(()=>{if(TH.skin==="modern")applyTheme()})}
 const msgTh=(t,err)=>{const m=$("#thMsg");if(m){m.textContent=t;m.className="msg"+(err?" err":"")}};
 function renderThemePanel(){
-  SKINS.forEach(s=>loadFonts(s.fonts));
+  SKINS.filter(s=>SHOW_THEMED||s.id==="modern").forEach(s=>loadFonts(s.fonts));
   const C=TH.custom, cf=CFONTS.find(x=>x.id===C.font)||CFONTS[0];
-  const all=SKINS.concat([{id:"custom",name:"Custom",blurb:"Your own main colour, accent, font and background.",pv:{bg:C.main,panel:mixHex(C.main,lumOf(C.main)<0.3?"#ffffff":"#ffffff",.12),acc:C.accent,font:cf.d.replace(/"/g,"")}}]);
+  const all=SKINS.filter(s=>SHOW_THEMED||s.id==="modern").concat([{id:"custom",name:"Custom",blurb:"Your own main colour, accent, font and background.",pv:{bg:C.main,panel:mixHex(C.main,lumOf(C.main)<0.3?"#ffffff":"#ffffff",.12),acc:C.accent,font:cf.d.replace(/"/g,"")}}]);
   const cards=all.map(s=>`<button class="skin" type="button" data-act="th-skin" data-v="${s.id}" aria-pressed="${TH.skin===s.id}">
     <span class="skin-pv" style="background:${s.pv.bg}"><u style="background:${s.pv.acc}"></u><span class="pvt"><span style="background:${s.pv.acc}"></span><span></span><span></span></span><span class="pvb"><span style="width:68%;background:${s.pv.acc}"></span></span>${s.pv.orn?`<em style="color:${s.pv.acc}"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true">${s.pv.orn}</svg></em>`:""}
       <i style="background:${s.pv.panel};box-shadow:inset 0 0 0 1px ${s.pv.acc}66"></i><i style="background:${s.pv.panel};box-shadow:inset 0 0 0 1px ${s.pv.acc}66;flex:.55"></i></span>
