@@ -6622,6 +6622,7 @@ function crStepReview5(s){
   return `<div class="crd"><p><b>${esc(s.name||"New character")}</b></p><p>${esc((s.sub||s.species))} ${esc(s.cls)}${s.subcls?" ("+esc(s.subcls)+")":""}, level ${s.level} \u00b7 ${esc(s.bg)}</p>
     <p>${CRAB.map(k=>k.toUpperCase()+" "+tot[k]).join(" \u00b7 ")}</p>
     <p class="hint">Skills: ${s.skills.concat((s.bgObj&&s.bgObj.sk||[]).map(crSkId)).filter((v,i,a)=>v&&a.indexOf(v)===i).map(crSkName).join(", ")||"none"}</p></div>
+    ${s.story?`<div class="crd"><b>Story</b><p>${esc(s.story.app)}</p><p>${esc(s.story.pers)}</p><p>${esc(s.story.back)}</p><div class="btns"><button class="btn sm" type="button" data-cr="restory">New story</button></div></div>`:""}
     <p class="hint">Creating will add your class features, species traits, background, gear, attacks and spells to a new sheet, and work out hit points and armor class.</p>`;
 }
 function crApplyAsi(s,tot){
@@ -6749,6 +6750,7 @@ async function crBuild5(s){
   if(sp&&sp.lg&&sp.lg.length)notes.push("Languages: "+sp.lg.join(", "));
   if(meta.prof&&meta.prof.length)notes.push("Class proficiencies: "+meta.prof.join(", "));
   if(bg&&bg.tool&&bg.tool.length)notes.push("Tool proficiencies: "+bg.tool.join(", "));
+  if(s.story){notes.push("","Appearance: "+s.story.app,"Personality: "+s.story.pers,"Backstory: "+s.story.back)}
   c.notes=notes.join("\n");
   /* hit points */
   const hd=num(meta.hd||cl.data.hd,8), cm=abMod(c,"con");
@@ -6792,6 +6794,7 @@ async function crRandom5(s){
   s.eq={}; (m.eq||[]).forEach((g,i)=>{const kits=g.opts.map((o,j)=>j).filter(j=>g.opts[j].items.length);s.eq[i]=kits.length?crPick(kits):0}); s.bgEq="A";
   s.asi={}; crAsiLevels(s).forEach(l=>{const p=CRPRI[s.cls]||CRAB; s.asi[l]={k:"asi2",a:p[0],b:p[1],f:""}});
   crSync(s); crAutoSpells(s);
+  s.story=crStory(s);
   s.step=crSteps(s).length-1;
 }
 function crAutoSpells(s){
@@ -6903,6 +6906,7 @@ async function crBuildPf(s){
     p.spells.c.concat(p.spells.s).forEach(n=>{const x=s.L.spells.find(y=>y.n===n);if(x){pfAddSpell(c,x);const sp=c.pf.spells[c.pf.spells.length-1];if(sp)sp.prep=true}});
   }
   c.pf.coins.gp=15;
+  if(s.story){c.pf.sk.app=s.story.app;c.pf.sk.pers=s.story.pers;c.notes="Backstory: "+s.story.back}
   pfHp(c); c.hp=c.hpMax; c.updated=Date.now();
   return c;
 }
@@ -6931,6 +6935,7 @@ async function crRandomPf(s){
   p.inc={}; crPfIncLevels(s).forEach(l=>{p.inc[l]=crPick(p.skills.concat([...have].filter(id=>PFSKILLS.some(x=>x[0]===id))))});
   p.fp={}; crPfSlots(s).forEach(sl=>{const o=crPfFeatOpts(s,sl).filter(f=>f.lv<=Math.max(1,sl.n));if(o.length)p.fp[sl.id]=crPick(o).n});
   crPfAutoSpells(s);
+  s.story=crStory(s);
   s.step=crSteps(s).length-1;
 }
 function crPfAutoSpells(s){
@@ -7008,6 +7013,7 @@ function crStepPfReview(s){
   const p=s.pf,m=crPfMods(s);
   return `<div class="crd"><p><b>${esc(s.name||"New character")}</b></p><p>${esc(p.her?p.her+" ":"")}${esc(p.anc)} ${esc(p.cls)}, level ${s.level} \u00b7 ${esc(p.bg)}</p>
     <p>${CRAB.map(k=>k.toUpperCase()+" "+sgn(m[k])).join(" \u00b7 ")}</p></div>
+    ${s.story?`<div class="crd"><b>Story</b><p>${esc(s.story.app)}</p><p>${esc(s.story.pers)}</p><p>${esc(s.story.back)}</p><div class="btns"><button class="btn sm" type="button" data-cr="restory">New story</button></div></div>`:""}
     <p class="hint">Creating will set up proficiencies, hit points, class features, feats${s.pfCls&&s.pfCls.sc&&s.pfCls.n!=="Champion"?", spell slots and spells":""}. Add armor, weapons and gear on the sheet.</p>`;
 }
 
@@ -7125,6 +7131,7 @@ async function crAct(a,b){
     case "pspc": crToggle(pf.spells.c,v,5); break;
     case "psps": crToggle(pf.spells.s,v,Object.values(crPfSpellRanks(s)).reduce((x,y)=>x+y,0)); break;
     case "pspauto": crPfAutoSpells(s); break;
+    case "restory": s.story=crStory(s); break;
   }
   if(CR){ if(s.sys==="pf2e"){crSyncPf(s);crPfDefaults(s)}else{crSync(s);crDefaults(s)} crRender(true) }
 }
@@ -7390,6 +7397,29 @@ document.addEventListener("click",e=>{
   let a=$("#printArea"); if(!a){a=document.createElement("div");a.id="printArea";document.body.appendChild(a)}
   a.innerHTML=printHTML(c); try{window.print()}catch(x){}
 });
+
+
+/* ===== random description and backstory ===== */
+const CRS={
+ build:["tall and lean","short and sturdy","broad-shouldered","slight and quick","average height with a steady posture","heavyset and strong","wiry and weathered"],
+ hair:["close-cropped dark hair","a long braid","unruly red hair","silver-streaked hair","a shaved head","tightly curled black hair","sandy hair tied back","no hair to speak of"],
+ mark:["a crooked nose from an old break","a scar across one eyebrow","ink-stained fingers","a missing earlobe","bright, watchful eyes","a gap-toothed grin","a faded tattoo on one forearm","mismatched eyes","a weathered travelling cloak"],
+ trait:["curious about everything","slow to trust but fiercely loyal","cheerful even when things look grim","blunt to a fault","quietly observant","restless and always on the move","generous to a fault","stubborn once their mind is made up","dryly funny","careful and methodical"],
+ want:["to earn a name that will outlast them","to repay an old debt","to find out what really happened to their family","to prove the doubters wrong","to see every corner of the world","to protect the people who took them in","to atone for a mistake they rarely mention","to find a place that feels like home"],
+ fear:["being forgotten","losing the people they care about","a secret coming to light","a debt they can never repay","the dark places beneath the earth","becoming the thing they fight"],
+ hook:["a letter that arrived without a sender","a rumour heard in a tavern","an old map found in a borrowed book","the death of a mentor","a debt called in at the worst moment","a strange dream that keeps returning","a stranger who knew their name"],
+ home:["a river town","a mountain hold","a crowded port city","a quiet farming village","a caravan that never stayed put","a walled city of narrow streets","a remote monastery","the edge of the wilds"]
+};
+const crR=a=>a[rd(a.length)-1];
+function crStory(s){
+  const pf=s.sys==="pf2e", name=s.name||"They", sp=pf?s.pf.anc:(s.sub&&s.ed==="2014"?s.sub:s.species), cl=pf?s.pf.cls:s.cls, bg=pf?s.pf.bg:s.bg;
+  const home=crR(CRS.home), want=crR(CRS.want), fear=crR(CRS.fear), hook=crR(CRS.hook);
+  const an=w=>/^[aeiou]/i.test(w)?"an ":"a ";
+  const app=name+" is "+an(sp)+sp+" "+cl+", "+crR(CRS.build)+", with "+crR(CRS.hair)+" and "+crR(CRS.mark)+".";
+  const pers=name+" is "+crR(CRS.trait)+" and "+crR(CRS.trait)+". They want "+want+", and fear "+fear+".";
+  const back=name+" grew up in "+home+" and came to the life of "+an(bg)+bg+" early on. The path to becoming "+an(cl)+cl+" began with "+hook+". Since then, "+name+" has wandered further from home, always driven by the wish "+want+". Whether that goal is a blessing or a burden is something even they have not decided.";
+  return {app:app,pers:pers,back:back};
+}
 
 render(); setStatus();
 })();
