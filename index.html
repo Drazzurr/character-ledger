@@ -1666,6 +1666,18 @@ html[data-fx="on"]:root[data-skin="modern"] .pc-lvl b,html[data-fx="on"]:root[da
 :root[data-skin="modern"] details.item>summary .sum-t{flex:1 1 0;min-width:7ch}
 :root[data-skin="modern"] details.item>summary .sum-m{order:3;flex:0 0 100%;padding-left:52px;flex-wrap:wrap;gap:6px;justify-content:flex-start;text-align:left}
 }
+
+.dsblock{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.dsblock h4{font:700 12px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.dsblock .btns{margin:0}
+.dsblock .dsbox{align-items:center}
+.dsblock .pip{width:30px;height:30px}
+:root[data-skin="modern"] .dsblock{border-top-color:var(--line)}
+:root[data-skin="modern"] .dsblock .dsbox{background:var(--panel);border-radius:14px}
+:root[data-skin="modern"] .dsblock .pip{border-color:var(--hp)}
+:root[data-skin="modern"] .dsblock .dsbox:first-child .pip{border-color:var(--accent)}
+:root[data-skin="modern"] .dsblock .dsbox:first-child .pip.on{background:var(--accent)}
+:root[data-skin="modern"] .dsblock .dsbox:last-child .pip.on{background:var(--hp)}
 </style>
 
 <div class="skinbg" aria-hidden="true"></div>
@@ -3308,6 +3320,13 @@ function renderSheet(){
           <button class="btn" type="button" data-act="hp-full">Full</button>
         </div>
         <p class="hint">Damage uses temp HP first. Play has quicker damage and healing.</p>
+        <div class="dsblock" id="ovDs"><h4>Death saving throws</h4>
+          <div class="dsrow">
+            <div class="dsbox"><span>Successes</span><div class="pips">${pips(3,num((c.deathSaves||{}).s),"ovds",'data-t="s"')}</div></div>
+            <div class="dsbox"><span>Failures</span><div class="pips">${pips(3,num((c.deathSaves||{}).f),"ovds",'data-t="f"')}</div></div>
+          </div>
+          <div class="btns"><button class="btn sm" type="button" data-act="ovds-clear">Clear saves</button></div>
+        </div>
       </div>
     </section>
 
@@ -4880,11 +4899,14 @@ function renderPlay(c){
       <div class="hpact"><button class="btn dmg" type="button" data-act="p-dmg">Damage</button>
         <label class="amt"><span>AMOUNT</span><input id="hpAmt" type="number" inputmode="numeric" min="0" value="" placeholder="0"></label>
         <button class="btn pri" type="button" data-act="p-heal">Heal</button></div>
-      <div class="dsrow">
-        <div class="dsbox"><span>Successes</span><div class="pips">${pips(3,num(ds.s),"ds",'data-t="s"')}</div></div>
-        <div class="dsbox"><span>Failures</span><div class="pips">${pips(3,num(ds.f),"ds",'data-t="f"')}</div></div>
+      <div class="btns"><button class="btn sm" type="button" data-act="p-temp">Set amount as temp HP</button></div>
+      <div class="dsblock"><h4>Death saving throws</h4>
+        <div class="dsrow">
+          <div class="dsbox"><span>Successes</span><div class="pips">${pips(3,num(ds.s),"ds",'data-t="s"')}</div></div>
+          <div class="dsbox"><span>Failures</span><div class="pips">${pips(3,num(ds.f),"ds",'data-t="f"')}</div></div>
+        </div>
+        <div class="btns"><button class="btn sm" type="button" data-act="ds-roll">Roll a death save</button><button class="btn sm" type="button" data-act="ds-reset">Clear saves</button></div>
       </div>
-      <div class="btns"><button class="btn sm" type="button" data-act="p-temp">Set amount as temp HP</button><button class="btn sm" type="button" data-act="ds-roll">Roll a death save</button><button class="btn sm" type="button" data-act="ds-reset">Clear saves</button></div>
     </section>
     <section class="panel"><h3>Rolls</h3>
       <div class="rollout" id="rollOut" aria-live="polite">${ui.rolls[0]||'<span class="hint" style="margin:0">Tap anything on this page to roll it.</span>'}</div>
@@ -4992,6 +5014,13 @@ document.addEventListener("click",e=>{
   if(a==="lvl-ok"&&ui.lvl&&c){levelDone(c);return}
   if(a==="lvl-cancel"){$("#lvlOv").hidden=true;ui.lvl=null;return}
   if(c&&!isPf(c)&&ui.view==="sheet"&&ui.tab==="play")playClick(c,b);
+  if(c&&!isPf(c)&&ui.view==="sheet"&&(a==="ovds"||a==="ovds-clear")){
+    c.deathSaves=Object.assign({s:0,f:0},c.deathSaves||{});
+    if(a==="ovds"){const k=b.dataset.t,n=num(b.dataset.n);c.deathSaves[k]=num(c.deathSaves[k])===n?n-1:n}
+    else c.deathSaves={s:0,f:0};
+    save();
+    document.querySelectorAll("#ovDs .dsbox").forEach((box,i)=>{const v=num(c.deathSaves[i?"f":"s"]);box.querySelectorAll(".pip").forEach((p,j)=>p.classList.toggle("on",j<v))});
+  }
 });
 document.addEventListener("input",e=>{if(e.target.id==="lvlGain"&&ui.lvl)ui.lvl.gain=num(e.target.value)});
 document.addEventListener("keydown",e=>{
