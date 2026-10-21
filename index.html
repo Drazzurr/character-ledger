@@ -652,7 +652,7 @@ input[readonly]{opacity:.65}
 .atk-t{display:flex;flex-direction:column;gap:3px;flex:1 1 150px;min-width:0}
 .atk-t b{font:600 16px/1.2 var(--display);overflow-wrap:anywhere}
 .atkv:last-of-type{border-bottom:0}
-.atkv b{font:600 16px/1.2 var(--display);flex:1 1 140px;min-width:0}
+.atkv b{font:600 16px/1.2 var(--display);flex:0 1 auto;min-width:0}
 .atkv .atkn{font:500 14px/1.2 var(--body);color:var(--muted)}
 .atkv>.btn{margin-left:auto}
 .abtns{display:flex;gap:6px}
@@ -1844,6 +1844,14 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 .qrout .rline{margin:0}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;gap:12px;align-items:center;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 14px;box-shadow:var(--shadow);max-width:calc(100vw - 28px)}
 #toast[hidden]{display:none}
+#printArea{display:none}
+@media print{body>*:not(#printArea){display:none!important}#printArea{display:block;color:#000;background:#fff;font:12px/1.35 Georgia,serif;padding:0}:root,body{background:#fff!important}
+#printArea h1{font-size:22px;margin:0 0 2px}#printArea h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #000;margin:12px 0 4px}#printArea p{margin:2px 0}
+#printArea table{border-collapse:collapse;width:100%;margin:8px 0}#printArea th,#printArea td{border:1px solid #444;padding:3px 6px;text-align:center;font-size:12px}}
+
+.pip{position:relative}.pip::after{content:"";position:absolute;inset:-8px}
+.rctl .btn.sm,.srow .btn.sm{min-width:44px;min-height:44px}
+.nb{color:color-mix(in srgb,var(--muted) 72%,var(--ink))}
 </style>
 
 <div class="skinbg" aria-hidden="true"></div>
@@ -3003,7 +3011,7 @@ const FXSK=[["acrobatics","Acrobatics"],["animal_handling","Animal Handling"],["
 const FXAB={strength:"str",dexterity:"dex",constitution:"con",intelligence:"int",wisdom:"wis",charisma:"cha"};
 const FXABN={str:"Strength",dex:"Dexterity",con:"Constitution",int:"Intelligence",wis:"Wisdom",cha:"Charisma"};
 const FXDMG=["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"];
-const FXCOND=/\b(while|when|whenever|if|unless|until|as long as|during|once|you can use|as a bonus action|as a reaction|as an action|on your turn|can expend|can spend|can choose|can add)\b/i;
+const FXCOND=/\b(while|when|whenever|if|unless|until|as long as|during|once|you can use|as a bonus action|as a reaction|as an action|on your turn|can expend|can spend|can choose|can add|for that duration|for the duration|for 1 minute|for 10 minutes|starting at (?:character )?level|transform|change your size)\b/i;
 const FXCHOICE=/\b(choose|your choice|of your choice|one of|any one|a skill)\b/i;
 function fxSentences(t){return String(t||"").replace(/\*\*|__/g,"").split(/(?<=[.!?])\s+|\n+/).map(s=>s.trim()).filter(Boolean)}
 function fxParse(text,opt){
@@ -3337,15 +3345,20 @@ function fxSummary(c){
 }
 function featsHTML(c){
   if(!c.features.length)return `<div class="empty">No features yet. Add class features, racial traits and feats, then open any entry to read it. Use Edit inside an entry to change it.</div>`;
+  const fq=lc(ui.fq||"");
+  const shown=c.features.filter(f=>(!fq||lc(f.name+" "+f.source+" "+f.desc).includes(fq))&&(!ui.favF||f.fav)).length;
+  if(!shown)return `<div class="empty">${ui.favF?"No favourite features yet. Open a feature and tap Favourite.":"No features match that search."}</div>`;
   return fxSummary(c)+c.features.map((f,i)=>{
+    if((fq&&!lc(f.name+" "+f.source+" "+f.desc).includes(fq))||(ui.favF&&!f.fav))return "";
     const ed=ui.edit.has(f.id);
     const body=ed?`<div class="igrid">${fld(c,"Name","features."+i+".name")}${fld(c,"Source","features."+i+".source",{ph:"Where it comes from (class, feat, species)"})}</div>
       <label class="fld"><span>Details</span><textarea data-f="features.${i}.desc" placeholder="What it does, how it works, and any numbers to remember">${esc(f.desc)}</textarea></label>
+      ${fxEditor(f,"features",i)}
       <div class="btns">${editBtn(f.id,"feat","Done","pri")}<button class="btn sm danger" type="button" data-act="del-feat" data-i="${i}">Delete feature</button></div>`
-    :`${kv("Source",f.source)}${viewText(f.desc,"No details yet. Tap Edit to add them.")}${fxRows(f,"features",i)}<div class="btns">${editBtn(f.id,"feat","Edit")}</div>`;
+    :`${kv("Source",f.source)}${viewText(f.desc,"No details yet. Tap Edit to add them.")}${fxRows(f,"features",i)}<div class="btns">${editBtn(f.id,"feat","Edit")}<button class="btn sm${f.fav?" pri":""}" type="button" data-act="fav" data-kind="features" data-i="${i}" aria-pressed="${!!f.fav}">${f.fav?"Favourite":"Favourite it"}</button></div>`;
     return `<details class="item" data-id="${esc(f.id)}"${ui.open.has(f.id)?" open":""}>
       <summary><span class="sum-t" data-live="features.${i}.name">${esc(f.name||"Untitled feature")}</span>
-        <span class="sum-m"><span data-live="features.${i}.source">${esc(f.source)}</span></span></summary>
+        <span class="sum-m">${f.fav?"&#9733; ":""}<span data-live="features.${i}.source">${esc(f.source)}</span></span></summary>
       <div class="ibody">${body}</div></details>`;
   }).join("");
 }
@@ -3376,16 +3389,16 @@ function spellItem(c,s,i){
     body=`<div class="kvs">${kv("Casting time",s.time)}${kv("Range",s.range)}${kv("Components",s.components)}${kv("Duration",s.duration)}</div>
       ${viewText(s.desc,"No description yet. Tap Edit to add one.")}
       ${s.higher?`<div class="kv"><span>At higher levels</span><div class="prose">${esc(s.higher)}</div></div>`:""}
-      <div class="btns">${editBtn(s.id,"spell","Edit")}<button class="btn sm" type="button" data-act="prep" data-i="${i}">${s.prepared?"Unprepare":"Prepare"}</button></div>`;
+      <div class="btns">${editBtn(s.id,"spell","Edit")}<button class="btn sm" type="button" data-act="prep" data-i="${i}">${s.prepared?"Unprepare":"Prepare"}</button><button class="btn sm${s.fav?" pri":""}" type="button" data-act="fav" data-kind="spells" data-i="${i}" aria-pressed="${!!s.fav}">${s.fav?"Favourite":"Favourite it"}</button></div>`;
   }
   return `<details class="item" data-id="${esc(s.id)}"${ui.open.has(s.id)?" open":""}>
-    <summary><span class="sum-t" data-live="${p}name">${esc(s.name||"Untitled spell")}</span><span class="sum-m">${tags}</span></summary>
+    <summary><span class="sum-t" data-live="${p}name">${esc(s.name||"Untitled spell")}</span><span class="sum-m">${s.fav?"&#9733; ":""}${tags}</span></summary>
     <div class="ibody">${body}</div></details>`;
 }
 function spellsHTML(c){
   if(!c.spells.length)return `<div class="empty">No spells yet. Add cantrips and spells with their full details, then open any entry to read or edit it.</div>`;
   const q=ui.q.trim().toLowerCase();
-  const rows=c.spells.map((s,i)=>({s:s,i:i})).filter(r=>!q||[r.s.name,r.s.school,r.s.desc,r.s.higher].join(" ").toLowerCase().includes(q));
+  const rows=c.spells.map((s,i)=>({s:s,i:i})).filter(r=>(!q||[r.s.name,r.s.school,r.s.desc,r.s.higher].join(" ").toLowerCase().includes(q))&&(!ui.favS||r.s.fav));
   if(!rows.length)return `<div class="empty">No spells match that search.</div>`;
   let out="";
   for(let l=0;l<=9;l++){
@@ -3619,7 +3632,9 @@ function renderFeats(c){
       <div id="resBox">${resHTML(c)}</div>
       <p class="hint">Short rest refills resources set to recharge on a short rest. Long rest refills those and the long rest ones. A long rest also resets spell slots and Pact slots. A short rest resets Pact slots.</p></section>
     <section class="panel span2"><h3>Features and traits</h3>
-      <div class="listbar"><button class="btn pri" type="button" data-act="add-feat">Add feature</button></div>
+      <div class="listbar"><button class="btn pri" type="button" data-act="add-feat">Add feature</button>
+        <label class="fld"><span>Search features</span><input id="featQ" type="search" value="${esc(ui.fq||"")}" placeholder="Name, source or text"></label>
+        <button class="btn${ui.favF?" pri":""}" type="button" data-act="fav-filter" data-kind="favF" aria-pressed="${!!ui.favF}">&#9733; Favourites</button></div>
       <div class="items" id="featBox">${featsHTML(c)}</div></section>
   </div>`;
   recompute();
@@ -3629,7 +3644,7 @@ function renderDetails(c){
   const campOpts=`<option value="">Unassigned</option>`+S.campaigns.map(k=>`<option value="${esc(k.id)}"${k.id===c.campaign?" selected":""}>${esc(k.name)}</option>`).join("");
   app.innerHTML=barHTML(c)+`<div class="grid">${portraitPanel(c)}
     <section class="panel span2"><h3>Character</h3><div class="ident">
-      <div class="fld name"><span>Character name</span><input data-f="name" type="text" value="${esc(c.name)}"></div>
+      <div class="fld name"><span>Character name</span><input data-f="name" aria-label="Character name" type="text" value="${esc(c.name)}"></div>
       ${fld(c,is24?"Species":"Race","race")}${fld(c,"Background","background")}${is24?fld(c,"Origin feat","originFeat",{ph:"Feat granted by your background"}):""}${fld(c,"Alignment","alignment")}
       <label class="fld"><span>Campaign</span><select data-f="campaign">${campOpts}</select></label>
       <label class="fld"><span>Rules</span><select data-f="rules"><option value="2014"${is24?"":" selected"}>5e (2014)</option><option value="2024"${is24?" selected":""}>5.5e (2024)</option></select></label>
@@ -3638,6 +3653,7 @@ function renderDetails(c){
     <section class="panel span2"><label class="fld"><span>Notes</span><textarea data-f="notes" placeholder="Backstory, session notes, goals">${esc(c.notes)}</textarea></label></section>
   </div>
   <div class="foot"><span class="status">Last edited ${new Date(c.updated||Date.now()).toLocaleString()} \u00b7 <span id="status" role="status"></span></span>
+    <button class="btn" type="button" data-act="print-char">Print or save as PDF</button>
     <button class="btn danger" type="button" data-act="del-char">Delete character</button></div>`;
   recompute(); refreshSubLists(c); setStatus();
 }
@@ -4075,7 +4091,7 @@ function renderSpells(c){
       </div></section>
     <section class="panel span2"><h3>Spell list</h3>
       <div class="listbar"><label class="fld"><span>Search spells</span><input id="spellQ" type="search" value="${esc(ui.q)}" placeholder="Name, school or text"></label>
-        <button class="btn pri" type="button" data-act="open-picker">Add from SRD and library</button><button class="btn" type="button" data-act="add-spell">Add by hand</button></div>
+        <button class="btn pri" type="button" data-act="open-picker">Add from SRD and library</button><button class="btn${ui.favS?" pri":""}" type="button" data-act="fav-filter" data-kind="favS" aria-pressed="${!!ui.favS}">&#9733; Favourites</button><button class="btn" type="button" data-act="add-spell">Add by hand</button></div>
       <div id="spellBox">${spellsHTML(c)}</div></section>
     <section class="panel span2"><h3>Spell slots (used / max)</h3><div id="slotBox">${slotsPanelHTML(c)}</div></section>
   </div>`;
@@ -4094,6 +4110,7 @@ function gearItem(c,it,i){
       ${fld(c,"Cost",p+"cost",{ph:"Price (amount and coin)"})}${fld(c,"Category",p+"cat")}${fld(c,"Damage",p+"dmg",{ph:"Damage dice and type"})}${fld(c,"Properties",p+"props")}${fld(c,"Armor class",p+"ac",{ph:"Base AC and any Dex limit"})}${fld(c,"Rarity",p+"rar")}</div>
       <div class="checks"><label class="chk"><input type="checkbox" data-t="b" data-f="${p}att"${it.att?" checked":""}>Requires attunement</label></div>
       <label class="fld"><span>Description</span><textarea data-f="${p}desc" placeholder="What the item does">${esc(it.desc)}</textarea></label>
+      ${fxEditor(it,"inventory",i)}
       <label class="fld"><span>Your notes</span><textarea data-f="${p}notes" placeholder="Your own notes: where you got it, charges, quirks" style="min-height:64px">${esc(it.notes)}</textarea></label>
       <div class="btns">${editBtn(it.id,"gear","Done","pri")}<button class="btn sm danger" type="button" data-act="del-item" data-i="${i}">Delete item</button></div>`;
   }else{
@@ -5200,6 +5217,7 @@ function renderPlay(c){
     <section class="panel span2"><h3>Attacks</h3>${atk}</section>
     <section class="panel"><h3>Spell slots</h3>${slotRows||pactRow?slotRows+pactRow:`<p class="hint" style="margin:0">No spell slots. Set a casting class under More, Details, or enter slots on the Spells tab.</p>`}</section>
     <section class="panel"><h3>Resources</h3><div id="resBox">${resHTML(c)}</div></section>
+    ${favPanel(c)}
     <section class="panel"><h3>Conditions</h3>
       <div class="chips wrapchips">${CONDS.map(n=>`<button class="chip" type="button" data-act="cond" data-n="${n}" aria-pressed="${cond.has(n)}">${n}</button>`).join("")}</div>
       <div class="srow"><span>Exhaustion</span><button class="btn sm" type="button" data-act="exh" data-d="-1" aria-label="Less exhaustion">-</button><b>${ex}</b><button class="btn sm" type="button" data-act="exh" data-d="1" aria-label="More exhaustion">+</button></div>
@@ -5379,7 +5397,7 @@ function renderPfDetails(c){
   app.innerHTML=`${barHTML(c)}
   <div class="grid">${portraitPanel(c)}
     <section class="panel span2"><div class="ident">
-      <div class="fld name"><span>Character name</span><input data-f="name" type="text" value="${esc(c.name)}"></div>
+      <div class="fld name"><span>Character name</span><input data-f="name" aria-label="Character name" type="text" value="${esc(c.name)}"></div>
       <label class="fld"><span>Ancestry</span><input data-f="race" type="text" list="pfAncList" value="${esc(c.race)}"></label>
       <label class="fld"><span>Heritage</span><input data-f="pf.heritage" type="text" list="pfHerList" value="${esc(p.heritage)}"></label>
       <label class="fld"><span>Background</span><input data-f="background" type="text" list="pfBgList" value="${esc(c.background)}"></label>
@@ -5417,6 +5435,7 @@ function renderPfDetails(c){
     <section class="panel span2"><label class="fld"><span>Notes</span><textarea data-f="notes" placeholder="Backstory, session notes, goals">${esc(c.notes)}</textarea></label></section>
   </div>
   <div class="foot"><span class="status">Last edited ${new Date(c.updated||Date.now()).toLocaleString()} \u00b7 <span id="status" role="status"></span></span>
+    <button class="btn" type="button" data-act="print-char">Print or save as PDF</button>
     <button class="btn danger" type="button" data-act="del-char">Delete character</button></div>`;
   pfRecompute(c); pfFillLists(c); setStatus();
 }
@@ -7288,6 +7307,90 @@ document.addEventListener("click",e=>{
 },true);
 
 setTimeout(qrSync,0);
+
+/* ===== effect editor ===== */
+function fxOptions(){
+  const o=[["ac","Armor class"],["speed","Speed (ft)"],["init","Initiative"],["hp","Max HP"],["hpl","Max HP per level"],["spellatk","Spell attack"],["spelldc","Spell save DC"],["save.all","All saving throws"]];
+  CRAB.forEach(k=>o.push(["abil."+k,FXABN[k]+" score"]));
+  CRAB.forEach(k=>o.push(["save."+k,FXABN[k]+" saves"]));
+  FXSK.forEach(x=>o.push(["skill."+x[0],x[1]+" bonus"]));
+  FXSK.forEach(x=>o.push(["pskill."+x[0],x[1]+": proficiency"]));
+  FXSK.forEach(x=>o.push(["eskill."+x[0],x[1]+": expertise"]));
+  CRAB.forEach(k=>o.push(["psave."+k,FXABN[k]+" saves: proficiency"]));
+  FXDMG.forEach(d=>o.push(["res."+d,"Resistance: "+d]));
+  FXDMG.forEach(d=>o.push(["imm."+d,"Immunity: "+d]));
+  ["darkvision","blindsight","truesight","tremorsense"].forEach(d=>o.push(["sense."+d,d.charAt(0).toUpperCase()+d.slice(1)+" (ft)"]));
+  return o;
+}
+const fxNoVal=k=>/^(pskill|eskill|psave|res|imm)\./.test(k);
+function fxEditor(o,kind,i){
+  const cur=(o.fx||[]).map((e,j)=>`<div class="fxrow"><span>${esc(fxLabel(e))}${e.cond?`<small> \u00b7 ${esc(e.cond)}</small>`:""}</span><button class="btn sm danger" type="button" data-act="fx-del" data-kind="${kind}" data-i="${i}" data-j="${j}" aria-label="Remove effect">Remove</button></div>`).join("");
+  return `<div class="fxbox"><b>Effects on your sheet</b>${cur||`<p class="hint">None yet. Add one to change a number on your sheet.</p>`}
+    <div class="igrid fxadd"><label class="fld"><span>Effect</span><select data-fxk="${esc(o.id)}">${fxOptions().map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join("")}</select></label>
+    <label class="fld"><span>Amount</span><input type="number" inputmode="numeric" data-fxv="${esc(o.id)}" value="1"></label></div>
+    <div class="btns"><button class="btn sm" type="button" data-act="fx-add" data-kind="${kind}" data-i="${i}" data-id="${esc(o.id)}">Add effect</button></div></div>`;
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-act="fx-add"],[data-act="fx-del"]'); if(!b)return;
+  const c=cur(); if(!c)return; const o=(c[b.dataset.kind]||[])[num(b.dataset.i)]; if(!o)return;
+  if(b.dataset.act==="fx-del"){(o.fx||[]).splice(num(b.dataset.j),1);if(o.fx&&!o.fx.length){o.fx=undefined;o.fxq="none"}}
+  else{
+    const k=($('[data-fxk="'+o.id+'"]')||{}).value, v=num(($('[data-fxv="'+o.id+'"]')||{}).value,1); if(!k)return;
+    o.fx=o.fx||[]; o.fx.push({k:k,v:fxNoVal(k)?1:v,c:0}); o.fxq="ok";
+  }
+  save(); recompute(); rerender(b.dataset.kind==="features"?"feat":"gear");
+});
+
+
+/* ===== favourites ===== */
+function favPanel(c){
+  const L=c.spells.filter(x=>x.fav).map(x=>[x.name,(num(x.level)?"Level "+x.level:"Cantrip"),x.desc]).concat(c.features.filter(x=>x.fav).map(x=>[x.name,x.source||"Feature",x.desc]));
+  if(!L.length)return `<section class="panel"><h3>Favourites</h3><p class="hint" style="margin:0">Star spells and features on their tabs and they appear here for quick reading.</p></section>`;
+  return `<section class="panel"><h3>Favourites</h3><div class="items">${L.map(x=>`<details class="item"><summary><span class="sum-t">${esc(x[0])}</span><span class="sum-m">${esc(x[1])}</span></summary><div class="ibody">${viewText(x[2],"No details.")}</div></details>`).join("")}</div></section>`;
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-act="fav"],[data-act="fav-filter"]'); if(!b)return; const c=cur(); if(!c)return;
+  if(b.dataset.act==="fav"){const o=(c[b.dataset.kind]||[])[num(b.dataset.i)];if(!o)return;o.fav=!o.fav;save();if(b.dataset.kind==="spells"){const bx=$("#spellBox");if(bx)bx.innerHTML=spellsHTML(c)}else rerender("feat");return}
+  ui[b.dataset.kind]=!ui[b.dataset.kind]; renderSheet();
+});
+document.addEventListener("input",e=>{
+  const t=e.target; if(t.id!=="featQ")return; ui.fq=t.value; const c=cur(), bx=$("#featBox"); if(c&&bx)bx.innerHTML=featsHTML(c);
+});
+
+
+/* ===== print / save as PDF ===== */
+function printHTML(c){
+  const h=(t,b)=>b?`<h2>${t}</h2>${b}`:"";
+  const txt=t=>`<p>${esc(String(t||"")).replace(/\n+/g,"<br>")}</p>`;
+  if(isPf(c)){
+    const p=c.pf, v=k=>sgn(pfVal(c,k));
+    return `<h1>${esc(c.name)}</h1><p>${esc([c.race,c.pf.heritage,c.cls,"level "+c.level,c.background].filter(Boolean).join(" \u00b7 "))}</p>
+    <table><tr>${CRAB.map(k=>`<th>${k.toUpperCase()}</th>`).join("")}<th>HP</th><th>AC</th><th>Perception</th><th>Fort</th><th>Ref</th><th>Will</th></tr>
+    <tr>${CRAB.map(k=>`<td>${sgn(pfMod(c,k))}</td>`).join("")}<td>${num(c.hp)}/${num(c.hpMax)}</td><td>${pfVal(c,"ac")}</td><td>${v("perception")}</td><td>${v("fortitude")}</td><td>${v("reflex")}</td><td>${v("will")}</td></tr></table>
+    ${h("Skills",`<p>${PFSKILLS.filter(x=>num(p.skills[x[0]])>0).map(x=>x[1]+" "+v("skill."+x[0])).join(", ")||"None trained"}</p>`)}
+    ${h("Strikes",p.strikes.map((x,i)=>`<p><b>${esc(x.name)}</b> ${v("atk."+i)} \u00b7 ${esc(pfDmg(c,x).text)}</p>`).join(""))}
+    ${h("Spells",p.spells.length?`<p>${p.spells.map(x=>esc(x.name)+" ("+(x.k==="cantrip"?"cantrip":"rank "+x.lv)+")").join(", ")}</p>`:"")}
+    ${h("Feats and features",p.feats.map(f=>`<p><b>${esc(f.name)}</b> <small>${esc(f.cat||"")}</small></p>`).join(""))}
+    ${h("Inventory",`<p>${p.inv.map(i=>esc(i.name)+(num(i.qty)>1?" x"+i.qty:"")).join(", ")}</p>`)}`;
+  }
+  const pb=prof(c);
+  return `<h1>${esc(c.name)}</h1><p>${esc([c.race,c.cls,c.subclass,"level "+c.level,c.background].filter(Boolean).join(" \u00b7 "))}</p>
+  <table><tr>${ABIL.map(a=>`<th>${a[0].toUpperCase()}</th>`).join("")}</tr><tr>${ABIL.map(a=>`<td>${abScore(c,a[0])} (${sgn(abMod(c,a[0]))})</td>`).join("")}</tr></table>
+  <table><tr><th>HP</th><th>AC</th><th>Initiative</th><th>Speed</th><th>Proficiency</th></tr><tr><td>${num(c.hp)}/${num(c.hpMax)}</td><td>${acOf(c)}</td><td>${sgn(initB(c))}</td><td>${speedOf(c)}</td><td>+${pb}</td></tr></table>
+  ${h("Saving throws",`<p>${ABIL.map(a=>a[0].toUpperCase()+" "+sgn(saveB(c,a[0]))+(saveP(c,a[0])?"*":"")).join(" \u00b7 ")}</p>`)}
+  ${h("Skills",`<p>${SKILLS.map(x=>x[1]+" "+sgn(skillB(c,x))+(skillP(c,x[0])?"*":"")).join(", ")}</p>`)}
+  ${h("Attacks",c.attacks.map(a=>`<p><b>${esc(a.name)}</b> ${esc(a.bonus)} \u00b7 ${esc(a.damage)}</p>`).join(""))}
+  ${h("Spells",c.spells.length?[0,1,2,3,4,5,6,7,8,9].map(l=>{const g=c.spells.filter(x=>num(x.level)===l);return g.length?`<p><b>${l?"Level "+l:"Cantrips"}:</b> ${g.map(x=>esc(x.name)).join(", ")}</p>`:""}).join(""):"")}
+  ${h("Features",c.features.map(f=>`<p><b>${esc(f.name)}</b> <small>${esc(f.source||"")}</small><br>${esc(String(f.desc||"")).replace(/\n+/g," ")}</p>`).join(""))}
+  ${h("Inventory",`<p>${c.inventory.map(i=>esc(i.name)+(num(i.qty)>1?" x"+i.qty:"")).join(", ")}</p>`)}
+  ${c.notes?h("Notes",txt(c.notes)):""}`;
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-act="print-char"]'); if(!b)return; const c=cur(); if(!c)return;
+  let a=$("#printArea"); if(!a){a=document.createElement("div");a.id="printArea";document.body.appendChild(a)}
+  a.innerHTML=printHTML(c); try{window.print()}catch(x){}
+});
+
 render(); setStatus();
 })();
 </script>
