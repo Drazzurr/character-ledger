@@ -1834,6 +1834,16 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 @media (max-width:420px){.crnav .btn{flex:1 1 30%}}
 .crpack{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field)}
 .crpack small{color:var(--muted)}
+:root[data-view="sheet"] body{padding-bottom:calc(var(--nav-h) + 96px + env(safe-area-inset-bottom,0px))}
+.qrbar{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:6px;box-shadow:var(--shadow)}
+#qr{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:12;display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:calc(100vw - 28px)}
+#qr[hidden]{display:none}
+.qrd{min-width:64px;height:48px;font:700 17px var(--display)}
+.qrout{background:var(--panel2);border:1px solid var(--accent);border-radius:14px;padding:8px 12px;max-width:min(320px,100%);box-shadow:var(--shadow)}
+.qrout[hidden]{display:none}
+.qrout .rline{margin:0}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;gap:12px;align-items:center;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 14px;box-shadow:var(--shadow);max-width:calc(100vw - 28px)}
+#toast[hidden]{display:none}
 </style>
 
 <div class="skinbg" aria-hidden="true"></div>
@@ -3587,7 +3597,7 @@ function renderSheet(){
             <div class="dsbox"><span>Successes</span><div class="pips">${pips(3,num((c.deathSaves||{}).s),"ovds",'data-t="s"')}</div></div>
             <div class="dsbox"><span>Failures</span><div class="pips">${pips(3,num((c.deathSaves||{}).f),"ovds",'data-t="f"')}</div></div>
           </div>
-          <div class="btns"><button class="btn sm" type="button" data-act="ovds-clear">Clear saves</button></div>
+          <div class="btns"><button class="btn sm" type="button" data-act="ovds-roll">Roll a death save</button><button class="btn sm" type="button" data-act="ovds-clear">Clear saves</button></div>
         </div>
       </div>
     </section>
@@ -4836,7 +4846,7 @@ function doImport(){
       if(d.library&&typeof d.library==="object"){
         const L=normLib(d.library); let libAdded=0;
         ["classes","spells","items","sections"].forEach(k=>L[k].forEach(x=>{if(!LIB[k].some(y=>y.id===x.id)){LIB[k].push(x);libAdded++}}));
-        if(libAdded){saveLib();note=" Added "+libAdded+" Library "+(libAdded===1?"entry":"entries")+" from the backup."}
+        Object.keys(L.packs||{}).forEach(k=>{if(!LIB.packs[k])LIB.packs[k]=L.packs[k]});if(libAdded){saveLib();note=" Added "+libAdded+" Library "+(libAdded===1?"entry":"entries")+" from the backup."}
       }
     }else if(Array.isArray(d)&&d.length&&d[0]&&d[0].attribs){
       d.forEach(x=>put(fromR20(x.name,x.attribs,camp)));
@@ -5107,6 +5117,7 @@ function showRoll(label,html,total,tag){
   const line=`<div class="rline"><b>${esc(label)}</b> <span class="rdet">${html}</span> <strong class="rtot">${total}</strong>${tag?` <span class="tag ex">${tag}</span>`:""}</div>`;
   ui.rolls.unshift(line); ui.rolls=ui.rolls.slice(0,14);
   const o=$("#rollOut"); if(o)o.innerHTML=line;
+  hap(/Natural/.test(tag||"")?[30,40,30]:18); qrFlash(line);
   const l=$("#rollLog"); if(l)l.innerHTML=ui.rolls.slice(1).join("");
 }
 function rollD20(label,bonus){
@@ -5182,6 +5193,7 @@ function renderPlay(c){
     <section class="panel"><h3>Rolls</h3>
       <div class="rollout" id="rollOut" aria-live="polite">${ui.rolls[0]||'<span class="hint" style="margin:0">Tap anything on this page to roll it.</span>'}</div>
       <div class="seg tight" role="group" aria-label="Roll mode">${[[-1,"Disadvantage"],[0,"Normal"],[1,"Advantage"]].map(([v,t])=>`<button class="btn sm${a===v?" pri":""}" type="button" data-act="adv" data-v="${v}" aria-pressed="${a===v}">${t}</button>`).join("")}</div>
+      <div class="btns" style="margin:8px 0"><button class="btn sm${HAP?" pri":""}" type="button" data-act="haptics" aria-pressed="${HAP}">Vibration ${HAP?"on":"off"}</button></div>
       <div class="dice">${[4,6,8,10,12,20,100].map(n=>`<button class="btn sm" type="button" data-act="roll" data-k="die.${n}">d${n}</button>`).join("")}</div>
       <div class="listbar" style="margin:10px 0 0"><label class="fld"><span>Custom roll</span><input id="rollExpr" type="text" placeholder="2d6+3"></label><button class="btn" type="button" data-act="roll" data-k="expr">Roll</button><button class="btn" type="button" data-act="roll" data-k="init">Initiative ${sgn(initB(c))}</button></div>
       <div class="rolllog" id="rollLog">${ui.rolls.slice(1).join("")}</div></section>
@@ -7206,6 +7218,76 @@ document.addEventListener("click",e=>{
   x.cat=b.dataset.v; x.catq="ok"; x.data=undefined; x.fx=undefined; x.fxq=undefined; libEnrich(); saveLib(); renderLib();
 });
 
+
+/* ===== play polish: quick d20 button, undo, haptics, death save on the overview ===== */
+let HAP=true; try{HAP=localStorage.getItem("character-ledger-haptics")!=="0"}catch(e){}
+function hap(p){try{if(HAP&&navigator.vibrate)navigator.vibrate(p)}catch(e){}}
+let qrEl=null, qrTimer=0;
+function qrBuild(){
+  if(qrEl)return qrEl;
+  qrEl=document.createElement("div"); qrEl.id="qr"; qrEl.hidden=true;
+  qrEl.innerHTML=`<div class="qrout" id="qrOut" aria-live="polite" hidden></div><div class="qrbar"><button class="btn sm" type="button" data-act="qr-adv" id="qrAdv" aria-label="Roll mode"></button><button class="btn pri qrd" type="button" data-act="qr-roll" aria-label="Roll a d20">d20</button></div>`;
+  document.body.appendChild(qrEl); return qrEl;
+}
+function qrSync(){
+  const el=qrBuild(), c=cur(), show=ui.view==="sheet"&&c&&ui.tab!=="play"&&$("#libOv").hidden&&$("#crOv").hidden&&$("#lvlOv").hidden;
+  el.hidden=!show;
+  const b=$("#qrAdv"); if(b){b.textContent=ui.adv===1?"Adv":ui.adv===-1?"Dis":"Normal";b.classList.toggle("pri",ui.adv!==0)}
+}
+function qrFlash(line){
+  const o=$("#qrOut"); if(!o||!qrEl||qrEl.hidden)return;
+  o.innerHTML=line; o.hidden=false; clearTimeout(qrTimer); qrTimer=setTimeout(()=>{o.hidden=true},5000);
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); const a=b&&b.dataset.act;
+  if(a==="qr-roll"){rollD20("d20",0);return}
+  if(a==="qr-adv"){ui.adv=ui.adv===0?1:ui.adv===1?-1:0;hap(10);qrSync();return}
+  if(a==="haptics"){HAP=!HAP;try{localStorage.setItem("character-ledger-haptics",HAP?"1":"0")}catch(x){}hap(20);const c=cur();if(c&&ui.tab==="play")renderPlay(c);return}
+  if(a==="ovds-roll"){
+    const c=cur(); if(!c)return;
+    const r=rd(20); c.deathSaves=Object.assign({s:0,f:0},c.deathSaves||{}); let tag="";
+    if(r===20){c.hp=Math.max(1,num(c.hp));c.deathSaves={s:0,f:0};tag="Back up with 1 HP"}
+    else if(r===1){c.deathSaves.f=Math.min(3,num(c.deathSaves.f)+2);tag="Two failures"}
+    else if(r>=10){c.deathSaves.s=Math.min(3,num(c.deathSaves.s)+1);tag="Success"}
+    else{c.deathSaves.f=Math.min(3,num(c.deathSaves.f)+1);tag="Failure"}
+    save();
+    document.querySelectorAll("#ovDs .dsbox").forEach((box,i)=>{const v=num(c.deathSaves[i?"f":"s"]);box.querySelectorAll(".pip").forEach((p,j)=>p.classList.toggle("on",j<v))});
+    const hp=document.querySelector('[data-f="hp"]'); if(hp)hp.value=c.hp;
+    showRoll("Death save","d20 ["+r+"]",r,tag+(r===20||r===1?"":""));
+    const t=$("#qrOut"); if(t){t.hidden=false}
+  }
+  setTimeout(qrSync,0);
+},false);
+document.addEventListener("touchend",()=>setTimeout(qrSync,60),{passive:true});
+/* undo: snapshot before anything destructive, offer to restore after */
+const UNDOACT=/^(del-(char|camp|pick|fac|res|feat|spell|item|atk)|p-rest|rest-short|rest-long|rest|hp-full|p-dmg|p-heal|pf-del.*|cls-del)$/;
+let undoSnap=null, undoTimer=0;
+function toastBuild(){let t=$("#toast");if(!t){t=document.createElement("div");t.id="toast";t.setAttribute("role","status");t.hidden=true;document.body.appendChild(t)}return t}
+function showUndo(msg,snap){
+  const t=toastBuild(); undoSnap=snap;
+  t.innerHTML=`<span>${esc(msg)}</span><button class="btn sm" type="button" data-act="undo">Undo</button>`; t.hidden=false;
+  clearTimeout(undoTimer); undoTimer=setTimeout(()=>{t.hidden=true;undoSnap=null},7000);
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); if(!b)return; const a=b.dataset.act;
+  if(a==="undo"){
+    if(!undoSnap)return; const keep=ui.sel;
+    try{S=norm(JSON.parse(undoSnap))}catch(x){return}
+    if(!S.characters.some(c=>c.id===keep))ui.sel=null;
+    undoSnap=null; $("#toast").hidden=true; save();
+    if(ui.view==="home"||!ui.sel)renderHome(); else renderSheet();
+    return;
+  }
+  if(!UNDOACT.test(a))return;
+  const snap=JSON.stringify(S), before=b.textContent;
+  setTimeout(()=>{
+    if(JSON.stringify(S)===snap)return;
+    const msg=/^del-/.test(a)||a==="cls-del"?"Deleted":/rest/.test(a)?"Rest applied":"Hit points changed";
+    showUndo(msg,snap);
+  },40);
+},true);
+
+setTimeout(qrSync,0);
 render(); setStatus();
 })();
 </script>
