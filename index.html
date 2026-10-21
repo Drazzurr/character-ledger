@@ -1832,6 +1832,8 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 .crnav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;bottom:0;padding:10px 0 2px;background:var(--bg2);margin-top:auto}
 .crnav .sp{flex:1}
 @media (max-width:420px){.crnav .btn{flex:1 1 30%}}
+.crpack{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field)}
+.crpack small{color:var(--muted)}
 </style>
 
 <div class="skinbg" aria-hidden="true"></div>
@@ -1938,8 +1940,9 @@ const fullAt=n=>FULLT[Math.max(0,Math.min(20,n))]||[];
 /* library: your own classes, spells, items and text, kept private to you */
 const LIBLS="character-ledger-lib-v1";
 function normLib(p){
-  const o={classes:[],spells:[],items:[],sections:[],updated:num(p&&p.updated)};
+  const o={classes:[],spells:[],items:[],sections:[],packs:{},updated:num(p&&p.updated)};
   ["classes","spells","items","sections"].forEach(k=>{if(p&&Array.isArray(p[k]))o[k]=p[k].filter(x=>x&&x.name!=null).map(x=>Object.assign({},x,{id:x.id||uid()}))});
+  if(p&&p.packs&&typeof p.packs==="object"&&!Array.isArray(p.packs))Object.keys(p.packs).forEach(k=>{o.packs[k]={creator:!!(p.packs[k]&&p.packs[k].creator)}});
   return o;
 }
 let LIB=normLib({});
@@ -4365,10 +4368,10 @@ function libImportHTML(){
     <div class="btns"><button class="btn pri" type="button" data-act="imp-parse">Find content in this text</button></div>${found}`;
 }
 function renderLib(){
-  const L=ui.lib, ov=$("#libOv");
+  const L=ui.lib, ov=$("#libOv"); libEnrich();
   const pf=L.sys==="pf2e", cnt=k=>LIB[k].filter(x=>sysOf(x)===L.sys).length;
   const tabs=pf?PFLIBTABS.concat([["spells","My spells ("+cnt("spells")+")"],["items","My items ("+cnt("items")+")"],["sections","My text ("+cnt("sections")+")"]])
-    :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["book","Import a book"],["import","Import text"]];
+    :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["sources","Sources"],["review","Needs review"+(libReviewList().length?" ("+libReviewList().length+")":"")],["book","Import a book"],["import","Import text"]];
   const sysBar=L.locked?`<div class="tags"><span class="tag ex">${pf?"Pathfinder 2e only":"D&amp;D 5e and 5.5e only"}</span></div>`
     :`<div class="seg" role="group" aria-label="Game system">${[["dnd5e","D&amp;D 5e and 5.5e"],["pf2e","Pathfinder 2e"]].map(([v,t])=>`<button class="btn sm${L.sys===v?" pri":""}" type="button" data-act="lib-sys" data-s="${v}" aria-pressed="${L.sys===v}">${t}</button>`).join("")}</div>`;
   const edBar=!pf&&!L.draft&&!L.view?`<label class="fld" style="max-width:260px"><span>Edition for new entries</span><select data-lined>${[["","5e and 5.5e (both)"],["2014","5e (2014)"],["2024","5.5e (2024)"]].map(([v,t])=>`<option value="${v}"${String(L.ed||"")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:"";
@@ -4378,7 +4381,7 @@ function renderLib(){
       <div class="btns"><button class="btn pri" type="button" data-act="lib-save">Save to library</button><button class="btn" type="button" data-act="lib-cancel">Cancel</button></div>`;
   }else if(!pf&&L.view&&LIB.classes[L.view.i]){
     body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-vback">Back to classes</button><button class="btn sm" type="button" data-act="lib-vedit">Edit</button></div>`+libClassViewHTML(LIB.classes[L.view.i]);
-  }else body=L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():libListHTML(L.tab);
+  }else body=L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():L.tab==="sources"?libSourcesHTML():L.tab==="review"?libReviewHTML():libListHTML(L.tab);
   ov.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="libT">
     <div class="bar" style="margin:0"><h2 id="libT">Library</h2><span class="status" id="libStatus">${esc(libStatusText())}</span><button class="btn sm pri" type="button" data-act="lib-close">Done</button></div>
     ${sysBar}
@@ -6400,7 +6403,7 @@ const CRARRAY=[15,14,13,12,10,8], CRPB={8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
 const crSkId=n=>(FXSK.find(x=>lc(x[1])===lc(n))||[0,""])[0];
 const crSkName=id=>(FXSK.find(x=>x[0]===id)||[0,id])[1];
 const crAbName=k=>FXABN[k]||k;
-const crPackOn=src=>{const p=LIB.packs&&LIB.packs[src||""];return !!(p&&p.creator)};
+const crPackOn=src=>{const p=LIB.packs&&LIB.packs[String(src||"").trim()||"No source name"];return !!(p&&p.creator)};
 const crQ=s=>String(s||"").replace(/[\u2018\u2019]/g,"'").trim().toLowerCase();
 async function crLoad5(){
   if(CRD.o)return;
@@ -6411,7 +6414,7 @@ async function crLoad5(){
 const crLib=(cat,ed)=>LIB.sections.filter(x=>sysOf(x)==="dnd5e"&&x.cat===cat&&crPackOn(x.source)&&(!x.ed||x.ed===ed));
 function crSpecies(ed){
   const out=(CRD.o[ed].species||[]).map(x=>({n:x.n,sz:x.sz,sp:x.sp,ab:x.ab||{},abo:x.abo,lg:x.lg||[],tr:x.tr||[],sub:x.sub||[],src:"SRD"}));
-  crLib("species",ed).forEach(x=>out.push({n:x.name,sz:(x.data&&x.data.size)||"Medium",sp:(x.data&&x.data.speed)||30,ab:{},lg:[],tr:[{n:x.name,d:x.text||""}],sub:[],src:x.source||"Library",lib:x}));
+  crLib("species",ed).forEach(x=>out.push({n:x.name,sz:(x.data&&x.data.size)||"Medium",sp:(x.data&&x.data.speed)||30,ab:(x.data&&x.data.ab)||{},lg:[],tr:[{n:x.name,d:x.text||""}],sub:[],src:x.source||"Library",lib:x}));
   return out;
 }
 function crBgs(ed){
@@ -6461,7 +6464,7 @@ function crNewState(sys){
     pf:{anc:"",her:"",bg:"",cls:"",boosts:{anc:[],bg:[],free:[]},skills:[],tradition:"",feats:{},spells:{c:[],s:[]}}};
 }
 function crSteps(s){
-  if(s.sys==="pf2e")return ["Basics","Ancestry","Background","Class","Abilities","Skills","Feats","Spells","Review"].filter(x=>x!=="Spells"||(s.pfCls&&s.pfCls.sc));
+  if(s.sys==="pf2e")return ["Basics","Ancestry","Background","Class","Abilities","Skills","Feats","Spells","Review"].filter(x=>x!=="Spells"||(s.pfCls&&s.pfCls.sc&&s.pfCls.n!=="Champion"));
   const a=["Basics","Species","Class","Background","Abilities","Skills","Gear"];
   if(s.casterMeta&&s.casterMeta.sc)a.push("Spells");
   if(s.level>=4)a.push("Improvements");
@@ -6575,7 +6578,7 @@ function crStepSpells(s){
 }
 const crAsiLevels=s=>ASI.concat(lc(s.cls)==="fighter"?[6,14]:lc(s.cls)==="rogue"?[10]:[]).filter(l=>l<=s.level).sort((a,b)=>a-b);
 function crStepImprove(s){
-  const lv=crAsiLevels(s), feats=s.L.feats.filter(f=>s.ed==="2014"||f.t==="general"||f.t==="fighting-style"&&0);
+  const lv=crAsiLevels(s), feats=s.L.feats.filter(f=>(s.ed==="2014"||f.t==="general")&&num(f.lv)<=s.level&&Object.keys(f.pre||{}).every(k=>!CRAB.includes(k)||crTotals(s)[k]>=num(f.pre[k])||(f.pre.abil&&0)));
   return lv.map(l=>{
     const a=s.asi[l]||(s.asi[l]={k:"asi2",a:(CRPRI[s.cls]||CRAB)[0],b:(CRPRI[s.cls]||CRAB)[1],f:""});
     return `<div class="crd"><b>Level ${l}</b><div class="igrid">
@@ -6603,7 +6606,8 @@ async function crPrepare(s){
   s.L.species=crSpecies(ed); s.L.bgs=crBgs(ed); s.L.feats=crFeats(ed);
   s.L.classes=await crClasses(ed);
   try{await loadSpells(ed)}catch(e){}
-  s.L.spells=(SPELLDATA[ed]||[]).filter(x=>x.ed===ed).concat(dndLib("spells").map(libSpellRec));
+  libEnrich();
+  s.L.spells=(SPELLDATA[ed]||[]).filter(x=>x.ed===ed).concat(dndLib("spells").filter(x=>crPackOn(x.source)&&(!x.ed||x.ed===ed)).map(libSpellRec));
   crSync(s);
 }
 function crSync(s){
@@ -6651,7 +6655,9 @@ async function crItemRecs(ed){
   D.forEach(r=>{m.set(crItemKey(r.n),r)});
   return m;
 }
+const CRGEN=[[/^(two )?(any )?martial (melee )?weapons?$/i,"Longsword"],[/^a martial weapon$/i,"Longsword"],[/^(two |any )?(other )?simple (melee )?weapons?$/i,"Spear"],[/^a simple weapon$/i,"Spear"],[/holy symbols?$/i,"Amulet"],[/druidic foci/i,"Sprig of mistletoe"]];
 function crAddItem(c,m,name,qty){
+  CRGEN.forEach(([rx,to])=>{if(rx.test(name)){if(/^two /i.test(name))qty=2;name=to}});
   const k=crItemKey(name); let r=m.get(k);
   if(!r&&/^(arcane|druidic|holy) /.test(lc(name)))r=null;
   const it=r?itemFromRec(Object.assign({},r,{source:r.source||"SRD"})):mkItem(name.charAt(0).toUpperCase()+name.slice(1));
@@ -6752,7 +6758,7 @@ async function crRandom5(s){
   /* class skills */
   const m=cl.meta, sk=m.sk||{n:2,from:FXSK.map(x=>x[1])}, bgs=new Set((bg.sk||[]).map(crSkId));
   s.skills=crShuffle(sk.from.map(crSkId).filter(id=>id&&!bgs.has(id))).slice(0,sk.n);
-  s.eq={}; (m.eq||[]).forEach((g,i)=>{s.eq[i]=rd(g.opts.length)-1}); s.bgEq="A";
+  s.eq={}; (m.eq||[]).forEach((g,i)=>{const kits=g.opts.map((o,j)=>j).filter(j=>g.opts[j].items.length);s.eq[i]=kits.length?crPick(kits):0}); s.bgEq="A";
   s.asi={}; crAsiLevels(s).forEach(l=>{const p=CRPRI[s.cls]||CRAB; s.asi[l]={k:"asi2",a:p[0],b:p[1],f:""}});
   crSync(s); crAutoSpells(s);
   s.step=crSteps(s).length-1;
@@ -6860,7 +6866,7 @@ async function crBuildPf(s){
   p.skills.forEach(id=>{c.pf.skills[id]=Math.max(1,num(c.pf.skills[id]))});
   crPfIncLevels(s).forEach(l=>{const id=p.inc[l];if(!id)return;const cap=l>=15?4:l>=7?3:2;c.pf.skills[id]=Math.min(cap,num(c.pf.skills[id])+1)});
   crPfSlots(s).forEach(sl=>{const nm=p.fp[sl.id];if(!nm)return;const f=s.L.feats.find(x=>x.n===nm&&(sl.cat==="general"?x.cat==="general":x.cat===sl.cat));if(f){const added=pfAddFeat(c,f,sl.cat);if(added){const x=c.pf.feats[c.pf.feats.length-1];x.at=sl.n}}});
-  if(d&&d.sc){
+  if(d&&d.sc&&d.n!=="Champion"){
     c.pf.cast.trad=p.tradition||PFTRAD[p.cls]||""; c.pf.cast.abl=crPfKey(s); c.pf.cast.kind=PFSPONT.includes(p.cls)?"spontaneous":"prepared";
     const rk=crPfSpellRanks(s); Object.keys(rk).forEach(r=>{c.pf.cast.slots[r]={max:rk[r],used:0}});
     p.spells.c.concat(p.spells.s).forEach(n=>{const x=s.L.spells.find(y=>y.n===n);if(x){pfAddSpell(c,x);const sp=c.pf.spells[c.pf.spells.length-1];if(sp)sp.prep=true}});
@@ -6897,7 +6903,7 @@ async function crRandomPf(s){
   s.step=crSteps(s).length-1;
 }
 function crPfAutoSpells(s){
-  const p=s.pf,d=s.pfCls; p.spells={c:[],s:[]}; if(!d||!d.sc)return;
+  const p=s.pf,d=s.pfCls; p.spells={c:[],s:[]}; if(!d||!d.sc||d.n==="Champion")return;
   if(!p.tradition)p.tradition=crPick(["arcane","divine","occult","primal"]);
   const all=s.L.spells.filter(x=>crPfOk(s,x)&&(x.tr||[]).includes(p.tradition)&&x.k!=="focus");
   p.spells.c=crShuffle(all.filter(x=>x.k==="cantrip"||x.lv===0)).slice(0,5).map(x=>x.n);
@@ -6957,7 +6963,7 @@ function crStepPfFeats(s){
   return `<p class="hint">Your background feat is added automatically.</p><div class="igrid">${sl.map(x=>{const o=crPfFeatOpts(s,x);return `<label class="fld"><span>${esc(x.label)}</span>${crSel("fp."+x.id,p.fp[x.id]||"",o.map(f=>[f.n,f.n+(f.lv>1?" (L"+f.lv+")":"")]),"None")}</label>`}).join("")}</div>`;
 }
 function crStepPfSpells(s){
-  const p=s.pf,d=s.pfCls; if(!d||!d.sc)return "";
+  const p=s.pf,d=s.pfCls; if(!d||!d.sc||d.n==="Champion")return "";
   const rk=crPfSpellRanks(s);
   const all=s.L.spells.filter(x=>crPfOk(s,x)&&(!p.tradition||(x.tr||[]).includes(p.tradition))&&x.k!=="focus");
   const can=all.filter(x=>x.k==="cantrip"||x.lv===0), sp=all.filter(x=>x.k!=="cantrip"&&x.lv>=1&&rk[x.lv]);
@@ -6971,11 +6977,11 @@ function crStepPfReview(s){
   const p=s.pf,m=crPfMods(s);
   return `<div class="crd"><p><b>${esc(s.name||"New character")}</b></p><p>${esc(p.her?p.her+" ":"")}${esc(p.anc)} ${esc(p.cls)}, level ${s.level} \u00b7 ${esc(p.bg)}</p>
     <p>${CRAB.map(k=>k.toUpperCase()+" "+sgn(m[k])).join(" \u00b7 ")}</p></div>
-    <p class="hint">Creating will set up proficiencies, hit points, class features, feats${s.pfCls&&s.pfCls.sc?", spell slots and spells":""}. Add armor, weapons and gear on the sheet.</p>`;
+    <p class="hint">Creating will set up proficiencies, hit points, class features, feats${s.pfCls&&s.pfCls.sc&&s.pfCls.n!=="Champion"?", spell slots and spells":""}. Add armor, weapons and gear on the sheet.</p>`;
 }
 
 /* ---- creator UI and events ---- */
-let CR=null;
+let CR=null, CR_BUSY=false;
 const crOv=()=>$("#crOv");
 function crStepBody(s){
   const st=crSteps(s)[s.step];
@@ -6984,6 +6990,9 @@ function crStepBody(s){
 }
 function crRender(keep){
   const s=CR, o=crOv(); if(!s||!o)return;
+  if(CR_BUSY)return; CR_BUSY=true;
+  try{const ae=document.activeElement; if(ae&&o.contains(ae)&&ae.blur)ae.blur()}catch(e){}
+  CR_BUSY=false;
   const steps=crSteps(s); s.step=Math.max(0,Math.min(steps.length-1,s.step));
   const prev=keep&&o.querySelector(".sheet")?o.querySelector(".sheet").scrollTop:0, ovTop=o.scrollTop;
   let body;
@@ -7111,12 +7120,91 @@ document.addEventListener("change",e=>{
       crSync(CR);
     }
     if(f==="level"&&CR.sys==="pf2e"){CR.pf.fp={};CR.pf.inc={};CR.pf.lvB={}}
-    crRender(true);
+    setTimeout(()=>{if(CR)crRender(true)},0);
   }
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&CR&&!crOv().hidden){closeCreator()}});
 crOv().addEventListener("click",e=>{if(e.target.id==="crOv")closeCreator()});
 
+
+
+/* ===== imported content: classification, packs, review queue ===== */
+const LIBCATS=[["feat","Feat"],["species","Species"],["background","Background"],["rule","Rule or other text"]];
+const libSrcName=x=>String(x.source||"").trim()||"No source name";
+function libGuess(x){
+  const t=String(x.text||""), n=String(x.name||"");
+  if(x.kind==="feat")return {cat:"feat",conf:"high"};
+  if(x.kind==="species")return {cat:"species",conf:"high"};
+  if(/background/i.test(n)&&/proficienc/i.test(t))return {cat:"background",conf:"high"};
+  if(/skill proficienc/i.test(t)&&/(equipment|tool proficienc)/i.test(t))return {cat:"background",conf:"high"};
+  if(/^\s*(general|origin|fighting style|epic boon)?\s*feat\b/im.test(t.slice(0,200))||/prerequisite/i.test(t.slice(0,300)))return {cat:"feat",conf:"high"};
+  if(/\bsize\b/i.test(t)&&/\bspeed\b/i.test(t)&&/(ability score|languages)/i.test(t))return {cat:"species",conf:"high"};
+  if(/\b(your|you) .{0,40}\b(proficiency|advantage|resistance|speed)\b/i.test(t)&&t.length<1400)return {cat:"feat",conf:"low"};
+  return {cat:"rule",conf:"low"};
+}
+function libExtract(x){
+  const t=String(x.text||"").replace(/\r/g,""), d={};
+  const list=v=>String(v||"").split(/,|\band\b|;/).map(a=>a.trim().replace(/\.$/,"")).filter(Boolean);
+  if(x.cat==="species"){
+    let m=t.match(/\bSize\b[^.\n]{0,40}?\b(Tiny|Small|Medium|Large|Huge)\b/i); if(m)d.size=m[1][0].toUpperCase()+m[1].slice(1).toLowerCase();
+    m=t.match(/\bspeed\b[^.\n]{0,60}?(\d+)\s*(?:feet|ft)/i); if(m)d.speed=num(m[1]);
+    const ab={}; const rx=/\b(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\b[^.\n]{0,30}?increases? by (\d)/ig; let r;
+    while((r=rx.exec(t)))ab[r[1].slice(0,3).toLowerCase()]=num(r[2]);
+    if(Object.keys(ab).length)d.ab=ab;
+  }else if(x.cat==="background"){
+    let m=t.match(/Skill Proficienc(?:y|ies)[.:*\s]+([^\n]+)/i); if(m)d.skills=list(m[1]).filter(a=>FXSK.some(k=>lc(k[1])===lc(a)));
+    m=t.match(/Tool Proficienc(?:y|ies)[.:*\s]+([^\n]+)/i); if(m)d.tools=list(m[1]);
+    m=t.match(/\bFeat[.:*\s]+([^\n(]+)/i); if(m)d.feat=m[1].trim().replace(/\.$/,"");
+    m=t.match(/Ability Scores?[.:*\s]+([^\n]+)/i); if(m)d.ab=list(m[1]).map(a=>lc(a).slice(0,3)).filter(a=>CRAB.includes(a));
+    m=t.match(/Equipment[.:*\s]+([^\n]+)/i); if(m){d.equip=parseEquipText(m[1].replace(/\bor\b.*$/i,"")).map(i=>[i.name.replace(/^(A|An|The) /,"").replace(/^./,ch=>ch.toUpperCase()),i.qty]).filter(i=>!/^(\d+\s*)?(gp|sp|cp|pp|gold|silver)\b/i.test(i[0]));const g=m[1].match(/(\d+)\s*GP/i);if(g)d.gp=num(g[1])}
+  }else if(x.cat==="feat"){
+    const pre={}, m=t.match(/Prerequisite[s]?[.:*\s]+([^\n]+)/i);
+    if(m){const lv=m[1].match(/level (\d+)/i); if(lv)pre.lvl=num(lv[1]); const rx=/\b(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+(\d+)/ig;let r;pre.abil={};while((r=rx.exec(m[1])))pre.abil[r[1].slice(0,3).toLowerCase()]=num(r[2]);pre.txt=m[1].trim()}
+    x.pre=pre; d.type=/origin feat/i.test(t.slice(0,160))?"origin":/fighting style/i.test(t.slice(0,160))?"fighting-style":"general";
+  }
+  return d;
+}
+function libEnrich(){
+  let ch=false;
+  LIB.sections.forEach(x=>{
+    if(sysOf(x)!=="dnd5e")return;
+    if(x.cat===undefined){const g=libGuess(x);x.cat=g.cat;x.catq=g.conf==="low"?"review":"ok";ch=true}
+    if(x.cat&&x.cat!=="rule"&&!x.data){x.data=libExtract(x);ch=true}
+    if(x.cat&&x.cat!=="rule"&&x.fx===undefined&&x.fxq===undefined){const r=fxParse(String(x.text||""),{name:x.name});x.fx=r.fx.length?r.fx:undefined;x.fxq=r.fx.length?(r.review?"review":"ok"):(r.review?"review":"none");ch=true}
+  });
+  LIB.sections.concat(LIB.classes,LIB.spells,LIB.items).forEach(x=>{
+    if(sysOf(x)!=="dnd5e")return; const k=libSrcName(x);
+    if(!LIB.packs[k]){LIB.packs[k]={creator:false};ch=true}
+  });
+  if(ch)saveLib();
+}
+function libReviewList(){return LIB.sections.map((x,i)=>[x,i]).filter(([x])=>sysOf(x)==="dnd5e"&&x.catq==="review")}
+function libSourcesHTML(){
+  const m={}; const add=(k,x)=>{const n=libSrcName(x);(m[n]=m[n]||{classes:0,spells:0,items:0,feat:0,species:0,background:0,rule:0})[k]++};
+  LIB.classes.forEach(x=>{if(sysOf(x)==="dnd5e"&&!x.addOn)add("classes",x)});LIB.spells.forEach(x=>{if(sysOf(x)==="dnd5e")add("spells",x)});LIB.items.forEach(x=>{if(sysOf(x)==="dnd5e")add("items",x)});
+  LIB.sections.forEach(x=>{if(sysOf(x)==="dnd5e")add(x.cat||"rule",x)});
+  const names=Object.keys(m).sort();
+  if(!names.length)return `<p>Nothing imported yet. Import a book or paste text and your sources will be listed here.</p>`;
+  return `<p>Turn a source on to offer its classes, species, backgrounds, feats and spells in the guided creator and the random character button. Off by default; your imports stay on this device.</p>
+    <div class="items">${names.map(n=>{const c=m[n],on=!!(LIB.packs[n]&&LIB.packs[n].creator);
+      const parts=[["classes","classes"],["species","species"],["background","backgrounds"],["feat","feats"],["spells","spells"],["items","items"],["rule","other"]].filter(p=>c[p[0]]).map(p=>c[p[0]]+" "+p[1]).join(", ");
+      return `<label class="chk crpack"><input type="checkbox" data-act="lib-pack" data-src="${esc(n)}"${on?" checked":""}><span><b>${esc(n)}</b><br><small>${esc(parts)}</small></span></label>`}).join("")}</div>`;
+}
+function libReviewHTML(){
+  const L=libReviewList();
+  if(!L.length)return `<p>Nothing needs review. Imported text was sorted automatically.</p>`;
+  return `<p>These entries could not be sorted with confidence. Pick what each one is so it lands in the right place in the creator.</p><div class="items">${L.map(([x,i])=>`<div class="item"><div class="ibody"><b>${esc(x.name)}</b> <span class="hint">${esc(libSrcName(x))}</span>
+    <p class="hint">${esc(String(x.text||"").slice(0,160))}</p><div class="seg">${LIBCATS.map(([v,t])=>`<button class="btn sm${x.cat===v?" pri":""}" type="button" data-act="lib-cat" data-i="${i}" data-v="${v}">${t}</button>`).join("")}</div></div></div>`).join("")}</div>`;
+}
+document.addEventListener("change",e=>{
+  const t=e.target; if(!t.dataset||t.dataset.act!=="lib-pack")return;
+  const k=t.dataset.src; LIB.packs[k]=LIB.packs[k]||{}; LIB.packs[k].creator=t.checked; saveLib();
+});
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-act="lib-cat"]'); if(!b)return;
+  const x=LIB.sections[num(b.dataset.i)]; if(!x)return;
+  x.cat=b.dataset.v; x.catq="ok"; x.data=undefined; x.fx=undefined; x.fxq=undefined; libEnrich(); saveLib(); renderLib();
+});
 
 render(); setStatus();
 })();
