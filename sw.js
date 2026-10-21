@@ -1,8 +1,8 @@
 /* Character Ledger offline helper. Bump VERSION when the app files change. */
-const VERSION="ledger-v25";
+const VERSION="ledger-v26";
 /* Third-party files in vendor/ never change for a given version, so they get their own cache that survives app updates. */
 const VENDOR="ledger-vendor-pdfjs-6.4.299";
-const SHELL=["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "classes-2014.json", "classes-2024.json", "items-2014.json", "items-2024.json", "magic-2014.json", "magic-2024.json", "spells-2014.json", "spells-2024.json"];
+const SHELL=["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "classes-2014.json", "classes-2024.json", "items-2014.json", "items-2024.json", "magic-2014.json", "magic-2024.json", "spells-2014.json", "spells-2024.json", "origins-5e.json", "creator-5e.json"];
 const PF=["pf2e-classes.json","pf2e-origins.json","pf2e-rules.json","pf2e-spells.json","pf2e-feats.json","pf2e-items.json"];
 const IMP=["importer/importer.js","importer/core.js","importer/db.js","importer/extract.js","importer/vocab.js","importer/worker.js","importer/layout.js","importer/styles.js"];
 const VENDOR_FILES=["vendor/pdfjs/pdf.mjs","vendor/pdfjs/pdf.worker.mjs"];

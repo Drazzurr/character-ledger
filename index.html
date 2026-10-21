@@ -1798,6 +1798,40 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 .skin-pv .pvt{position:absolute;left:38px;top:14px;display:flex;gap:4px}
 .skin-pv .pvt>span{display:block;width:18px;height:5px;border-radius:2px;background:rgba(255,255,255,.28)}
 .fxopt{display:flex;flex-direction:column;gap:6px}
+
+.fxbox{margin:10px 0;padding:10px 12px;border-radius:var(--r-sm);background:var(--panel2);border:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.fxbox>b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fxrow{align-items:flex-start;gap:8px;min-height:32px}.fxrow small{color:var(--muted)}
+.fxsum{margin:0 0 10px}.fxcap{display:block;font-size:11px;color:var(--accent);font-weight:700;text-align:center}
+
+.crprog{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:thin}
+.crprog span{flex:none;font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.crprog span.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.crprog span.done{color:var(--ink)}
+.crbody{display:flex;flex-direction:column;gap:12px}
+.crbody h4{margin:6px 0 0;font:600 14px/1.2 var(--display)}
+.crgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px}
+.crgrid.one{grid-template-columns:1fr}
+.crc{text-align:left;display:flex;flex-direction:column;gap:2px;min-height:48px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field);color:var(--ink);font:inherit;cursor:pointer;min-width:0}
+.crc b{font-weight:600;font-size:14.5px;overflow-wrap:anywhere}
+.crc span{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.crc.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.crc:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.crd{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--panel);display:flex;flex-direction:column;gap:6px}
+.crd p{margin:0}
+.crabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.crab{display:grid;grid-template-columns:36px 1fr auto;gap:6px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field)}
+.crab>span{font:700 12.5px var(--body);color:var(--muted)}
+.crab small{grid-column:1/-1;color:var(--muted);font-size:12px;min-height:0}
+.crab small:empty{display:none}
+.crab b{font-size:15px;text-align:right}
+.crab b i{font-style:normal;color:var(--muted);font-weight:500}
+.crab select,.crab input{width:100%;min-width:0}
+.crbuy{display:flex;gap:6px;align-items:center}
+.crbuy b{min-width:22px;text-align:center}
+.crnav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;bottom:0;padding:10px 0 2px;background:var(--bg2);margin-top:auto}
+.crnav .sp{flex:1}
+@media (max-width:420px){.crnav .btn{flex:1 1 30%}}
 </style>
 
 <div class="skinbg" aria-hidden="true"></div>
@@ -1867,6 +1901,7 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 <div class="ov" id="themeOv" hidden></div>
 <div class="ov" id="portOv" hidden></div>
 <div class="ov" id="lvlOv" hidden></div>
+<div class="ov" id="crOv" hidden></div>
 
 <script>
 (function(){
@@ -2047,6 +2082,7 @@ function itemFromRec(r){
   o.rng=r.rng||""; o.ac=r.ac||(r.stealth||r.str?"":"");
   if(r.ac){o.ac=r.ac+(r.stealth?" (stealth disadvantage)":"")+(r.str?" (Str "+r.str+")":"")}
   o.rar=r.rar||""; o.att=!!r.att; o.desc=r.desc||""; o.source=r.source||"";
+  if(o.rar)fxAttach(o,{item:1});
   return o;
 }
 function attackFromItem(c,it){
@@ -2783,6 +2819,7 @@ function blankChar(camp,rules){
   return o;
 }
 const mkFeat=name=>({id:uid(),name:name,source:"",desc:""});
+function fxAttach(o,opt){const r=fxParse((o.desc||"")+"",Object.assign({name:o.name},opt||{}));if(r.fx.length){o.fx=r.fx;o.fxq=r.review?"review":"ok"}else if(r.review)o.fxq="review";return o}
 const mkRes=name=>({id:uid(),name:name||"New resource",max:1,cur:1,reset:"long"});
 const mkSpell=name=>({id:uid(),name:name||"New spell",level:0,school:"",time:"1 action",range:"",components:"",duration:"",conc:false,ritual:false,prepared:false,desc:"",higher:""});
 const mkPick=w=>({id:uid(),weapon:w||"",prop:""});
@@ -2939,11 +2976,98 @@ function pfPen(c,abl){
 }
 
 /* ---------- derived values ---------- */
-const abMod=(c,k)=>Math.floor((num(c.abilities[k],10)-10)/2);
+const abScore=(c,k)=>Math.max(num(c.abilities[k],10)+fxSum(c,"abil."+k),fxMax(c,"abilset."+k));
+const abMod=(c,k)=>Math.floor((abScore(c,k)-10)/2);
 const prof=c=>Math.ceil(Math.max(1,num(c.level,1))/4)+1;
-const saveB=(c,k)=>abMod(c,k)+(c.saveProf[k]?prof(c):0);
-const skillB=(c,s)=>abMod(c,s[2])+num(c.skills[s[0]])*prof(c);
-const initB=c=>abMod(c,"dex")+num(c.initExtra);
+const saveP=(c,k)=>(c.saveProf[k]||fxHas(c,"psave."+k))?1:0;
+const saveB=(c,k)=>abMod(c,k)+(saveP(c,k)?prof(c):0)+fxSum(c,"save."+k)+fxSum(c,"save.all");
+const skillP=(c,id)=>Math.max(num(c.skills[id]),fxHas(c,"eskill."+id)?2:fxHas(c,"pskill."+id)?1:0);
+const skillB=(c,s)=>abMod(c,s[2])+skillP(c,s[0])*prof(c)+fxSum(c,"skill."+s[0])+fxSum(c,"skill.all");
+const initB=c=>abMod(c,"dex")+num(c.initExtra)+fxSum(c,"init");
+const acOf=c=>num(c.ac)+fxSum(c,"ac"), speedOf=c=>num(c.speed)+fxSum(c,"speed");
+/* ===== effects: parse rules text into sheet effects, and total them ===== */
+const FXSK=[["acrobatics","Acrobatics"],["animal_handling","Animal Handling"],["arcana","Arcana"],["athletics","Athletics"],["deception","Deception"],["history","History"],["insight","Insight"],["intimidation","Intimidation"],["investigation","Investigation"],["medicine","Medicine"],["nature","Nature"],["perception","Perception"],["performance","Performance"],["persuasion","Persuasion"],["religion","Religion"],["sleight_of_hand","Sleight of Hand"],["stealth","Stealth"],["survival","Survival"]];
+const FXAB={strength:"str",dexterity:"dex",constitution:"con",intelligence:"int",wisdom:"wis",charisma:"cha"};
+const FXABN={str:"Strength",dex:"Dexterity",con:"Constitution",int:"Intelligence",wis:"Wisdom",cha:"Charisma"};
+const FXDMG=["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"];
+const FXCOND=/\b(while|when|whenever|if|unless|until|as long as|during|once|you can use|as a bonus action|as a reaction|as an action|on your turn|can expend|can spend|can choose|can add)\b/i;
+const FXCHOICE=/\b(choose|your choice|of your choice|one of|any one|a skill)\b/i;
+function fxSentences(t){return String(t||"").replace(/\*\*|__/g,"").split(/(?<=[.!?])\s+|\n+/).map(s=>s.trim()).filter(Boolean)}
+function fxParse(text,opt){
+  opt=opt||{}; const out=[]; let review=false; const seen=new Set();
+  const push=(e,s)=>{const key=e.k+"|"+e.v+"|"+(e.c?1:0);if(seen.has(key))return;seen.add(key);if(e.c){e.on=false;e.cond=s.length>110?s.slice(0,107)+"...":s}out.push(e)};
+  fxSentences(text).forEach(s0=>{
+    let s=s0; if(opt.item)s=s.replace(/\b(?:while|when) (?:you(?:'re| are)? )?(?:wear(?:ing)?|wield(?:ing)?|hold(?:ing)?|carry(?:ing)?|attuned to|us(?:e|ing)) (?:this|it|these|them|the [a-z ]+?)\b[^,.]*/ig,"");
+    const l=s.toLowerCase(), c=FXCOND.test(s)?1:0, before=out.length;
+    let m,rm0;
+    const ABRX="(strength|dexterity|constitution|intelligence|wisdom|charisma)";
+    const re1=new RegExp("your "+ABRX+" score (?:increases|is increased) by (\\d+)","g");
+    while((m=re1.exec(l)))push({k:"abil."+FXAB[m[1]],v:+m[2],c:c},s);
+    const re1b=new RegExp("increase your "+ABRX+" score by (\\d+)","g");
+    while((m=re1b.exec(l)))push({k:"abil."+FXAB[m[1]],v:+m[2],c:c},s);
+    if((m=new RegExp("your "+ABRX+" score is (\\d+)").exec(l)))push({k:"abilset."+FXAB[m[1]],v:+m[2],c:c},s);
+    if((m=/\+(\d+) (?:bonus )?to (?:your )?(?:ac|armor class)/.exec(l)||/bonus (?:to|of) (?:your )?(?:ac|armor class)(?: of)? \+?(\d+)/.exec(l)||/(?:ac|armor class) (?:increases|is increased) by (\d+)/.exec(l)||/(?:gain|have) a \+(\d+) bonus to (?:ac|armor class)/.exec(l)))push({k:"ac",v:+m[1],c:c},s);
+    if(/bonus to (?:ac|armor class) and (?:to )?saving throws/.test(l)&&(m=/\+(\d+)/.exec(l)))push({k:"save.all",v:+m[1],c:c},s);
+    else if((m=/\+(\d+) bonus to (?:all )?saving throws/.exec(l)))push({k:"save.all",v:+m[1],c:c},s);
+    if((m=/(?:your )?(?:walking )?speed increases by (\d+) f(?:ee|oo)t/.exec(l)||/\+(\d+) f(?:ee|oo)t (?:to|of) (?:your )?(?:walking )?speed/.exec(l)||/gain (\d+) feet of (?:extra )?(?:walking )?movement/.exec(l)))push({k:"speed",v:+m[1],c:c},s);
+    if((m=/\b(fly|swim|climb|burrow)(?:ing)? speed (?:of|equal to your walking speed|equal to)\s*(\d+)?/.exec(l))&&!/can't|cannot/.test(l))push({k:"move."+m[1],v:m[2]?+m[2]:"walk",c:c},s);
+    const rs=/(darkvision|blindsight|truesight|tremorsense)[^.\d]{0,60}?(\d+)\s*(?:feet|ft)/.exec(l)||/(darkvision|blindsight|truesight|tremorsense)\s*\((\d+)\s*(?:feet|ft)/.exec(l);
+    if(rs)push({k:"sense."+rs[1],v:+rs[2],c:c},s);
+    else if(opt.name&&(m=/(darkvision|blindsight|truesight|tremorsense)/i.exec(opt.name))&&(rm0=/(\d+)\s*(?:feet|ft)/.exec(l)))push({k:"sense."+m[1].toLowerCase(),v:+rm0[1],c:0},s);
+    if(/proficien(?:cy|t) in/.test(l)){
+      if(FXCHOICE.test(l)&&!/\b(?:the )?(?:acrobatics|arcana|athletics|deception|history|insight|intimidation|investigation|medicine|nature|perception|performance|persuasion|religion|stealth|survival|sleight of hand|animal handling) skill/.test(l)){if(/skill|saving/.test(l))review=true}
+      else{
+        const hits=FXSK.filter(([id,n])=>new RegExp("\\b"+n.toLowerCase()+"\\b").test(l));
+        hits.forEach(([id])=>push({k:"pskill."+id,v:1,c:c},s));
+        const sv=/proficiency in (strength|dexterity|constitution|intelligence|wisdom|charisma) saving throws?/.exec(l);
+        if(sv)push({k:"psave."+FXAB[sv[1]],v:1,c:c},s);
+      }
+    }
+    if(/expertise in|double your proficiency bonus/.test(l)&&!FXCHOICE.test(l)){FXSK.filter(([id,n])=>new RegExp("\\b"+n.toLowerCase()+"\\b").test(l)).forEach(([id])=>push({k:"eskill."+id,v:1,c:c},s))}
+    let rm; const rr=/resistance (?:to|against) ([a-z ,]+?) damage/g;
+    while((rm=rr.exec(l))){FXDMG.forEach(d=>{if(new RegExp("\\b"+d+"\\b").test(rm[1]))push({k:"res."+d,v:1,c:c},s)})}
+    const ri=/immun(?:e|ity) to ([a-z ,]+?) damage/g;
+    while((rm=ri.exec(l))){FXDMG.forEach(d=>{if(new RegExp("\\b"+d+"\\b").test(rm[1]))push({k:"imm."+d,v:1,c:c},s)})}
+    if((m=/hit point maximum increases by (\d+)(?:,? and (?:it )?increases by (\d+)(?: again)? (?:every|each) (?:time you gain a level|level))?/.exec(l))){push({k:"hp",v:+m[1],c:c},s);if(m[2])push({k:"hpl",v:+m[2],c:c},s)}
+    else if((m=/hit point maximum increases by an amount equal to (twice )?your level/.exec(l)))push({k:"hpl",v:m[1]?2:1,c:c},s);
+    if((m=/\+(\d+) (?:bonus )?to (?:your )?initiative/.exec(l)))push({k:"init",v:+m[1],c:c},s);
+    else if(/add (?:your )?proficiency bonus to (?:the roll|your initiative)|initiative proficiency/.test(l))push({k:"init",v:"pb",c:c},s);
+    if((m=/\+(\d+) (?:bonus )?to (?:your )?spell attack rolls?/.exec(l)))push({k:"spellatk",v:+m[1],c:c},s);
+    if((m=/\+(\d+) (?:bonus )?to (?:your )?spell save dc/.exec(l)))push({k:"spelldc",v:+m[1],c:c},s);
+    if(out.length===before&&/\+\d+|(?:bonus|increase)s? (?:to|by|of)|score (?:of|is)|you gain|proficiency/.test(l)&&/\d/.test(l)&&!/\b(\d+d\d+|\d+ (?:minutes?|hours?|rounds?|days?|gp|feet away|squares?))/.test(l)&&/attack|damage|ac\b|armor|speed|save|saving|skill|initiative|score|hit point|dc\b/.test(l)&&!/^(?:the |a |an )?(?:target|creature|each)\b/.test(l))review=true;
+  });
+  return {fx:out,review:review&&!out.length||(review&&out.some(e=>e.c))};
+}
+function fxLabel(e){
+  const k=e.k.split("."),a=k[0],b=k[1],sg=v=>v==="pb"?"proficiency bonus":(v>=0?"+":"")+v;
+  const sk=id=>(FXSK.find(x=>x[0]===id)||[0,id])[1];
+  switch(a){
+    case"ac":return sg(e.v)+" Armor class";case"speed":return sg(e.v)+" ft speed";case"init":return sg(e.v)+" Initiative";
+    case"hp":return sg(e.v)+" Max HP";case"hpl":return sg(e.v)+" Max HP per level";
+    case"abil":return sg(e.v)+" "+FXABN[b];case"abilset":return FXABN[b]+" score becomes "+e.v+" (if higher)";
+    case"save":return sg(e.v)+(b==="all"?" all saving throws":" "+FXABN[b]+" saves");
+    case"skill":return sg(e.v)+" "+sk(b);case"pskill":return "Proficiency: "+sk(b);case"eskill":return "Expertise: "+sk(b);
+    case"psave":return "Proficiency: "+FXABN[b]+" saves";
+    case"res":return "Resistance: "+b;case"imm":return "Immunity: "+b;
+    case"sense":return b.charAt(0).toUpperCase()+b.slice(1)+" "+e.v+" ft";
+    case"move":return b.charAt(0).toUpperCase()+b.slice(1)+" speed"+(e.v==="walk"?" (equal to walking)":" "+e.v+" ft");
+    case"spellatk":return sg(e.v)+" Spell attack";case"spelldc":return sg(e.v)+" Spell save DC";
+  }
+  return e.k+" "+e.v;
+}
+function fxList(c){
+  const out=[];
+  const add=(arr,src,owner)=>(arr||[]).forEach((e,i)=>{if(e&&e.on!==false)out.push({k:e.k,v:e.v,src:src,e:e})});
+  (c.features||[]).forEach(f=>{if(f.fx&&f.fxOn!==false)add(f.fx,f.name)});
+  (c.inventory||[]).forEach(it=>{if(it.fx&&it.equipped&&(!it.att||it.attuned))add(it.fx,it.name)});
+  return out;
+}
+function fxVal(c,v){return v==="pb"?prof(c):num(v)}
+function fxSum(c,k){let t=0;fxList(c).forEach(x=>{if(x.k===k)t+=fxVal(c,x.v)});return t}
+function fxHas(c,k){return fxList(c).some(x=>x.k===k)}
+function fxMax(c,k){let t=0;fxList(c).forEach(x=>{if(x.k===k)t=Math.max(t,num(x.v))});return t}
+function fxCap(c,k){const v=fxSum(c,k);return v?`<small class="fxcap">${v>0?"+":""}${v} from effects</small>`:""}
+
 const passive=c=>10+skillB(c,SKILLS.find(s=>s[0]==="perception"));
 
 /* ---------- state + storage ---------- */
@@ -3048,10 +3172,17 @@ function renderHome(){
 
   let strip="";
   if(ui.newChar){
-    strip=`<div class="rulepick"><b>Which game is this character for?</b>
-      <button class="btn pri" type="button" data-act="create-char" data-rules="2014">D&amp;D 5e (2014)</button>
-      <button class="btn pri" type="button" data-act="create-char" data-rules="2024">D&amp;D 5.5e (2024)</button>
-      <button class="btn pri" type="button" data-act="create-char" data-sys="pf2e">Pathfinder 2e (Remaster)</button>
+    strip=`<div class="rulepick"><b>Build a character</b>
+      <button class="btn pri" type="button" data-act="creator" data-rules="2024">Guided: D&amp;D 5.5e</button>
+      <button class="btn pri" type="button" data-act="creator" data-rules="2014">Guided: D&amp;D 5e</button>
+      <button class="btn pri" type="button" data-act="creator" data-sys="pf2e">Guided: Pathfinder 2e</button>
+      <button class="btn" type="button" data-act="creator-rand" data-rules="2024">Random 5.5e</button>
+      <button class="btn" type="button" data-act="creator-rand" data-rules="2014">Random 5e</button>
+      <button class="btn" type="button" data-act="creator-rand" data-sys="pf2e">Random PF2e</button>
+      <b style="margin-top:6px;font-size:14px;color:var(--muted)">Or start with a blank sheet</b>
+      <button class="btn" type="button" data-act="create-char" data-rules="2014">D&amp;D 5e (2014)</button>
+      <button class="btn" type="button" data-act="create-char" data-rules="2024">D&amp;D 5.5e (2024)</button>
+      <button class="btn" type="button" data-act="create-char" data-sys="pf2e">Pathfinder 2e (Remaster)</button>
       <button class="btn" type="button" data-act="cancel-new">Cancel</button></div>`;
   }else if(ui.addCamp){
     strip=`<div class="strip"><label class="fld"><span>New campaign name</span><input id="newCampName" type="text" maxlength="60" placeholder="Curse of Strahd"></label>
@@ -3077,7 +3208,7 @@ function renderHome(){
         <span class="sub">${esc(sub)}${ui.camp==="all"&&c.campaign?" \u00b7 "+esc(campName(c.campaign)):""}</span>
         <span class="card-hp"><span class="hpbar${pct<34?" low":""}" aria-hidden="true"><i style="width:${pct}%"></i></span><b>${num(c.hp)} / ${num(c.hpMax)}</b></span>
       </span>
-      <span class="actile"><span>AC</span><b>${num(c.ac)}</b></span>
+      <span class="actile"><span>AC</span><b>${isPf(c)?num(c.ac):acOf(c)}</b></span>
     </button>`}).join("");
   const label=ui.camp==="all"?"All characters":ui.camp==="none"?"Unassigned":campName(ui.camp);
 
@@ -3157,7 +3288,7 @@ function updVitals(c){
   const T=$("#top"); if(!T||!c)return;
   const q=k=>T.querySelector('[data-v="'+k+'"]'), set=(k,v)=>{const el=q(k);if(el)el.textContent=v};
   set("hp",num(c.hp)); set("hpMax",num(c.hpMax)); set("tmp",num(c.hpTemp)?"+"+num(c.hpTemp):"");
-  set("ac",num(c.ac)); set("init",sgn(isPf(c)?pfVal(c,"perception"):initB(c))); set("speed",num(c.speed));
+  set("ac",isPf(c)?num(c.ac):acOf(c)); set("init",sgn(isPf(c)?pfVal(c,"perception"):initB(c))); set("speed",isPf(c)?num(c.speed):speedOf(c));
   const pct=hpPct(c), bar=q("bar"); if(bar){bar.style.width=pct+"%";bar.parentNode.classList.toggle("low",pct<34)}
   const sub=T.querySelector(".who-sub"); if(sub)sub.textContent=subOf(c);
 }
@@ -3183,14 +3314,22 @@ function resHTML(c){
   }).join("")+`</div>`;
 }
 
+function fxRows(o,kind,i){
+  if(!o.fx||!o.fx.length)return o.fxq==="review"?`<div class="fxbox"><b>Effects</b><p class="hint">This text may change a number on your sheet but I could not tell how. Add the effect by hand if you want it applied.</p></div>`:"";
+  return `<div class="fxbox"><b>Effects on your sheet</b>${o.fx.map((e,j)=>`<label class="chk fxrow"><input type="checkbox" data-act="fx-tog" data-kind="${kind}" data-i="${i}" data-j="${j}"${e.on!==false?" checked":""}><span>${esc(fxLabel(e))}${e.cond?`<small> \u00b7 ${esc(e.cond)}</small>`:""}</span></label>`).join("")}</div>`;
+}
+function fxSummary(c){
+  const L=fxList(c); if(!L.length)return "";
+  return `<div class="fxbox fxsum"><b>Active effects</b><div class="tags">${L.map(x=>`<span class="tag ex" title="${esc(x.src)}">${esc(fxLabel(x))}</span>`).join("")}</div></div>`;
+}
 function featsHTML(c){
   if(!c.features.length)return `<div class="empty">No features yet. Add class features, racial traits and feats, then open any entry to read it. Use Edit inside an entry to change it.</div>`;
-  return c.features.map((f,i)=>{
+  return fxSummary(c)+c.features.map((f,i)=>{
     const ed=ui.edit.has(f.id);
     const body=ed?`<div class="igrid">${fld(c,"Name","features."+i+".name")}${fld(c,"Source","features."+i+".source",{ph:"Where it comes from (class, feat, species)"})}</div>
       <label class="fld"><span>Details</span><textarea data-f="features.${i}.desc" placeholder="What it does, how it works, and any numbers to remember">${esc(f.desc)}</textarea></label>
       <div class="btns">${editBtn(f.id,"feat","Done","pri")}<button class="btn sm danger" type="button" data-act="del-feat" data-i="${i}">Delete feature</button></div>`
-    :`${kv("Source",f.source)}${viewText(f.desc,"No details yet. Tap Edit to add them.")}<div class="btns">${editBtn(f.id,"feat","Edit")}</div>`;
+    :`${kv("Source",f.source)}${viewText(f.desc,"No details yet. Tap Edit to add them.")}${fxRows(f,"features",i)}<div class="btns">${editBtn(f.id,"feat","Edit")}</div>`;
     return `<details class="item" data-id="${esc(f.id)}"${ui.open.has(f.id)?" open":""}>
       <summary><span class="sum-t" data-live="features.${i}.name">${esc(f.name||"Untitled feature")}</span>
         <span class="sum-m"><span data-live="features.${i}.source">${esc(f.source)}</span></span></summary>
@@ -3421,9 +3560,9 @@ function renderSheet(){
 
     <section class="panel"><h3>Combat</h3>
       <div class="stats">
-        <div class="stat"><span>Armor class</span><input type="number" inputmode="numeric" data-t="n" data-f="ac" value="${esc(c.ac)}" aria-label="Armor class"></div>
+        <div class="stat"><span>Armor class</span><input type="number" inputmode="numeric" data-t="n" data-f="ac" value="${esc(c.ac)}" aria-label="Armor class">${fxCap(c,"ac")}</div>
         <div class="stat"><span>Initiative</span><b data-init>+0</b></div>
-        <div class="stat"><span>Speed</span><input type="number" inputmode="numeric" data-t="n" data-f="speed" value="${esc(c.speed)}" aria-label="Speed in feet"></div>
+        <div class="stat"><span>Speed</span><input type="number" inputmode="numeric" data-t="n" data-f="speed" value="${esc(c.speed)}" aria-label="Speed in feet">${fxCap(c,"speed")}</div>
         ${is24?`<div class="stat"><span>Heroic inspiration</span><button class="btn sm${c.heroic?" pri":""}" type="button" data-act="heroic" aria-pressed="${!!c.heroic}">${c.heroic?"Have it":"None"}</button></div>
         <div class="stat"><span>Exhaustion</span><input type="number" inputmode="numeric" min="0" max="6" data-t="n" data-f="exhaustion" value="${esc(c.exhaustion)}" aria-label="Exhaustion level"><small class="exh" data-exh></small></div>`:""}
       </div>
@@ -3507,7 +3646,7 @@ function recompute(){
   if(ui.tab==="spells"){
     const ab=c.spellcasting.ability, sd=$("[data-sdc]"), sa=$("[data-satk]");
     if(sd&&sa){
-      if(ab){const m=abMod(c,ab);sd.textContent=8+prof(c)+m;sa.textContent=sgn(prof(c)+m)}
+      if(ab){const m=abMod(c,ab);sd.textContent=8+prof(c)+m+fxSum(c,"spelldc");sa.textContent=sgn(prof(c)+m+fxSum(c,"spellatk"))}
       else{sd.textContent="-";sa.textContent="-"}
     }
     return;
@@ -3515,9 +3654,9 @@ function recompute(){
   ABIL.forEach(([k])=>{
     $(`[data-mod="${k}"]`).textContent=sgn(abMod(c,k));
     $(`[data-save="${k}"]`).textContent=sgn(saveB(c,k));
-    setDot("save."+k,c.saveProf[k]?1:0);
+    setDot("save."+k,saveP(c,k));
   });
-  SKILLS.forEach(s=>{$(`[data-skill="${s[0]}"]`).textContent=sgn(skillB(c,s));setDot("skill."+s[0],num(c.skills[s[0]]))});
+  SKILLS.forEach(s=>{$(`[data-skill="${s[0]}"]`).textContent=sgn(skillB(c,s));setDot("skill."+s[0],skillP(c,s[0]))});
   $("[data-pb]").textContent=sgn(prof(c));
   $("[data-init]").textContent=sgn(initB(c));
   $("[data-pp]").textContent=passive(c);
@@ -3705,6 +3844,7 @@ document.addEventListener("click",e=>{
       const f=mkFeat("New feature"); c.features.push(f); ui.open.add(f.id); ui.edit.add(f.id); save();
       $("#featBox").innerHTML=featsHTML(c); focusItem(f.id);
     } break;
+    case "fx-tog": if(c){const o=(c[b.dataset.kind]||[])[num(b.dataset.i)],e=o&&o.fx&&o.fx[num(b.dataset.j)];if(e){e.on=b.checked;save();recompute();const k=b.dataset.kind==="features"?"feat":"gear";rerender(k)}} break;
     case "del-feat": if(c&&confirmTwice(b,"Tap again to delete")){
       const f=c.features.splice(num(b.dataset.i),1)[0]; if(f)ui.open.delete(f.id);
       save(); $("#featBox").innerHTML=featsHTML(c);
@@ -3777,7 +3917,7 @@ document.addEventListener("click",e=>{
     case "lib-del": if(confirmTwice(b,"Tap again to delete")){LIB[ui.lib.tab].splice(num(b.dataset.i),1);saveLib();renderLib()} break;
     case "lib-save": commitDraft(); break;
     case "lib-cancel": ui.lib.draft=null; ui.lib.msg=""; renderLib(); break;
-    case "lib-addfeat": if(c){const x=LIB.sections[num(b.dataset.i)];if(x&&sysOf(x)!==sysOf(c)){}else if(x&&isPf(c)){pfAddFeat(c,{n:x.name,lvl:"",d:x.text,src:x.source||"Library"},"bonus");save();b.textContent="Added";b.disabled=true}else if(x){const f=mkFeat(x.name);f.source=x.source||"Library";f.desc=x.text||"";c.features.push(f);save();if(ui.view==="sheet"&&ui.tab==="feats")rerender("feat");b.textContent="Added";b.disabled=true}} break;
+    case "lib-addfeat": if(c){const x=LIB.sections[num(b.dataset.i)];if(x&&sysOf(x)!==sysOf(c)){}else if(x&&isPf(c)){pfAddFeat(c,{n:x.name,lvl:"",d:x.text,src:x.source||"Library"},"bonus");save();b.textContent="Added";b.disabled=true}else if(x){const f=mkFeat(x.name);f.source=x.source||"Library";f.desc=x.text||"";if(x.fx)f.fx=JSON.parse(JSON.stringify(x.fx));else fxAttach(f);c.features.push(f);save();if(ui.view==="sheet"&&ui.tab==="feats")rerender("feat");b.textContent="Added";b.disabled=true}} break;
     case "bk-run": bookRun(); break;
     case "bk-add": bookAdd(); break;
     case "bk-sel": {const e=bookState().entries&&bookState().entries[num(b.dataset.i)];if(e){e.sel=b.checked;const bt=document.querySelector('[data-act="bk-add"]');if(bt)bt.textContent="Add "+bookState().entries.filter(x=>x.sel).length+" selected to library"}break;}
@@ -3880,7 +4020,7 @@ async function applyClass(c,i){
   let added=0;
   const add=(arr,label)=>(arr||[]).filter(f=>num(f.lvl)<=n).forEach(f=>{
     const src=label+" "+f.lvl, k=lc(f.name)+"|"+lc(src); if(have.has(k))return; have.add(k);
-    const x=mkFeat(f.name); x.source=src; x.desc=f.desc||""; c.features.push(x); added++;
+    const x=mkFeat(f.name); x.source=src; x.desc=f.desc||""; fxAttach(x); c.features.push(x); added++;
   });
   add(d.features,d.name);
   const sd=subDef(d,r.sub), subNote=!sd&&String(r.sub||"").trim();
@@ -3945,7 +4085,7 @@ function gearItem(c,it,i){
       <div class="btns">${editBtn(it.id,"gear","Done","pri")}<button class="btn sm danger" type="button" data-act="del-item" data-i="${i}">Delete item</button></div>`;
   }else{
     const canAtt=it.att||it.attuned||it.rar, canAtk=!!attackFromItem(c,it), canAc=/^\d/.test(String(it.ac||""))&&lc(it.name)!=="shield";
-    body=`<div class="kvs">${kv("Category",it.cat)}${kv("Cost",it.cost)}${kv("Weight each",Number(it.w)?fmtW(it.w)+" lb":"")}${kv("Damage",it.dmg)}${kv("Properties",it.props)}${kv("Armor class",it.ac)}${kv("Rarity",it.rar)}${kv("Source",it.source)}</div>
+    body=`<div class="kvs">${kv("Category",it.cat)}${kv("Cost",it.cost)}${kv("Weight each",Number(it.w)?fmtW(it.w)+" lb":"")}${kv("Damage",it.dmg)}${kv("Properties",it.props)}${kv("Armor class",it.ac)}${kv("Rarity",it.rar)}${kv("Source",it.source)}</div>${fxRows(it,"inventory",i)}
       ${it.desc?viewText(it.desc,""):""}${it.notes?`<div class="kv"><span>Your notes</span><div class="prose">${esc(it.notes)}</div></div>`:""}
       <div class="rctl" style="max-width:260px"><button class="btn sm" type="button" data-act="gear-qty" data-i="${i}" data-d="-1" aria-label="One fewer">-</button><span class="rval">x${num(it.qty)}</span><button class="btn sm" type="button" data-act="gear-qty" data-i="${i}" data-d="1" aria-label="One more">+</button></div>
       <div class="btns"><button class="btn sm${it.equipped?" pri":""}" type="button" data-act="gear-equip" data-i="${i}" aria-pressed="${!!it.equipped}">${it.equipped?"Equipped":"Equip"}</button>
@@ -5281,7 +5421,7 @@ function renderPfSheet(c){
         <div class="stat"><span>Armor class</span><b data-pfv="ac">10</b></div>
         <div class="stat"><span>Perception</span><b data-pfv="perception">+0</b></div>
         <div class="stat"><span>Class DC</span><b data-pfv="classDC">10</b></div>
-        <div class="stat"><span>Speed (ft)</span><input type="number" inputmode="numeric" data-t="n" data-f="speed" value="${esc(c.speed)}" aria-label="Speed in feet"></div>
+        <div class="stat"><span>Speed (ft)</span><input type="number" inputmode="numeric" data-t="n" data-f="speed" value="${esc(c.speed)}" aria-label="Speed in feet">${fxCap(c,"speed")}</div>
       </div>${pfBarsHP(c)}
       <div class="igrid" style="margin-top:12px">
         <label class="fld"><span>Size</span><input type="text" data-f="pf.size" value="${esc(p.size)}"></label>
@@ -6251,6 +6391,732 @@ new MutationObserver(decorateRows).observe(document.getElementById("app"),{child
   levelDone=function(c){_ld(c);burst(44,1.3);sfx("level")};
   if(typeof pfLevelDone==="function"){const _pl=pfLevelDone;pfLevelDone=function(c){_pl(c);burst(44,1.3);sfx("level")}}
 })();
+
+/* ===== character creator and random character ===== */
+const CRD={};
+const CRAB=["str","dex","con","int","wis","cha"];
+const CRPRI={Barbarian:["str","con","dex"],Bard:["cha","dex","con"],Cleric:["wis","con","str"],Druid:["wis","con","dex"],Fighter:["str","con","dex"],Monk:["dex","wis","con"],Paladin:["str","cha","con"],Ranger:["dex","wis","con"],Rogue:["dex","con","int"],Sorcerer:["cha","con","dex"],Warlock:["cha","con","dex"],Wizard:["int","con","dex"]};
+const CRARRAY=[15,14,13,12,10,8], CRPB={8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
+const crSkId=n=>(FXSK.find(x=>lc(x[1])===lc(n))||[0,""])[0];
+const crSkName=id=>(FXSK.find(x=>x[0]===id)||[0,id])[1];
+const crAbName=k=>FXABN[k]||k;
+const crPackOn=src=>{const p=LIB.packs&&LIB.packs[src||""];return !!(p&&p.creator)};
+const crQ=s=>String(s||"").replace(/[\u2018\u2019]/g,"'").trim().toLowerCase();
+async function crLoad5(){
+  if(CRD.o)return;
+  const [a,b]=await Promise.all([fetch("origins-5e.json"),fetch("creator-5e.json")]);
+  if(!a.ok||!b.ok)throw new Error("HTTP");
+  CRD.o=await a.json(); CRD.c=await b.json();
+}
+const crLib=(cat,ed)=>LIB.sections.filter(x=>sysOf(x)==="dnd5e"&&x.cat===cat&&crPackOn(x.source)&&(!x.ed||x.ed===ed));
+function crSpecies(ed){
+  const out=(CRD.o[ed].species||[]).map(x=>({n:x.n,sz:x.sz,sp:x.sp,ab:x.ab||{},abo:x.abo,lg:x.lg||[],tr:x.tr||[],sub:x.sub||[],src:"SRD"}));
+  crLib("species",ed).forEach(x=>out.push({n:x.name,sz:(x.data&&x.data.size)||"Medium",sp:(x.data&&x.data.speed)||30,ab:{},lg:[],tr:[{n:x.name,d:x.text||""}],sub:[],src:x.source||"Library",lib:x}));
+  return out;
+}
+function crBgs(ed){
+  const out=(CRD.o[ed].bg||[]).map(x=>Object.assign({src:"SRD"},x));
+  crLib("background",ed).forEach(x=>{const d=x.data||{};out.push({n:x.name,sk:d.skills||[],tool:d.tools||[],eq:d.equip||[],gp:d.gp||0,ab:d.ab||[],feat:d.feat||"",d:x.text||"",src:x.source||"Library",lib:x})});
+  return out;
+}
+function crFeats(ed){
+  const out=(CRD.o[ed].feats||[]).map(x=>Object.assign({src:"SRD"},x));
+  crLib("feat",ed).forEach(x=>out.push({n:x.name,t:(x.data&&x.data.type)||"general",lv:(x.pre&&x.pre.lvl)||0,pre:(x.pre&&x.pre.abil)||{},d:x.text||"",src:x.source||"Library",lib:x}));
+  return out;
+}
+async function crClasses(ed){
+  const D=await loadClasses(ed), out=[];
+  SRDCLASSES.forEach(n=>{const d=D.find(x=>x.name===n);if(d)out.push({n:n,data:d,meta:CRD.c[ed][n]||{},src:"SRD"})});
+  LIB.classes.filter(x=>!x.addOn&&sysOf(x)==="dnd5e"&&(!x.ed||x.ed===ed)&&crPackOn(x.source)).forEach(x=>out.push({n:x.name,data:x,meta:{hd:x.hd,saves:(x.saves||[]).map(lc),abil:lc(x.ability||"")},src:x.source||"Library",lib:1}));
+  return out;
+}
+function crBonus(s){
+  const o={}; const add=(k,v)=>{o[k]=(o[k]||0)+v};
+  if(s.ed==="2014"){
+    const sp=s.speciesObj; if(sp){Object.entries(sp.ab||{}).forEach(([k,v])=>add(k,v)); const sb=(sp.sub||[]).find(x=>x.n===s.sub); if(sb)Object.entries(sb.ab||{}).forEach(([k,v])=>add(k,v)); (s.aboPicks||[]).forEach(k=>add(k,sp.abo?sp.abo.v:1))}
+  }else{
+    const b=s.bgObj; if(b&&b.ab&&b.ab.length){ if(s.bgMode==="111")b.ab.forEach(k=>add(k,1)); else{ if(s.bgA)add(s.bgA,2); if(s.bgB)add(s.bgB,1)} }
+  }
+  return o;
+}
+function crTotals(s){const b=crBonus(s),o={};CRAB.forEach(k=>{o[k]=Math.min(20,num(s.base[k],8)+(b[k]||0))});return o}
+const crPtCost=s=>CRAB.reduce((a,k)=>a+(CRPB[num(s.base[k],8)]||0),0);
+function crRollPool(){const r=[];for(let i=0;i<6;i++){const d=[rd(6),rd(6),rd(6),rd(6)].sort((a,b)=>a-b);r.push(d[1]+d[2]+d[3])}return r.sort((a,b)=>b-a)}
+function crSuggest(s){
+  const pri=(CRPRI[s.cls]||[]).concat(CRAB).filter((k,i,a)=>a.indexOf(k)===i);
+  const pool=(s.method==="roll"&&s.pool&&s.pool.length?s.pool:CRARRAY).slice().sort((a,b)=>b-a);
+  s.base={}; pri.forEach((k,i)=>{s.base[k]=pool[i]});
+}
+function crSpellGoal(s,meta,mod){
+  if(!meta||!meta.sc)return null;
+  const row=meta.sc[Math.min(20,Math.max(1,s.level))-1]||[0,0,0], L=s.level;
+  let k=row[1];
+  if(meta.spk==="prep")k=Math.max(1,mod+(/paladin|ranger/i.test(s.cls)?Math.floor(L/2):L)); 
+  return {cantrips:row[0],spells:k,maxl:Math.max(1,row[2]),wiz:meta.spk==="prep"&&s.cls==="Wizard"};
+}
+const crRandName=(()=>{const A=["Ar","Bel","Cor","Dra","El","Fen","Gar","Hal","Ira","Jor","Kel","Lor","Mir","Nev","Or","Pel","Quin","Ros","Syl","Tor","Ul","Vas","Wyn","Yor","Zan"],B=["a","e","i","o","u","ae","ia","io"],C=["dan","lis","ren","thas","wyn","vik","mar","dris","gorn","lia","sel","tor","nis","ric","bryn"];
+  return ()=>A[rd(A.length)-1]+B[rd(B.length)-1]+C[rd(C.length)-1]})();
+function crNewState(sys){
+  return {sys:sys,ed:"2024",step:0,name:"",level:1,species:"",sub:"",cls:"",subcls:"",bg:"",method:"array",pool:CRARRAY.slice(),base:{},bgMode:"21",bgA:"",bgB:"",aboPicks:[],skills:[],eq:{},bgEq:"A",spells:{c:[],s:[]},asi:{},msg:"",allSrc:false,
+    pf:{anc:"",her:"",bg:"",cls:"",boosts:{anc:[],bg:[],free:[]},skills:[],tradition:"",feats:{},spells:{c:[],s:[]}}};
+}
+function crSteps(s){
+  if(s.sys==="pf2e")return ["Basics","Ancestry","Background","Class","Abilities","Skills","Feats","Spells","Review"].filter(x=>x!=="Spells"||(s.pfCls&&s.pfCls.sc));
+  const a=["Basics","Species","Class","Background","Abilities","Skills","Gear"];
+  if(s.casterMeta&&s.casterMeta.sc)a.push("Spells");
+  if(s.level>=4)a.push("Improvements");
+  a.push("Review"); return a;
+}
+
+/* ---- 5e steps ---- */
+const crCard=(act,val,title,on,sub)=>`<button class="crc${on?" on":""}" type="button" data-cr="${act}" data-v="${esc(val)}" aria-pressed="${!!on}"><b>${esc(title)}</b>${sub?`<span>${esc(sub)}</span>`:""}</button>`;
+const crSel=(f,val,opts,ph)=>`<select data-crf="${f}">${ph!=null?`<option value="">${esc(ph)}</option>`:""}${opts.map(o=>{const v=Array.isArray(o)?o[0]:o,t=Array.isArray(o)?o[1]:o;return `<option value="${esc(v)}"${String(val)===String(v)?" selected":""}>${esc(t)}</option>`}).join("")}</select>`;
+function crSrcNote(list){const n=new Set(list.filter(x=>x.src&&x.src!=="SRD").map(x=>x.src));return n.size?`<p class="hint">Includes content from: ${[...n].map(esc).join(", ")}.</p>`:`<p class="hint">Showing the free SRD options. Turn on your imported content under Library, Sources to see it here.</p>`}
+function crStepBasics(s){
+  return `<div class="igrid"><label class="fld"><span>Character name</span><input data-crf="name" value="${esc(s.name)}" placeholder="Name"></label>
+    <label class="fld lv"><span>Level</span><input type="number" inputmode="numeric" min="1" max="20" data-crf="level" value="${s.level}"></label></div>
+    <div class="btns"><button class="btn sm" type="button" data-cr="rname">Random name</button></div>
+    <div class="kv"><span>Game</span><div class="seg" role="group">${[["2014","D&amp;D 5e (2014)"],["2024","D&amp;D 5.5e (2024)"],["pf2e","Pathfinder 2e"]].map(([v,t])=>`<button class="btn sm${(s.sys==="pf2e"?"pf2e":s.ed)===v?" pri":""}" type="button" data-cr="game" data-v="${v}">${t}</button>`).join("")}</div></div>
+    <p class="hint">Everything you pick can be changed later on the sheet.</p>`;
+}
+function crStepSpecies(s){
+  const L=s.L.species, sp=L.find(x=>x.n===s.species);
+  let det="";
+  if(sp){
+    const sb=sp.sub||[];
+    det=`<div class="crd"><p><b>${esc(sp.n)}</b> \u00b7 ${esc(sp.sz)} \u00b7 speed ${sp.sp} ft${Object.keys(sp.ab||{}).length?" \u00b7 "+Object.entries(sp.ab).map(([k,v])=>"+"+v+" "+k.toUpperCase()).join(", "):""}</p>
+      <p class="hint">${sp.tr.map(t=>esc(t.n)).join(", ")||"No listed traits."}</p></div>`;
+    if(sb.length)det+=`<h4>${s.ed==="2014"?"Subrace":"Lineage"}</h4><div class="crgrid">${sb.map(x=>crCard("sub",x.n,x.n,s.sub===x.n,(x.tr||[]).map(t=>t.n).join(", "))).join("")}</div>`;
+    if(s.ed==="2014"&&sp.abo)det+=`<h4>Choose ${sp.abo.n} abilities for +${sp.abo.v}</h4><div class="crgrid">${CRAB.filter(k=>!(sp.ab&&sp.ab[k])).map(k=>crCard("abo",k,crAbName(k),s.aboPicks.includes(k))).join("")}</div>`;
+  }
+  return `${crSrcNote(L)}<div class="crgrid">${L.map(x=>crCard("species",x.n,x.n,s.species===x.n,x.src==="SRD"?x.sz+" \u00b7 "+x.sp+" ft":x.src)).join("")}</div>${det}`;
+}
+function crStepClass(s){
+  const L=s.L.classes, c=L.find(x=>x.n===s.cls);
+  let det="";
+  if(c){
+    const m=c.meta, d=c.data, subs=(d.subclasses||[]);
+    det=`<div class="crd"><p><b>${esc(c.n)}</b> \u00b7 d${m.hd||d.hd||"?"} \u00b7 saves ${(m.saves||[]).map(k=>k.toUpperCase()).join(", ")||"?"}${m.sc?" \u00b7 casts spells ("+(m.abil||"").toUpperCase()+")":""}</p>
+      ${m.prof&&m.prof.length?`<p class="hint">Proficient with: ${m.prof.map(esc).join(", ")}</p>`:""}
+      <p class="hint">${(d.features||[]).filter(f=>num(f.lvl)===1).map(f=>esc(f.name)).join(", ")||""}</p></div>`;
+    if(subs.length){
+      det+=`<h4>Subclass${s.level>=3?"":" (chosen at level 3 or later; optional now)"}</h4><div class="crgrid">${crCard("subcls","","None yet",!s.subcls)}${subs.map(x=>crCard("subcls",x.name,x.name,s.subcls===x.name)).join("")}</div>`;
+    }
+  }
+  return `${crSrcNote(L)}<div class="crgrid">${L.map(x=>crCard("cls",x.n,x.n,s.cls===x.n,"d"+(x.meta.hd||x.data.hd||"?")+(x.meta.sc?" \u00b7 caster":""))).join("")}</div>${det}`;
+}
+function crStepBg(s){
+  const L=s.L.bgs, b=L.find(x=>x.n===s.bg);
+  let det="";
+  if(b){
+    det=`<div class="crd"><p><b>${esc(b.n)}</b>${b.sk&&b.sk.length?" \u00b7 skills: "+b.sk.map(esc).join(", "):""}${b.tool&&b.tool.length?" \u00b7 tools: "+b.tool.map(esc).join(", "):""}${b.feat?" \u00b7 feat: "+esc(b.feat)+(b.fnote?" ("+esc(b.fnote)+")":""):""}</p>${b.d&&s.ed==="2014"?`<p class="hint">${esc(String(b.d).slice(0,260))}</p>`:""}</div>`;
+    if(s.ed==="2024"&&b.ab&&b.ab.length===3){
+      det+=`<h4>Ability score increases</h4><div class="seg"><button class="btn sm${s.bgMode==="21"?" pri":""}" type="button" data-cr="bgmode" data-v="21">+2 and +1</button><button class="btn sm${s.bgMode==="111"?" pri":""}" type="button" data-cr="bgmode" data-v="111">+1 to all three</button></div>`;
+      if(s.bgMode==="21")det+=`<div class="igrid"><label class="fld"><span>+2 to</span>${crSel("bgA",s.bgA,b.ab.map(k=>[k,crAbName(k)]),"Choose")}</label><label class="fld"><span>+1 to</span>${crSel("bgB",s.bgB,b.ab.filter(k=>k!==s.bgA).map(k=>[k,crAbName(k)]),"Choose")}</label></div>`;
+    }
+  }
+  return `${crSrcNote(L)}<div class="crgrid">${L.map(x=>crCard("bg",x.n,x.n,s.bg===x.n,(x.sk||[]).join(", ")||x.src)).join("")}</div>${det}`;
+}
+function crStepAbil(s){
+  const bon=crBonus(s), tot=crTotals(s);
+  const methods=[["array","Standard array"],["buy","Point buy"],["roll","Roll 4d6"],["manual","Type them in"]];
+  let ctl="";
+  if(s.method==="buy"){
+    ctl=`<p class="hint">Points left: <b>${27-crPtCost(s)}</b> of 27. Scores run from 8 to 15 before bonuses.</p>`;
+  }else if(s.method==="roll"){
+    ctl=`<div class="btns"><button class="btn sm" type="button" data-cr="roll">${s.pool&&s.pool.length&&s.rolled?"Roll again":"Roll six scores"}</button></div><p class="hint">${s.rolled?"Rolled: "+s.pool.join(", ")+". Assign them below.":"Roll four d6 for each score and drop the lowest die."}</p>`;
+  }else if(s.method==="array")ctl=`<p class="hint">Assign 15, 14, 13, 12, 10 and 8 to your abilities.</p>`;
+  const used=new Set(CRAB.map(k=>s.base[k]).filter(Boolean)), pool=s.method==="roll"?s.pool:CRARRAY;
+  const rows=CRAB.map(k=>{
+    let inp;
+    if(s.method==="buy")inp=`<span class="crbuy"><button class="btn sm" type="button" data-cr="pb" data-a="${k}" data-d="-1" aria-label="Lower ${k}">-</button><b>${num(s.base[k],8)}</b><button class="btn sm" type="button" data-cr="pb" data-a="${k}" data-d="1" aria-label="Raise ${k}">+</button></span>`;
+    else if(s.method==="manual")inp=`<input type="number" inputmode="numeric" min="3" max="20" data-crf="base.${k}" value="${num(s.base[k],10)}">`;
+    else{
+      const opts=pool.filter((v,i)=>{const cnt=pool.slice(0,i+1).filter(x=>x===v).length,u=CRAB.filter(a=>a!==k&&s.base[a]===v).length;return u<pool.filter(x=>x===v).length&&cnt>u});
+      inp=`<select data-crf="base.${k}"><option value="">-</option>${[...new Set(opts.concat(s.base[k]?[s.base[k]]:[]))].sort((a,b)=>b-a).map(v=>`<option${s.base[k]===v?" selected":""}>${v}</option>`).join("")}</select>`;
+    }
+    const m=Math.floor((tot[k]-10)/2);
+    return `<div class="crab"><span>${k.toUpperCase()}</span>${inp}<b>${tot[k]} <i>(${sgn(m)})</i></b><small>${bon[k]?"includes +"+bon[k]+" bonus":""}</small></div>`;
+  }).join("");
+  return `<div class="seg">${methods.map(([v,t])=>`<button class="btn sm${s.method===v?" pri":""}" type="button" data-cr="method" data-v="${v}">${t}</button>`).join("")}<button class="btn sm" type="button" data-cr="suggest">Suggest for ${esc(s.cls||"my class")}</button></div>${ctl}<div class="crabs">${rows}</div>
+    <p class="hint">Totals include species or background bonuses. Bonuses from imported species traits are added on the sheet after you finish.</p>`;
+}
+function crStepSkills(s){
+  const c=s.L.classes.find(x=>x.n===s.cls), sk=c&&c.meta&&c.meta.sk?c.meta.sk:{n:2,from:FXSK.map(x=>x[1])};
+  const bg=s.bgObj, bgs=new Set((bg&&bg.sk||[]).map(crSkId));
+  return `<p>Choose <b>${sk.n}</b> class skills (${s.skills.length} chosen).${bgs.size?" Your background already gives "+[...bgs].map(crSkName).join(" and ")+".":""}</p>
+    <div class="crgrid">${sk.from.map(n=>{const id=crSkId(n);return crCard("skill",id,n,s.skills.includes(id),bgs.has(id)?"also from background":"")}).join("")}</div>`;
+}
+function crEqGroups(s){
+  const c=s.L.classes.find(x=>x.n===s.cls),m=c&&c.meta; return m&&m.eq?m.eq:[];
+}
+const crOptTxt=o=>o.items.map(([n,q])=>(q>1?q+" ":"")+n).join(", ")+(o.gp?(o.items.length?", ":"")+o.gp+" gp":"")||"Nothing";
+function crStepGear(s){
+  const groups=crEqGroups(s), bg=s.bgObj;
+  let h="";
+  if(!groups.length&&!(c=>c)(0))h="";
+  h+=groups.map((g,i)=>`<div class="crd"><b>Choice ${i+1}</b><div class="crgrid one">${g.opts.map((o,j)=>crCard("eq",i+":"+j,crOptTxt(o),(s.eq[i]==null?0:s.eq[i])===j)).join("")}</div></div>`).join("");
+  if(bg&&bg.eq&&bg.eq.length&&s.ed==="2024"){
+    h+=`<div class="crd"><b>Background gear</b><div class="crgrid one">${crCard("bgeq","A",bg.eq.map(([n,q])=>(q>1?q+" ":"")+n).join(", ")+(bg.gp?", "+bg.gp+" gp":""),s.bgEq==="A")}${crCard("bgeq","B","50 gp instead",s.bgEq==="B")}</div></div>`;
+  }else if(bg&&bg.eq&&bg.eq.length)h+=`<div class="crd"><b>Background gear</b><p class="hint">${bg.eq.map(([n,q])=>(q>1?q+" ":"")+n).join(", ")}${bg.gp?", "+bg.gp+" gp":""}</p></div>`;
+  const fixed=(s.L.classes.find(x=>x.n===s.cls)||{meta:{}}).meta.fixed||[];
+  if(fixed.length)h+=`<p class="hint">You also get: ${fixed.map(([n,q])=>(q>1?q+" ":"")+esc(n)).join(", ")}.</p>`;
+  return h||`<p>No standard equipment is listed for this class. Add gear on the sheet's Gear tab.</p>`;
+}
+function crStepSpells(s){
+  const g=s.goal; if(!g)return "";
+  const cl=s.cls, all=s.L.spells.filter(x=>(x.cl||[]).some(n=>lc(n)===lc(cl)));
+  const can=all.filter(x=>x.l===0), sp=all.filter(x=>x.l>=1&&x.l<=g.maxl);
+  const chip=(x,key)=>crCard("sp"+key,x.n,x.n,s.spells[key].includes(x.n),(x.l?"L"+x.l+" \u00b7 ":"")+x.s);
+  return `<p>Cantrips: <b>${s.spells.c.length}</b> of ${g.cantrips} \u00b7 Spells: <b>${s.spells.s.length}</b> of ${g.spells}${g.wiz?" (spellbook has "+(6+2*(s.level-1))+")":""}</p>
+    <div class="btns"><button class="btn sm" type="button" data-cr="spauto">Pick for me</button></div>
+    ${g.cantrips?`<h4>Cantrips</h4><div class="crgrid">${can.map(x=>chip(x,"c")).join("")}</div>`:""}
+    <h4>Spells (up to level ${g.maxl})</h4><div class="crgrid">${sp.map(x=>chip(x,"s")).join("")}</div>`;
+}
+const crAsiLevels=s=>ASI.concat(lc(s.cls)==="fighter"?[6,14]:lc(s.cls)==="rogue"?[10]:[]).filter(l=>l<=s.level).sort((a,b)=>a-b);
+function crStepImprove(s){
+  const lv=crAsiLevels(s), feats=s.L.feats.filter(f=>s.ed==="2014"||f.t==="general"||f.t==="fighting-style"&&0);
+  return lv.map(l=>{
+    const a=s.asi[l]||(s.asi[l]={k:"asi2",a:(CRPRI[s.cls]||CRAB)[0],b:(CRPRI[s.cls]||CRAB)[1],f:""});
+    return `<div class="crd"><b>Level ${l}</b><div class="igrid">
+      <label class="fld"><span>Choose</span>${crSel("asi."+l+".k",a.k,[["asi2","+2 to one ability"],["asi11","+1 to two abilities"],["feat","Take a feat"]])}</label>
+      ${a.k==="feat"?`<label class="fld"><span>Feat</span>${crSel("asi."+l+".f",a.f,feats.map(f=>f.n),"Choose a feat")}</label>`:`<label class="fld"><span>${a.k==="asi2"?"Ability":"First ability"}</span>${crSel("asi."+l+".a",a.a,CRAB.map(k=>[k,crAbName(k)]))}</label>${a.k==="asi11"?`<label class="fld"><span>Second ability</span>${crSel("asi."+l+".b",a.b,CRAB.filter(k=>k!==a.a).map(k=>[k,crAbName(k)]))}</label>`:""}`}
+    </div></div>`}).join("")||`<p>No ability improvements yet at this level.</p>`;
+}
+function crStepReview5(s){
+  const tot=crTotals(s); crApplyAsi(s,tot);
+  return `<div class="crd"><p><b>${esc(s.name||"New character")}</b></p><p>${esc((s.sub||s.species))} ${esc(s.cls)}${s.subcls?" ("+esc(s.subcls)+")":""}, level ${s.level} \u00b7 ${esc(s.bg)}</p>
+    <p>${CRAB.map(k=>k.toUpperCase()+" "+tot[k]).join(" \u00b7 ")}</p>
+    <p class="hint">Skills: ${s.skills.concat((s.bgObj&&s.bgObj.sk||[]).map(crSkId)).filter((v,i,a)=>v&&a.indexOf(v)===i).map(crSkName).join(", ")||"none"}</p></div>
+    <p class="hint">Creating will add your class features, species traits, background, gear, attacks and spells to a new sheet, and work out hit points and armor class.</p>`;
+}
+function crApplyAsi(s,tot){
+  crAsiLevels(s).forEach(l=>{const a=s.asi[l];if(!a)return;if(a.k==="asi2")tot[a.a]=Math.min(20,tot[a.a]+2);else if(a.k==="asi11"){tot[a.a]=Math.min(20,tot[a.a]+1);tot[a.b]=Math.min(20,tot[a.b]+1)}});
+  return tot;
+}
+
+/* ---- prepare, build and random (5e) ---- */
+async function crPrepare(s){
+  if(s.sys==="pf2e")return crPreparePf(s);
+  await crLoad5();
+  const ed=s.ed; s.L=s.L||{};
+  s.L.species=crSpecies(ed); s.L.bgs=crBgs(ed); s.L.feats=crFeats(ed);
+  s.L.classes=await crClasses(ed);
+  try{await loadSpells(ed)}catch(e){}
+  s.L.spells=(SPELLDATA[ed]||[]).filter(x=>x.ed===ed).concat(dndLib("spells").map(libSpellRec));
+  crSync(s);
+}
+function crSync(s){
+  if(s.sys==="pf2e")return crSyncPf(s);
+  const L=s.L; if(!L)return;
+  s.speciesObj=L.species.find(x=>x.n===s.species)||null;
+  s.bgObj=L.bgs.find(x=>x.n===s.bg)||null;
+  const c=L.classes.find(x=>x.n===s.cls);
+  s.casterMeta=c?c.meta:null;
+  const conm=0, tot=crTotals(s);
+  const m=s.casterMeta&&s.casterMeta.abil?Math.floor((tot[s.casterMeta.abil]-10)/2):0;
+  s.goal=crSpellGoal(s,s.casterMeta,m);
+}
+function crValid(s){
+  const st=crSteps(s)[s.step];
+  if(s.sys==="pf2e")return crValidPf(s,st);
+  if(st==="Basics")return "";
+  if(st==="Species"){if(!s.species)return "Choose a species.";const sp=s.speciesObj;if(sp&&s.ed==="2014"&&sp.abo&&s.aboPicks.length!==sp.abo.n)return "Choose "+sp.abo.n+" abilities for the bonus.";return ""}
+  if(st==="Class")return s.cls?"":"Choose a class.";
+  if(st==="Background"){if(!s.bg)return "Choose a background.";const b=s.bgObj;if(s.ed==="2024"&&b&&b.ab&&b.ab.length===3&&s.bgMode==="21"&&(!s.bgA||!s.bgB))return "Choose where the +2 and +1 go.";return ""}
+  if(st==="Abilities"){
+    if(s.method==="buy"&&crPtCost(s)>27)return "That costs more than 27 points.";
+    if((s.method==="array"||s.method==="roll")&&CRAB.some(k=>!s.base[k]))return "Assign a score to every ability.";
+    return "";
+  }
+  if(st==="Skills"){const c=s.L.classes.find(x=>x.n===s.cls),n=c&&c.meta.sk?c.meta.sk.n:2;return s.skills.length<n?"Choose "+n+" skills ("+s.skills.length+" so far).":""}
+  return "";
+}
+function crDefaults(s){
+  /* fill sensible defaults when a step is entered */
+  if(s.sys==="pf2e")return;
+  if(!s.bgMode)s.bgMode="21";
+  if(s.ed==="2024"&&s.bgObj&&s.bgObj.ab&&s.bgObj.ab.length===3&&s.bgMode==="21"){
+    const pri=CRPRI[s.cls]||[];
+    if(!s.bgA||!s.bgObj.ab.includes(s.bgA)){s.bgA=pri.find(k=>s.bgObj.ab.includes(k))||s.bgObj.ab[0]}
+    if(!s.bgB||!s.bgObj.ab.includes(s.bgB)||s.bgB===s.bgA){s.bgB=pri.find(k=>s.bgObj.ab.includes(k)&&k!==s.bgA)||s.bgObj.ab.find(k=>k!==s.bgA)}
+  }
+  if(!CRAB.every(k=>s.base[k])){if(s.method==="buy"){CRAB.forEach(k=>{s.base[k]=8})}}
+  const bgs=new Set(((s.bgObj&&s.bgObj.sk)||[]).map(crSkId));
+  s.skills=s.skills.filter(x=>!bgs.has(x));
+}
+const crItemKey=n=>lc(n).replace(/[^a-z0-9 ]/g,"").replace(/ies$/,"y").replace(/s$/,"");
+async function crItemRecs(ed){
+  const D=await loadItems(ed).catch(()=>[]), m=new Map();
+  D.forEach(r=>{m.set(crItemKey(r.n),r)});
+  return m;
+}
+function crAddItem(c,m,name,qty){
+  const k=crItemKey(name); let r=m.get(k);
+  if(!r&&/^(arcane|druidic|holy) /.test(lc(name)))r=null;
+  const it=r?itemFromRec(Object.assign({},r,{source:r.source||"SRD"})):mkItem(name.charAt(0).toUpperCase()+name.slice(1));
+  it.qty=qty||1; c.inventory.push(it); return it;
+}
+async function crBuild5(s){
+  crSync(s);
+  const ed=s.ed, c=blankChar(ui.camp&&S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"",ed);
+  const sp=s.speciesObj, bg=s.bgObj, cl=s.L.classes.find(x=>x.n===s.cls), meta=cl.meta;
+  c.name=s.name.trim()||"New character"; c.level=s.level;
+  c.race=(s.sub&&ed==="2014"?s.sub:s.species)||""; c.background=s.bg||"";
+  c.speed=sp?sp.sp:30;
+  if(ed==="2014"&&sp&&s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb&&sb.sp)c.speed=sb.sp}
+  const tot=crApplyAsi(s,crTotals(s)); CRAB.forEach(k=>{c.abilities[k]=tot[k]});
+  c.classes=[mkClassRow(s.cls,s.subcls||"",s.level)];
+  c.saveProf={}; (meta.saves||cl.data.saves&&cl.data.saves.map(lc)||[]).forEach(k=>{c.saveProf[lc(k).slice(0,3)]=1});
+  const bgSk=((bg&&bg.sk)||[]).map(crSkId);
+  s.skills.concat(bgSk).filter(Boolean).forEach(id=>{c.skills[id]=1});
+  /* species traits and background feat */
+  const addF=(name,src,desc)=>{const x=mkFeat(name);x.source=src;x.desc=desc||"";fxAttach(x);c.features.push(x)};
+  if(sp){
+    sp.tr.forEach(t=>addF(t.n,s.species,t.d));
+    if(ed==="2014"&&s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb)(sb.tr||[]).forEach(t=>addF(t.n,s.sub,t.d))}
+    if(ed==="2024"&&s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb)(sb.tr||[]).forEach(t=>addF(t.n,s.sub,t.d))}
+  }
+  if(bg&&bg.feat){const f=s.L.feats.find(x=>lc(x.n)===lc(bg.feat));addF(bg.feat+(bg.fnote?" ("+bg.fnote+")":""),"Origin feat",f?f.d:(bg.d||""));c.originFeat=bg.feat}
+  if(ed==="2014"&&bg&&bg.d)addF(bg.n+" background",bg.n,bg.d);
+  crAsiLevels(s).forEach(l=>{const a=s.asi[l];if(a&&a.k==="feat"&&a.f){const f=s.L.feats.find(x=>x.n===a.f);addF(a.f,"Level "+l+" feat",f?f.d:"")}});
+  /* gear */
+  const recs=await crItemRecs(ed);
+  const eq=crEqGroups(s), have=[];
+  eq.forEach((g,i)=>{const o=g.opts[s.eq[i]==null?0:s.eq[i]]||g.opts[0];if(!o)return;o.items.forEach(([n,q])=>have.push([n,q]));c.coins.gp+=o.gp||0});
+  (meta.fixed||[]).forEach(([n,q])=>have.push([n,q]));
+  if(bg){
+    if(ed==="2024"&&s.bgEq==="B")c.coins.gp+=50;
+    else{(bg.eq||[]).forEach(([n,q])=>have.push([n,q]));c.coins.gp+=bg.gp||0}
+  }
+  have.forEach(([n,q])=>{
+    if(/^arcane focus$/i.test(n))n="Crystal";
+    const it=crAddItem(c,recs,n,q);
+  });
+  let ac=null, armor=null, shield=null, wcount=0;
+  c.inventory.forEach(it=>{
+    const cat=lc(it.cat);
+    if(/armor/.test(cat)&&!/shield/.test(lc(it.name))&&/^\d/.test(it.ac||"")){ if(!armor){armor=it;it.equipped=true} }
+    else if(lc(it.name)==="shield"){shield=it;it.equipped=true}
+    else if(it.dmg&&wcount<3){wcount++;it.equipped=wcount<=2;const a=attackFromItem(c,it);if(a)c.attacks.push(a)}
+  });
+  const dx=abMod(c,"dex");
+  let base=10+dx;
+  if(armor){const v=acFromItem(c,armor);if(v)base=v}
+  else if(s.cls==="Barbarian")base=10+dx+abMod(c,"con");
+  else if(s.cls==="Monk")base=10+dx+abMod(c,"wis");
+  if(shield)base+=2;
+  c.ac=base;
+  /* notes */
+  const notes=[];
+  if(sp&&sp.lg&&sp.lg.length)notes.push("Languages: "+sp.lg.join(", "));
+  if(meta.prof&&meta.prof.length)notes.push("Class proficiencies: "+meta.prof.join(", "));
+  if(bg&&bg.tool&&bg.tool.length)notes.push("Tool proficiencies: "+bg.tool.join(", "));
+  c.notes=notes.join("\n");
+  /* hit points */
+  const hd=num(meta.hd||cl.data.hd,8), cm=abMod(c,"con");
+  c.hpMax=Math.max(1,hd+cm+(s.level-1)*(Math.floor(hd/2)+1+cm));
+  c.hp=c.hpMax;
+  /* spells */
+  if(s.goal){
+    s.spells.c.concat(s.spells.s).forEach(n=>{
+      const x=s.L.spells.find(y=>y.n===n);
+      if(x)c.spells.push(Object.assign(mkSpell(x.n),{level:x.l,school:x.s,time:x.t,range:x.r,components:x.c,duration:x.d,conc:x.k,ritual:x.ri,desc:x.desc,higher:x.hi,prepared:true}));
+    });
+    if(meta.abil)c.spellcasting.ability=meta.abil;
+  }
+  return c;
+}
+async function crFinish(s){
+  const c=await crBuild5(s);
+  S.characters.push(c); ui.sel=c.id; ui.tab="sheet"; ui.q=""; ui.newChar=false;
+  c.classes[0].level=s.level;
+  await applyClass(c,0);
+  /* applyClass adds features up to level; recompute derived stuff */
+  syncClassFields(c); syncSlots(c);
+  c.updated=Date.now(); save(); closeCreator(); renderSheet(); window.scrollTo(0,0);
+}
+/* ---- random (5e) ---- */
+const crPick=a=>a[rd(a.length)-1];
+const crShuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rd(i+1)-1;[a[i],a[j]]=[a[j],a[i]]}return a};
+async function crRandom5(s){
+  await crPrepare(s);
+  const L=s.L;
+  s.name=s.name||crRandName();
+  const sp=crPick(L.species); s.species=sp.n; s.sub=sp.sub&&sp.sub.length?crPick(sp.sub).n:"";
+  s.aboPicks=[]; if(s.ed==="2014"&&sp.abo){s.aboPicks=crShuffle(CRAB.filter(k=>!(sp.ab&&sp.ab[k]))).slice(0,sp.abo.n)}
+  const cl=crPick(L.classes); s.cls=cl.n;
+  const subs=cl.data.subclasses||[]; s.subcls=s.level>=3&&subs.length?crPick(subs).name:"";
+  const bg=crPick(L.bgs); s.bg=bg.n; s.bgMode="21"; s.bgA=""; s.bgB="";
+  crSync(s); s.method="array"; crSuggest(s); crDefaults(s);
+  /* class skills */
+  const m=cl.meta, sk=m.sk||{n:2,from:FXSK.map(x=>x[1])}, bgs=new Set((bg.sk||[]).map(crSkId));
+  s.skills=crShuffle(sk.from.map(crSkId).filter(id=>id&&!bgs.has(id))).slice(0,sk.n);
+  s.eq={}; (m.eq||[]).forEach((g,i)=>{s.eq[i]=rd(g.opts.length)-1}); s.bgEq="A";
+  s.asi={}; crAsiLevels(s).forEach(l=>{const p=CRPRI[s.cls]||CRAB; s.asi[l]={k:"asi2",a:p[0],b:p[1],f:""}});
+  crSync(s); crAutoSpells(s);
+  s.step=crSteps(s).length-1;
+}
+function crAutoSpells(s){
+  const g=s.goal; s.spells={c:[],s:[]}; if(!g)return;
+  const cl=s.cls, all=s.L.spells.filter(x=>(x.cl||[]).some(n=>lc(n)===lc(cl)));
+  s.spells.c=crShuffle(all.filter(x=>x.l===0)).slice(0,g.cantrips).map(x=>x.n);
+  const dmg=/damage|heal|bless|shield|cure|bane|sleep|charm|fog|web|mage armor|magic missile|thunder|hunter|command/i;
+  const pool=all.filter(x=>x.l>=1&&x.l<=g.maxl);
+  const pref=crShuffle(pool.filter(x=>dmg.test(x.n+" "+(x.desc||"").slice(0,120))));
+  const rest=crShuffle(pool.filter(x=>!pref.includes(x)));
+  s.spells.s=pref.concat(rest).slice(0,g.spells).map(x=>x.n);
+}
+
+/* ---- Pathfinder 2e creator ---- */
+const PFTRAD={Bard:"occult",Cleric:"divine",Druid:"primal",Oracle:"divine",Psychic:"occult",Wizard:"arcane",Animist:"divine",Magus:"arcane",Necromancer:"arcane",Witch:"",Sorcerer:"",Summoner:"",Champion:"divine"};
+const PFSPONT=["Bard","Sorcerer","Oracle","Psychic","Summoner","Animist"];
+const crPfOk=(s,x)=>s.allSrc||/^Pathfinder (Player Core|GM Core)/.test(x.src||"");
+const crPfSlug=n=>lc(n).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+async function crPreparePf(s){
+  const [ori,cls,feats,spells]=await Promise.all([pfLoad("origins"),pfLoad("classes"),pfLoad("feats"),pfLoad("spells")]);
+  s.L={anc:ori.ancestries,her:ori.heritages,bgs:ori.backgrounds,classes:cls,feats:feats,spells:spells};
+  crSyncPf(s);
+}
+function crSyncPf(s){
+  const L=s.L; if(!L)return; const p=s.pf;
+  s.pfAnc=L.anc.find(x=>x.n===p.anc)||null;
+  s.pfBg=L.bgs.find(x=>x.n===p.bg)||null;
+  s.pfCls=L.classes.find(x=>x.n===p.cls)||null;
+  if(s.pfCls&&s.pfCls.sc&&!p.tradition&&PFTRAD[p.cls])p.tradition=PFTRAD[p.cls];
+}
+const crPfKey=s=>{const p=s.pf,d=s.pfCls;return p.key||(d&&d.key&&d.key[0])||"str"};
+/* ability modifiers from choices */
+function crPfMods(s){
+  const p=s.pf,m={str:0,dex:0,con:0,int:0,wis:0,cha:0}, a=s.pfAnc, b=s.pfBg;
+  if(a){(a.bo||[]).forEach((o,i)=>{const k=o.length>=6?p.ancB[i]:(o.length===1?o[0]:p.ancB[i]||"");if(k)m[k]++});(a.fl||[]).forEach(o=>{if(o.length===1)m[o[0]]--})}
+  if(b){(b.bo||[]).forEach((o,i)=>{const k=o.length>=6?p.bgB[i]:(o.length===1?o[0]:p.bgB[i]||"");if(k)m[k]++})}
+  if(s.pfCls)m[crPfKey(s)]++;
+  (p.free||[]).forEach(k=>{if(k)m[k]++});
+  [5,10,15,20].forEach(l=>{if(s.level>=l)((p.lvB&&p.lvB[l])||[]).forEach(k=>{if(k&&m[k]<4)m[k]++})});
+  return m;
+}
+function crPfSlots(s){
+  const d=s.pfCls; if(!d)return[];
+  const sl=pfPlanSlots(d), out=[];
+  for(let n=1;n<=s.level;n++)sl(n).forEach(([cat,label],i)=>{
+    if(n===1&&label==="Background skill feat")return;
+    out.push({id:n+":"+cat+":"+i,n:n,cat:cat,label:label+" (level "+n+")"});
+  });
+  return out;
+}
+function crPfFeatOpts(s,sl){
+  const F=s.L.feats, p=s.pf, anc=crPfSlug(p.anc), cls=crPfSlug(p.cls);
+  return F.filter(f=>crPfOk(s,f)&&f.lv<=sl.n&&(
+    sl.cat==="ancestry"?f.cat==="ancestry"&&(f.t||[]).includes(anc):
+    sl.cat==="class"?f.cat==="class"&&(f.t||[]).includes(cls):
+    sl.cat==="skill"?f.cat==="skill":
+    f.cat==="general")).sort((a,b)=>a.lv-b.lv||a.n.localeCompare(b.n));
+}
+function crPfSpellRanks(s){
+  const L=s.level,o={};
+  for(let r=1;r<=9;r++){const n=L>=2*r?3:L===2*r-1?2:0;if(n)o[r]=n}
+  if(L>=19)o[10]=1;
+  return o;
+}
+function crPfSkillNeed(s){
+  const d=s.pfCls; if(!d)return 0;
+  const m=crPfMods(s);
+  return Math.max(0,d.tr+Math.max(0,m.int));
+}
+function crPfIncLevels(s){const d=s.pfCls;return d&&d.lvl?d.lvl.ski.filter(l=>l<=s.level):[]}
+function crValidPf(s,st){
+  const p=s.pf;
+  if(st==="Ancestry"){if(!p.anc)return "Choose an ancestry.";if(!p.her&&s.L.her.some(h=>crPfSlug(h.anc)===crPfSlug(p.anc)))return "Choose a heritage.";return ""}
+  if(st==="Background")return p.bg?"":"Choose a background.";
+  if(st==="Class")return p.cls?"":"Choose a class.";
+  if(st==="Abilities"){
+    const a=s.pfAnc,b=s.pfBg;
+    if(a&&(a.bo||[]).some((o,i)=>o.length>1&&!p.ancB[i]))return "Choose your ancestry boosts.";
+    if(b&&(b.bo||[]).some((o,i)=>o.length>1&&!p.bgB[i]))return "Choose your background boosts.";
+    if((p.free||[]).filter(Boolean).length<4||new Set(p.free).size<4)return "Choose four different free boosts.";
+    return "";
+  }
+  if(st==="Skills"){const n=crPfSkillNeed(s);return p.skills.length<n?"Choose "+n+" skills ("+p.skills.length+" so far).":""}
+  return "";
+}
+function crPfDefaults(s){
+  const p=s.pf; p.ancB=p.ancB||[]; p.bgB=p.bgB||[]; p.free=p.free||[]; p.lvB=p.lvB||{}; p.inc=p.inc||{}; p.fp=p.fp||{};
+  const d=s.pfCls; if(d&&(!p.key||!d.key.includes(p.key)))p.key=d.key[0]||"str";
+}
+/* build */
+async function crBuildPf(s){
+  crSyncPf(s); crPfDefaults(s);
+  const p=s.pf, d=s.pfCls, camp=ui.camp&&S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"";
+  const c=pfBlank(camp); c.name=s.name.trim()||"New character"; c.level=s.level;
+  c.cls=p.cls; c.race=p.anc; c.background=p.bg; c.pf.heritage=p.her;
+  const m=crPfMods(s); CRAB.forEach(k=>{c.pf.mods[k]=m[k]});
+  c.pf.keyAbility=crPfKey(s);
+  S.characters.push(c); ui.sel=c.id;
+  await pfApply(c,"ancestry"); await pfApply(c,"class"); await pfApply(c,"background");
+  c.pf.keyAbility=crPfKey(s);
+  const her=s.L.her.find(h=>h.n===p.her&&crPfSlug(h.anc)===crPfSlug(p.anc));
+  if(her)pfAddFeat(c,{n:her.n,lvl:1,d:her.d,src:her.src},"ancestryfeature");
+  p.skills.forEach(id=>{c.pf.skills[id]=Math.max(1,num(c.pf.skills[id]))});
+  crPfIncLevels(s).forEach(l=>{const id=p.inc[l];if(!id)return;const cap=l>=15?4:l>=7?3:2;c.pf.skills[id]=Math.min(cap,num(c.pf.skills[id])+1)});
+  crPfSlots(s).forEach(sl=>{const nm=p.fp[sl.id];if(!nm)return;const f=s.L.feats.find(x=>x.n===nm&&(sl.cat==="general"?x.cat==="general":x.cat===sl.cat));if(f){const added=pfAddFeat(c,f,sl.cat);if(added){const x=c.pf.feats[c.pf.feats.length-1];x.at=sl.n}}});
+  if(d&&d.sc){
+    c.pf.cast.trad=p.tradition||PFTRAD[p.cls]||""; c.pf.cast.abl=crPfKey(s); c.pf.cast.kind=PFSPONT.includes(p.cls)?"spontaneous":"prepared";
+    const rk=crPfSpellRanks(s); Object.keys(rk).forEach(r=>{c.pf.cast.slots[r]={max:rk[r],used:0}});
+    p.spells.c.concat(p.spells.s).forEach(n=>{const x=s.L.spells.find(y=>y.n===n);if(x){pfAddSpell(c,x);const sp=c.pf.spells[c.pf.spells.length-1];if(sp)sp.prep=true}});
+  }
+  c.pf.coins.gp=15;
+  pfHp(c); c.hp=c.hpMax; c.updated=Date.now();
+  return c;
+}
+async function crFinishPf(s){
+  const c=await crBuildPf(s);
+  ui.tab="sheet"; ui.q=""; ui.newChar=false;
+  save(); closeCreator(); renderSheet(); window.scrollTo(0,0);
+}
+/* random */
+async function crRandomPf(s){
+  await crPrepare(s); const L=s.L,p=s.pf;
+  s.name=s.name||crRandName();
+  const ancs=L.anc.filter(x=>crPfOk(s,x)); const a=crPick(ancs.length?ancs:L.anc); p.anc=a.n;
+  const hs=L.her.filter(h=>crPfSlug(h.anc)===crPfSlug(a.n)&&crPfOk(s,h)); p.her=hs.length?crPick(hs).n:(L.her.find(h=>crPfSlug(h.anc)===crPfSlug(a.n))||{n:""}).n;
+  const bgs=L.bgs.filter(x=>crPfOk(s,x)); p.bg=crPick(bgs.length?bgs:L.bgs).n;
+  const cls=L.classes.filter(x=>crPfOk(s,x)); p.cls=crPick(cls.length?cls:L.classes).n;
+  crSyncPf(s); crPfDefaults(s); p.key=crPick(s.pfCls.key.length?s.pfCls.key:["str"]);
+  const used=new Set(); p.ancB=[]; p.bgB=[];
+  (s.pfAnc.bo||[]).forEach((o,i)=>{p.ancB[i]=o.length>1?crPick(o.filter(k=>k!==p.key)):o[0]});
+  (s.pfBg.bo||[]).forEach((o,i)=>{p.bgB[i]=o.length>1?crPick(o):o[0]});
+  const pri=[p.key,"con","dex","wis","int","cha","str"].filter((k,i,a)=>a.indexOf(k)===i);
+  p.free=pri.slice(0,4);
+  p.lvB={}; [5,10,15,20].forEach(l=>{p.lvB[l]=pri.slice(0,4)});
+  const have=new Set(((s.pfBg.sk||[]).concat(s.pfCls.trs||[])).map(lc));
+  p.skills=crShuffle(PFSKILLS.map(x=>x[0]).filter(id=>!have.has(id))).slice(0,crPfSkillNeed(s));
+  p.inc={}; crPfIncLevels(s).forEach(l=>{p.inc[l]=crPick(p.skills.concat([...have].filter(id=>PFSKILLS.some(x=>x[0]===id))))});
+  p.fp={}; crPfSlots(s).forEach(sl=>{const o=crPfFeatOpts(s,sl).filter(f=>f.lv<=Math.max(1,sl.n));if(o.length)p.fp[sl.id]=crPick(o).n});
+  crPfAutoSpells(s);
+  s.step=crSteps(s).length-1;
+}
+function crPfAutoSpells(s){
+  const p=s.pf,d=s.pfCls; p.spells={c:[],s:[]}; if(!d||!d.sc)return;
+  if(!p.tradition)p.tradition=crPick(["arcane","divine","occult","primal"]);
+  const all=s.L.spells.filter(x=>crPfOk(s,x)&&(x.tr||[]).includes(p.tradition)&&x.k!=="focus");
+  p.spells.c=crShuffle(all.filter(x=>x.k==="cantrip"||x.lv===0)).slice(0,5).map(x=>x.n);
+  const rk=crPfSpellRanks(s);
+  Object.keys(rk).forEach(r=>{p.spells.s=p.spells.s.concat(crShuffle(all.filter(x=>x.k!=="cantrip"&&x.lv===num(r))).slice(0,rk[r]).map(x=>x.n))});
+}
+/* steps */
+function crStepPfAnc(s){
+  const p=s.pf, L=s.L.anc.filter(x=>crPfOk(s,x)||x.n===p.anc), a=s.pfAnc;
+  let det="";
+  if(a){
+    const hs=s.L.her.filter(h=>crPfSlug(h.anc)===crPfSlug(a.n)&&(crPfOk(s,h)||h.n===p.her));
+    det=`<div class="crd"><p><b>${esc(a.n)}</b> \u00b7 ${esc(PFSIZE[a.sz]||a.sz)} \u00b7 speed ${a.sp} ft \u00b7 ${a.hp} HP</p><p class="hint">${esc(String(a.d||"").slice(0,240))}</p></div>`;
+    if(hs.length)det+=`<h4>Heritage</h4><div class="crgrid">${hs.map(h=>crCard("pher",h.n,h.n,p.her===h.n)).join("")}</div>`;
+  }
+  return `${crPfNote(s)}<div class="crgrid">${L.map(x=>crCard("panc",x.n,x.n,p.anc===x.n,x.hp+" HP \u00b7 "+x.sp+" ft")).join("")}</div>${det}`;
+}
+const crPfNote=s=>`<label class="chk"><input type="checkbox" data-crf="allSrc"${s.allSrc?" checked":""}>Include every source book, not just Player Core and GM Core</label>`;
+function crStepPfBg(s){
+  const p=s.pf, L=s.L.bgs.filter(x=>crPfOk(s,x)||x.n===p.bg), b=s.pfBg;
+  let det="";
+  if(b)det=`<div class="crd"><p><b>${esc(b.n)}</b> \u00b7 trained in ${esc((b.sk||[]).concat(b.lore||[]).join(", "))}${b.ft&&b.ft.length?" \u00b7 feat: "+esc(b.ft.join(", ")):""}</p><p class="hint">${esc(String(b.d||"").slice(0,240))}</p></div>`;
+  return `${crPfNote(s)}<div class="crgrid">${L.map(x=>crCard("pbg",x.n,x.n,p.bg===x.n,(x.sk||[]).join(", "))).join("")}</div>${det}`;
+}
+function crStepPfCls(s){
+  const p=s.pf, L=s.L.classes.filter(x=>crPfOk(s,x)||x.n===p.cls), d=s.pfCls;
+  let det="";
+  if(d){
+    det=`<div class="crd"><p><b>${esc(d.n)}</b> \u00b7 ${d.hp} HP per level \u00b7 key ability ${d.key.map(k=>k.toUpperCase()).join(" or ")||"choice"}${d.sc?" \u00b7 spellcaster":""}</p><p class="hint">${esc(String(d.d||"").slice(0,260))}</p></div>`;
+    if(d.key.length>1)det+=`<h4>Key ability</h4><div class="crgrid">${d.key.map(k=>crCard("pkey",k,crAbName(k),crPfKey(s)===k)).join("")}</div>`;
+    if(d.sc&&!PFTRAD[d.n]||(d.sc&&!PFTRAD[d.n]===false&&0))det+=``;
+    if(d.sc&&!PFTRAD[d.n])det+=`<h4>Spell tradition</h4><div class="crgrid">${["arcane","divine","occult","primal"].map(t=>crCard("ptrad",t,t,p.tradition===t)).join("")}</div>`;
+  }
+  return `${crPfNote(s)}<div class="crgrid">${L.map(x=>crCard("pcls",x.n,x.n,p.cls===x.n,x.hp+" HP"+(x.sc?" \u00b7 caster":""))).join("")}</div>${det}`;
+}
+function crStepPfAbil(s){
+  const p=s.pf,a=s.pfAnc,b=s.pfBg,m=crPfMods(s);
+  const slot=(label,o,arr,i,f)=>o.length===1?`<div class="kv"><span>${label}</span><b>${crAbName(o[0])}</b></div>`:`<label class="fld"><span>${label}</span>${crSel(f+"."+i,arr[i]||"",(o.length>=6?CRAB:o).map(k=>[k,crAbName(k)]),"Choose")}</label>`;
+  let h="";
+  if(a)h+=`<h4>${esc(a.n)} boosts</h4><div class="igrid">${(a.bo||[]).map((o,i)=>slot("Boost "+(i+1),o,p.ancB,i,"ancB")).join("")}</div>${(a.fl||[]).length?`<p class="hint">Flaw: ${a.fl.map(o=>o.map(k=>crAbName(k)).join(" or ")).join(", ")}</p>`:""}`;
+  if(b)h+=`<h4>${esc(b.n)} boosts</h4><div class="igrid">${(b.bo||[]).map((o,i)=>slot("Boost "+(i+1),o,p.bgB,i,"bgB")).join("")}</div>`;
+  h+=`<h4>Class and free boosts</h4><p class="hint">${s.pfCls?esc(s.pfCls.n)+" boosts "+crAbName(crPfKey(s)):"Choose a class first."}. Choose four different abilities for your free boosts.</p><div class="igrid">${[0,1,2,3].map(i=>`<label class="fld"><span>Free boost ${i+1}</span>${crSel("free."+i,(p.free||[])[i]||"",CRAB.map(k=>[k,crAbName(k)]),"Choose")}</label>`).join("")}</div>`;
+  [5,10,15,20].filter(l=>s.level>=l).forEach(l=>{h+=`<h4>Level ${l} boosts</h4><div class="igrid">${[0,1,2,3].map(i=>`<label class="fld"><span>Boost ${i+1}</span>${crSel("lvB."+l+"."+i,((p.lvB||{})[l]||[])[i]||"",CRAB.map(k=>[k,crAbName(k)]),"Choose")}</label>`).join("")}</div>`});
+  return h+`<div class="crabs">${CRAB.map(k=>`<div class="crab"><span>${k.toUpperCase()}</span><b>${sgn(m[k])}</b></div>`).join("")}</div>`;
+}
+function crStepPfSkills(s){
+  const p=s.pf,d=s.pfCls,need=crPfSkillNeed(s);
+  const fixed=new Set(((s.pfBg&&s.pfBg.sk)||[]).concat((d&&d.trs)||[]).map(lc));
+  let h=`<p>Choose <b>${need}</b> trained skills (${p.skills.length} chosen). ${fixed.size?"Already trained: "+[...fixed].map(pfCap).join(", ")+".":""}</p><div class="crgrid">${PFSKILLS.filter(x=>!fixed.has(x[0])).map(x=>crCard("psk",x[0],x[1],p.skills.includes(x[0]))).join("")}</div>`;
+  const inc=crPfIncLevels(s);
+  if(inc.length){const have=PFSKILLS.filter(x=>fixed.has(x[0])||p.skills.includes(x[0]));h+=`<h4>Skill increases</h4><div class="igrid">${inc.map(l=>`<label class="fld"><span>Level ${l}</span>${crSel("inc."+l,p.inc[l]||"",have.map(x=>[x[0],x[1]]),"Choose")}</label>`).join("")}</div>`}
+  return h;
+}
+function crStepPfFeats(s){
+  const p=s.pf, sl=crPfSlots(s);
+  if(!sl.length)return `<p>No feat slots yet.</p>`;
+  return `<p class="hint">Your background feat is added automatically.</p><div class="igrid">${sl.map(x=>{const o=crPfFeatOpts(s,x);return `<label class="fld"><span>${esc(x.label)}</span>${crSel("fp."+x.id,p.fp[x.id]||"",o.map(f=>[f.n,f.n+(f.lv>1?" (L"+f.lv+")":"")]),"None")}</label>`}).join("")}</div>`;
+}
+function crStepPfSpells(s){
+  const p=s.pf,d=s.pfCls; if(!d||!d.sc)return "";
+  const rk=crPfSpellRanks(s);
+  const all=s.L.spells.filter(x=>crPfOk(s,x)&&(!p.tradition||(x.tr||[]).includes(p.tradition))&&x.k!=="focus");
+  const can=all.filter(x=>x.k==="cantrip"||x.lv===0), sp=all.filter(x=>x.k!=="cantrip"&&x.lv>=1&&rk[x.lv]);
+  const nSp=Object.values(rk).reduce((a,b)=>a+b,0);
+  return `${!PFTRAD[d.n]?`<h4>Tradition</h4><div class="crgrid">${["arcane","divine","occult","primal"].map(t=>crCard("ptrad",t,t,p.tradition===t)).join("")}</div>`:""}
+    <p>Cantrips: <b>${p.spells.c.length}</b> of 5 \u00b7 Spells: <b>${p.spells.s.length}</b> of ${nSp}</p><div class="btns"><button class="btn sm" type="button" data-cr="pspauto">Pick for me</button></div>
+    <h4>Cantrips</h4><div class="crgrid">${can.map(x=>crCard("pspc",x.n,x.n,p.spells.c.includes(x.n))).join("")}</div>
+    <h4>Spells</h4><div class="crgrid">${sp.map(x=>crCard("psps",x.n,x.n,p.spells.s.includes(x.n),"Rank "+x.lv)).join("")}</div>`;
+}
+function crStepPfReview(s){
+  const p=s.pf,m=crPfMods(s);
+  return `<div class="crd"><p><b>${esc(s.name||"New character")}</b></p><p>${esc(p.her?p.her+" ":"")}${esc(p.anc)} ${esc(p.cls)}, level ${s.level} \u00b7 ${esc(p.bg)}</p>
+    <p>${CRAB.map(k=>k.toUpperCase()+" "+sgn(m[k])).join(" \u00b7 ")}</p></div>
+    <p class="hint">Creating will set up proficiencies, hit points, class features, feats${s.pfCls&&s.pfCls.sc?", spell slots and spells":""}. Add armor, weapons and gear on the sheet.</p>`;
+}
+
+/* ---- creator UI and events ---- */
+let CR=null;
+const crOv=()=>$("#crOv");
+function crStepBody(s){
+  const st=crSteps(s)[s.step];
+  if(s.sys==="pf2e")return {Basics:crStepBasics,Ancestry:crStepPfAnc,Background:crStepPfBg,Class:crStepPfCls,Abilities:crStepPfAbil,Skills:crStepPfSkills,Feats:crStepPfFeats,Spells:crStepPfSpells,Review:crStepPfReview}[st](s);
+  return {Basics:crStepBasics,Species:crStepSpecies,Class:crStepClass,Background:crStepBg,Abilities:crStepAbil,Skills:crStepSkills,Gear:crStepGear,Spells:crStepSpells,Improvements:crStepImprove,Review:crStepReview5}[st](s);
+}
+function crRender(keep){
+  const s=CR, o=crOv(); if(!s||!o)return;
+  const steps=crSteps(s); s.step=Math.max(0,Math.min(steps.length-1,s.step));
+  const prev=keep&&o.querySelector(".sheet")?o.querySelector(".sheet").scrollTop:0, ovTop=o.scrollTop;
+  let body;
+  try{ body=s.loading?`<p>Loading game data...</p>`:crStepBody(s) }catch(e){ body=`<p class="msg err">Something went wrong building this step. ${esc(e.message||"")}</p>` }
+  const last=s.step===steps.length-1;
+  o.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="crT">
+    <div class="bar" style="margin:0"><h2 id="crT">${s.sys==="pf2e"?"Pathfinder 2e":s.ed==="2014"?"D&amp;D 5e":"D&amp;D 5.5e"} character</h2><button class="btn sm" type="button" data-cr="cancel">Close</button></div>
+    <div class="crprog" role="list" aria-label="Steps">${steps.map((t,i)=>`<span role="listitem" class="${i===s.step?"on":i<s.step?"done":""}"${i===s.step?' aria-current="step"':""}>${esc(t)}</span>`).join("")}</div>
+    <section class="crbody"><h3>${esc(steps[s.step])}</h3>${body}</section>
+    <div class="msg${s.msg?" err":""}" role="status">${esc(s.msg||"")}</div>
+    <div class="crnav"><button class="btn" type="button" data-cr="rand">Randomize</button><span class="sp"></span>
+      <button class="btn" type="button" data-cr="back"${s.step?"":" disabled"}>Back</button>
+      <button class="btn pri" type="button" data-cr="${last?"finish":"next"}"${s.busy?" disabled":""}>${last?(s.busy?"Creating...":"Create character"):"Next"}</button></div></div>`;
+  const sh=o.querySelector(".sheet"); if(sh&&keep)sh.scrollTop=prev; o.scrollTop=keep?ovTop:0;
+}
+async function openCreator(sys,ed,rand){
+  CR=crNewState(sys); CR.ed=ed; CR.loading=true; CR.rand=!!rand; CR.name=""; ui.newChar=false;
+  const o=crOv(); o.hidden=false; crRender();
+  try{
+    if(rand){ await (sys==="pf2e"?crRandomPf(CR):crRandom5(CR)) } else await crPrepare(CR);
+    CR.loading=false;
+  }catch(e){ CR.loading=false; CR.msg="The game data could not be loaded here. "+(e.message||""); }
+  crRender();
+}
+function closeCreator(){const o=crOv();if(o){o.hidden=true;o.innerHTML=""}CR=null}
+function crSetPath(s,f,v){
+  const p=f.split("."), pf=s.pf;
+  if(p[0]==="name"){s.name=v;return false}
+  if(p[0]==="level"){s.level=Math.max(1,Math.min(20,num(v,1)));return true}
+  if(p[0]==="allSrc"){s.allSrc=!!v;return true}
+  if(p[0]==="base"){s.base[p[1]]=num(v,0)||0;return true}
+  if(p[0]==="bgA"||p[0]==="bgB"&&p.length===1){s[p[0]]=v;return true}
+  if(p[0]==="asi"){const l=p[1];s.asi[l]=s.asi[l]||{};s.asi[l][p[2]]=v;return true}
+  if(p[0]==="ancB"||p[0]==="bgB"){pf[p[0]]=pf[p[0]]||[];pf[p[0]][num(p[1])]=v;return true}
+  if(p[0]==="free"){pf.free=pf.free||[];pf.free[num(p[1])]=v;return true}
+  if(p[0]==="lvB"){pf.lvB=pf.lvB||{};pf.lvB[p[1]]=pf.lvB[p[1]]||[];pf.lvB[p[1]][num(p[2])]=v;return true}
+  if(p[0]==="inc"){pf.inc[p[1]]=v;return true}
+  if(p[0]==="fp"){pf.fp[f.slice(3)]=v;return true}
+  return true;
+}
+const crToggle=(arr,v,max)=>{const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);else if(!max||arr.length<max)arr.push(v)};
+async function crEnterStep(s){
+  if(s.sys==="pf2e"){crPfDefaults(s);crSyncPf(s);return}
+  crSync(s); crDefaults(s);
+  const st=crSteps(s)[s.step];
+  if(st==="Abilities"&&!CRAB.every(k=>s.base[k])&&s.method!=="manual"&&s.method!=="buy")crSuggest(s);
+  if(st==="Abilities"&&s.method==="manual"&&!CRAB.every(k=>s.base[k]))CRAB.forEach(k=>{s.base[k]=s.base[k]||10});
+  if(st==="Spells"){crSync(s);if(s.goal&&!s.spells.c.length&&!s.spells.s.length)crAutoSpells(s)}
+}
+async function crAct(a,b){
+  const s=CR; if(!s||s.loading)return;
+  const v=b.dataset.v, pf=s.pf; s.msg="";
+  switch(a){
+    case "cancel": closeCreator(); return;
+    case "rname": s.name=crRandName(); break;
+    case "game": {
+      const n=crNewState(v==="pf2e"?"pf2e":"dnd5e"); n.ed=v==="2014"?"2014":"2024"; n.name=s.name; n.level=s.level; n.rand=s.rand; n.loading=true;
+      CR=n; crRender(); try{ if(n.rand)await (n.sys==="pf2e"?crRandomPf(n):crRandom5(n)); else await crPrepare(n); n.step=n.rand?crSteps(n).length-1:0 }catch(e){n.msg="The game data could not be loaded here."} n.loading=false; break;}
+    case "rand": {
+      s.loading=true; crRender(); const keepName=s.name;
+      try{ if(s.sys==="pf2e"){s.pf=crNewState("pf2e").pf;await crRandomPf(s)}else{Object.assign(s,{species:"",sub:"",cls:"",subcls:"",bg:"",aboPicks:[],skills:[],eq:{},spells:{c:[],s:[]},asi:{},base:{}});await crRandom5(s)} s.name=s.name||keepName }catch(e){s.msg="Randomizing failed: "+(e.message||"")}
+      s.loading=false; s.rand=true; break;}
+    case "next": {
+      const err=crValid(s); if(err){s.msg=err;break}
+      s.step++; await crEnterStep(s); break;}
+    case "back": if(s.step>0){s.step--;await crEnterStep(s)} break;
+    case "finish": {
+      const err=crValid(s); if(err){s.msg=err;break}
+      s.busy=true; crRender(true);
+      try{ if(s.sys==="pf2e")await crFinishPf(s); else await crFinish(s); return }
+      catch(e){ s.busy=false; s.msg="Could not create the character: "+(e.message||e) }
+      break;}
+    /* 5e */
+    case "species": s.species=v; s.sub=""; s.aboPicks=[]; break;
+    case "sub": s.sub=s.sub===v?"":v; break;
+    case "abo": {const sp=s.speciesObj; crToggle(s.aboPicks,v,sp&&sp.abo?sp.abo.n:2); break;}
+    case "cls": s.cls=v; s.subcls=""; s.skills=[]; s.eq={}; s.spells={c:[],s:[]}; s.base={}; break;
+    case "subcls": s.subcls=v; break;
+    case "bg": s.bg=v; s.bgA=""; s.bgB=""; break;
+    case "bgmode": s.bgMode=v; break;
+    case "method": s.method=v; s.base={}; s.rolled=false; if(v==="roll")s.pool=[]; else s.pool=CRARRAY.slice(); if(v==="buy")CRAB.forEach(k=>{s.base[k]=8}); break;
+    case "roll": s.pool=crRollPool(); s.rolled=true; s.base={}; break;
+    case "pb": {const k=b.dataset.a,d=num(b.dataset.d),cur=num(s.base[k],8),n=cur+d; if(n<8||n>15)break; const old=s.base[k]; s.base[k]=n; if(crPtCost(s)>27){s.base[k]=old;s.msg="You have used all 27 points."} break;}
+    case "suggest": crSuggest(s); break;
+    case "skill": {const c=s.L.classes.find(x=>x.n===s.cls),n=c&&c.meta.sk?c.meta.sk.n:2; const bgs=((s.bgObj&&s.bgObj.sk)||[]).map(crSkId); if(bgs.includes(v))break; crToggle(s.skills,v,n); break;}
+    case "eq": {const [g,o]=v.split(":");s.eq[g]=num(o);break;}
+    case "bgeq": s.bgEq=v; break;
+    case "spc": crToggle(s.spells.c,v,s.goal?s.goal.cantrips:0); break;
+    case "sps": crToggle(s.spells.s,v,s.goal?s.goal.spells:0); break;
+    case "spauto": crSync(s); crAutoSpells(s); break;
+    /* pf2e */
+    case "panc": pf.anc=v; pf.her=""; pf.ancB=[]; break;
+    case "pher": pf.her=v; break;
+    case "pbg": pf.bg=v; pf.bgB=[]; pf.skills=[]; break;
+    case "pcls": pf.cls=v; pf.key=""; pf.fp={}; pf.spells={c:[],s:[]}; pf.skills=[]; pf.tradition=""; break;
+    case "pkey": pf.key=v; break;
+    case "ptrad": pf.tradition=v; pf.spells={c:[],s:[]}; break;
+    case "psk": crToggle(pf.skills,v,crPfSkillNeed(s)); break;
+    case "pspc": crToggle(pf.spells.c,v,5); break;
+    case "psps": crToggle(pf.spells.s,v,Object.values(crPfSpellRanks(s)).reduce((x,y)=>x+y,0)); break;
+    case "pspauto": crPfAutoSpells(s); break;
+  }
+  if(CR){ if(s.sys==="pf2e"){crSyncPf(s);crPfDefaults(s)}else{crSync(s);crDefaults(s)} crRender(true) }
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]");
+  if(b){
+    const a=b.dataset.act;
+    if(a==="creator"){openCreator(b.dataset.sys==="pf2e"?"pf2e":"dnd5e",b.dataset.rules||"2024",false);return}
+    if(a==="creator-rand"){openCreator(b.dataset.sys==="pf2e"?"pf2e":"dnd5e",b.dataset.rules||"2024",true);return}
+  }
+  const x=e.target.closest("[data-cr]"); if(x&&CR&&crOv().contains(x)){crAct(x.dataset.cr,x)}
+});
+document.addEventListener("input",e=>{
+  const t=e.target; if(!CR||!t.dataset||t.dataset.crf!=="name")return; CR.name=t.value;
+});
+document.addEventListener("change",e=>{
+  const t=e.target; if(!CR||!t.dataset||!t.dataset.crf)return;
+  const f=t.dataset.crf; let v=t.type==="checkbox"?t.checked:t.value;
+  if(/^base\./.test(f))v=t.value===""?0:num(t.value);
+  const re=crSetPath(CR,f,v);
+  if(re){
+    if(CR.sys==="pf2e")crSyncPf(CR);else{
+      if(f==="level"){CR.asi={};crSync(CR);const g=CR.goal;if(!g){CR.spells={c:[],s:[]}}else{CR.spells.c=CR.spells.c.slice(0,g.cantrips);CR.spells.s=CR.spells.s.slice(0,g.spells)}}
+      crSync(CR);
+    }
+    if(f==="level"&&CR.sys==="pf2e"){CR.pf.fp={};CR.pf.inc={};CR.pf.lvB={}}
+    crRender(true);
+  }
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&CR&&!crOv().hidden){closeCreator()}});
+crOv().addEventListener("click",e=>{if(e.target.id==="crOv")closeCreator()});
+
 
 render(); setStatus();
 })();
