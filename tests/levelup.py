@@ -33,6 +33,12 @@ LIB={"updated":9999999999999,"packs":{"Valda Test":{"creator":True}},
    {"id":"vsl1","name":"Binder Spells","source":"Valda Test","kind":"text","text":"Binder Spells\nCantrips (0 Level): Spirit Bolt, Fire Bolt\n1st Level: Ghost Chain, Shield, Wraith Ward"},
    {"id":"vsp1","name":"Veilkin","source":"Valda Test","kind":"species","text":"Veilkin Traits\nAbility Score Increase. Your Charisma score increases by 2.\nAge. They live long.\nSize. Veilkin are Medium.\nSpeed. Your base walking speed is 30 feet.\nDarkvision. You can see in dim light within 60 feet of you as if it were bright light.\nVeil Step. Once per long rest you can teleport 10 feet.\nLanguages. You can speak, read, and write Common and Sylvan.\nSubraces\nDusk Veilkin\nAbility Score Increase. Your Wisdom score increases by 1.\nDusk Sight. Your darkvision extends to 120 feet.\nDawn Veilkin\nAbility Score Increase. Your Strength score increases by 1.\nDawn Blade. You are proficient with longswords."}]}
 def run(pg,js,a=None): return pg.evaluate(js,a)
+FILLJS="""(()=>{for(const s of document.querySelectorAll('#lvlOv select.chsel, #crOv select.chsel')){if(s.value)continue;const o=[...s.options].find(o=>o.value&&!o.disabled);if(o){s.value=o.value;s.dispatchEvent(new Event('change',{bubbles:true}));return 1}}for(const i of document.querySelectorAll('#lvlOv input[data-chf], #crOv input[data-chf]')){if(!i.value){i.value='x';i.dispatchEvent(new Event('input',{bubbles:true}))}}return 0})()"""
+def fill(pg):
+    for i in range(30):
+        pg.wait_for_timeout(200)
+        if not pg.evaluate(FILLJS): pg.wait_for_timeout(300)
+        if not pg.evaluate(FILLJS): return
 def step_through(pg,maxsteps=12,pick=0):
     """Walk the level-up wizard choosing sensible options."""
     for _ in range(maxsteps):
@@ -43,20 +49,7 @@ def step_through(pg,maxsteps=12,pick=0):
             run(pg,"(()=>{if(!document.querySelector('#lvlOv [data-lu=cls].on,#lvlOv [data-lu=ncls].on'))document.querySelector('#lvlOv [data-lu=cls]').click()})()")
         if st=="Subclass":
             run(pg,f"document.querySelectorAll('#lvlOv [data-lu=sub]')[{pick}].click()")
-        if st=="Choices":
-            run(pg,"""(()=>{document.querySelectorAll('#lvlOv .crbody h4').forEach(h=>{const m=h.textContent.match(/choose (\\d+)/i);const n=m?+m[1]:1;const g=h.nextElementSibling;if(!g)return;const cs=[...g.querySelectorAll('.crc:not([disabled]),.crc.on')];cs.filter(x=>!x.classList.contains('on')).slice(0,n-cs.filter(x=>x.classList.contains('on')).length).forEach(x=>x.click())})})()""")
-            pg.wait_for_timeout(150)
-            run(pg,"""(()=>{document.querySelectorAll('#lvlOv .crbody h4').forEach(h=>{const m=h.textContent.match(/choose (\\d+) \\((\\d+)/i);if(!m)return;let need=+m[1]-+m[2];const g=h.nextElementSibling;[...g.querySelectorAll('.crc:not(.on):not([disabled])')].forEach(x=>{if(need-->0)x.click()})})})()""")
-        if st in ("Choices","Improvement"):
-            for i in range(8):
-                pg.wait_for_timeout(250)
-                n=run(pg,"""(()=>{for(const p of document.querySelectorAll('#lvlOv .chlbl')){const m=p.textContent.match(/\\((\\d+) of (\\d+)\\)/);if(m&&+m[1]<+m[2]){let g=p.nextElementSibling;const b=g&&g.querySelector('[data-ch]:not(.on)');if(b){b.click();return 1}}}return 0})()""")
-                if not n:break
-        if st in ("Choices","Improvement"):
-            for i in range(8):
-                pg.wait_for_timeout(250)
-                n=run(pg,"""(()=>{for(const p of document.querySelectorAll('#lvlOv .chlbl')){const m=p.textContent.match(/\\((\\d+) of (\\d+)\\)/);if(m&&+m[1]<+m[2]){let g=p.nextElementSibling;const b=g&&g.querySelector('[data-ch]:not(.on)');if(b){b.click();return 1}}}return 0})()""")
-                if not n:break
+        if st in ("Features","Improvement"): fill(pg)
         if st=="Improvement":
             sel=run(pg,"(()=>{const s=document.querySelector('#lvlOv select[data-luf=a]');if(s&&!s.value){s.value=s.options[1].value;s.dispatchEvent(new Event('change',{bubbles:true}))}return !!s})()")
         if st=="Spells":
@@ -119,10 +112,11 @@ try:
     if lv==2:
         for _ in range(6):
             st=run(pg,"document.querySelector('#lvlOv .crbody h3').textContent")
-            if st=="Choices":break
+            if st=="Features":break
             if st=="Spells": run(pg,"document.querySelector('#lvlOv [data-lu=spauto]').click()")
             run(pg,"(()=>{const b=document.querySelector('#lvlOv [data-lu=next]');b&&b.click()})()");pg.wait_for_timeout(250)
-        cards=run(pg,"[...document.querySelectorAll('#lvlOv [data-lu=opt]')].map(b=>b.textContent+(b.disabled?' [locked]':''))")
+        pg.wait_for_timeout(400)
+        cards=run(pg,"[...document.querySelectorAll('#lvlOv select[data-lug] option')].filter(o=>o.value).map(o=>o.textContent+(o.disabled?' [locked]':''))")
         print("seal cards",cards)
         ok(len(cards)==3 and any('locked' in x and 'Frost' in x for x in cards),"split options with locked prerequisite")
     if lv==4:
@@ -135,21 +129,24 @@ try:
         opts=run(pg,"[...document.querySelectorAll('#lvlOv select[data-luf=f] option')].map(o=>o.value)")
         ok("Spirit Touched" in opts,f"library feat offered {opts[:5]}")
         run(pg,"(()=>{const s=document.querySelector('#lvlOv select[data-luf=f]');s.value='Spirit Touched';s.dispatchEvent(new Event('change',{bubbles:true}))})()");pg.wait_for_timeout(200)
-        fa=run(pg,"[...document.querySelectorAll('#lvlOv [data-ch]')].map(b=>b.dataset.v)")
+        pg.wait_for_timeout(300)
+        fa=run(pg,"[...document.querySelectorAll('#lvlOv select[data-chs] option')].filter(o=>o.value).map(o=>o.value)")
         ok(fa==["wis","cha"],f"feat ability choice {fa}")
-        run(pg,"[...document.querySelectorAll('#lvlOv [data-ch]')].find(b=>b.dataset.v==='cha').click()");pg.wait_for_timeout(200)
+        run(pg,"(()=>{const s=document.querySelector('#lvlOv select[data-chs]');s.value='cha';s.dispatchEvent(new Event('change',{bubbles:true}))})()");pg.wait_for_timeout(200)
     r=step_through(pg); ok(r=="done",f"Binder ->{lv}: {r}")
   print("binder steps",seen)
   c=chars(pg)[0]
   print("binder",c["classes"],c["abilities"]["cha"],[ (f["name"],f["source"],f.get("type")) for f in c["features"]],[s["name"] for s in c["spells"]])
   ok(c["classes"][0]["level"]==5 and c["classes"][0]["sub"],"binder level/sub")
-  ok(sum(f["name"].startswith("Seal Rite:") for f in c["features"])==1,"binder one seal rite")
-  ok(not any(f["name"]=="Seal Rite: Bonded Frost" for f in c["features"]),"prerequisite respected")
+  sr=[f for f in c["features"] if f["name"]=="Seal Rite"]
+  ok(not any(f["name"].startswith("Seal Rite:") for f in c["features"]),"picked option is not a separate feature")
+  ok(sr and len(sr[0].get("opts",[]))==1,"binder one seal rite attached to Seal Rite")
+  ok(not any(o["name"]=="Bonded Frost" for f in sr for o in f.get("opts",[])),"prerequisite respected")
   ok(any(s["name"] in ("Fire Bolt","Shield","Ghost Chain") for s in c["spells"]),"spell list section linked (SRD and unlinked spells)")
   ok(not any(s["name"]=="Magic Missile" for s in c["spells"]),"only listed spells offered")
-  ok(any(f["name"].startswith("Fighting Style: ") for f in c["features"]),"fighting style with no options listed got a pick")
+  ok(any(f["name"]=="Fighting Style" and f.get("opts") for f in c["features"]),"fighting style with no options listed got a pick, attached to the feature")
   ok(any(c["skills"].get(k)==1 for k in ("arcana","history","religion")),"skill choice applied")
-  ok(any("Your choice" in f["desc"] for f in c["features"] if f["name"]=="Spirit Lore"),"choice written on the feature")
+  ok(any(f.get("chosen") for f in c["features"] if f["name"]=="Spirit Lore"),"choice saved on the feature")
   ok(c["abilities"]["cha"]==17,"feat raised cha")
   ok(any(s["name"]=="Soul Lance" or s["name"]=="Ghost Chain" for s in c["spells"]),"library spells picked")
   icons=run(pg,"[...document.querySelectorAll('#featBox details.item>summary')].map(s=>s.querySelector('.sum-t').textContent+'='+s.title)")
@@ -254,12 +251,21 @@ try:
   ok(tag,"sheet shows Choose on a feature with an open choice")
   run(pg,"document.querySelector('#featBox details.item summary').click()");pg.wait_for_timeout(150)
   run(pg,"document.querySelector('[data-act=ch-open]').click()");pg.wait_for_timeout(800)
-  for i in range(4):
+  fill(pg)
+  for i in range(0):
     run(pg,"(()=>{for(const p of document.querySelectorAll('#lvlOv .chlbl')){const m=p.textContent.match(/\\((\\d+) of (\\d+)\\)/);if(m&&+m[1]<+m[2]){const b=p.nextElementSibling.querySelector('[data-ch]:not(.on)');if(b){b.click();return}}}})()");pg.wait_for_timeout(150)
   run(pg,"document.querySelector('[data-chx=ok]').click()");pg.wait_for_timeout(300)
   cc=chars(pg)[0]; f=[x for x in cc["features"] if x["name"]=="Wanderer's Gift"][0]
-  ok(f.get("chDone") and "Your choice" in f["desc"],"sheet choice saved: "+f["desc"][-80:])
+  ok(f.get("chDone") and len(f.get("chosen",[]))==2,"sheet choice saved: "+str(f.get("chosen")))
   ok(sum(1 for v in cc["skills"].values() if v)>=4,"sheet choice added skills")
+
+  # 7) old characters: options that were separate features move onto the feature that gave them
+  old=base(rules="2024",classes=[{"id":"c1","name":"Fighter","sub":"","level":2}],features=[{"id":"a","name":"Fighting Style","source":"Warden 2","desc":"Choose one."},{"id":"b","name":"Fighting Style: Protection","source":"Warden 2","desc":"Impose disadvantage."},{"id":"d","name":"Sentinel's Stand","source":"Warden 1","desc":"x"},{"id":"e","name":"Sentinel's Stand: Primal Toughness","source":"Warden 1","desc":"y"},{"id":"g","name":"Spellcasting: Bard","source":"Bard 1","desc":"z"}])
+  pg=load(pg,old,LIB)
+  names=run(pg,"[...document.querySelectorAll('#featBox details.item .sum-t')].map(e=>e.textContent)")
+  ok("Fighting Style: Protection" not in names and "Sentinel's Stand: Primal Toughness" not in names and "Spellcasting: Bard" in names,"old options merged "+str(names))
+  picks=run(pg,"[...document.querySelectorAll('#featBox .chpick')].map(e=>e.textContent)")
+  ok("Protection" in picks and "Primal Toughness" in picks,"choice shown on its feature "+str(picks))
   print("errors",errs)
   ok(not errs,"page errors")
 finally:

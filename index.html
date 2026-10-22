@@ -1828,6 +1828,17 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 .campsrc{margin:-4px 0 14px;padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--panel)}
 .chgrp{margin:0 0 14px;padding:0 0 10px;border-bottom:1px solid var(--line)}.chgrp:last-child{border-bottom:0}
 .chlbl{margin:10px 0 6px;font-weight:600}.chlbl span{color:var(--muted);font-weight:400}
+.chsel{width:100%;margin:0 0 8px;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field);color:var(--ink);font:inherit}
+.chdesc{margin:-2px 0 10px;padding:8px 10px;border-left:3px solid var(--accent);background:var(--panel);border-radius:0 var(--r-sm) var(--r-sm) 0;font-size:14px;color:var(--muted)}
+.lufeat{display:flex;flex-direction:column;gap:0;margin-bottom:8px}.lufeat>details.item{margin-bottom:0}
+.lufeat-t{font-weight:600;padding:10px 12px 0}
+.chbox{margin:-6px 0 0;padding:14px 12px 4px;border:1px solid var(--accent);border-top:0;border-radius:0 0 var(--r-sm) var(--r-sm);background:var(--accent-soft)}
+.lufeat-t+.chbox{border-top:1px solid var(--accent);border-radius:var(--r-sm);margin-top:6px}
+.chbox .chlbl:first-child{margin-top:0}.chbox .chgrp{margin:0;padding:0;border:0}.chbox .chgrp h4{margin:8px 0 0}
+.chosen{margin:10px 0;padding:10px 12px;border:1px solid var(--accent);border-radius:var(--r-sm);background:var(--accent-soft)}
+.chosen-h{display:block;font:600 11px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.chosen p{margin:4px 0}.chopt{margin:6px 0}.chopt-h{display:flex;align-items:center;justify-content:space-between;gap:8px}.chopt .prose{font-size:14px;color:var(--muted);margin-top:2px}
+.tag.chpick{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle}
 .tag.chtag{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .crc:disabled{opacity:.5;cursor:not-allowed;background:transparent;border-style:dashed}
 .prow div.plink{text-align:left;align-items:flex-start}
@@ -2876,6 +2887,16 @@ function normChar(c){
   o.saveProf=c.saveProf||{}; o.skills=c.skills||{}; o.attacks=Array.isArray(c.attacks)?c.attacks:[];
   o.features=migList(c.features,mkFeat); o.spells=migList(c.spells,mkSpell); o.resources=migList(c.resources,mkRes);
   o.features.forEach(f=>{if(f.uses){f.desc="Uses: "+f.uses+(f.desc?"\n\n"+f.desc:"")}delete f.uses});
+  /* options picked earlier were separate features ("Fighting Style: Protection"); they now sit on the feature that gave them */
+  o.features.slice().forEach(f=>{
+    const m=String(f.name||"").match(/^([^:]{3,60}):\s*(.+)$/); let p=null;
+    if(m){const k=lc(m[1]);p=o.features.find(x=>x!==f&&!/:/.test(x.name||"")&&[k,k+"s"].includes(lc(x.name)))}
+    else if(/^fighting style \(/i.test(f.source||""))p=o.features.find(x=>x!==f&&/^(additional )?fighting style$/i.test(x.name||""));
+    if(!p)return;
+    p.opts=p.opts||[]; if(!p.opts.some(x=>lc(x.full)===lc(f.name)))p.opts.push({name:optShort(f.name),full:f.name,desc:String(f.desc||"").trim(),type:f.type||""});
+    p.chDone=true; p._mfx=1; o.features.splice(o.features.indexOf(f),1);
+  });
+  o.features.forEach(p=>{if(p._mfx){delete p._mfx;try{chFx(p)}catch(e){}}});
   o.spellcasting=normSpellcasting(o);
   o.rules=c.rules==="2024"?"2024":"2014"; o.system="dnd5e";
   o.mastery=Object.assign({slots:0,picks:[]},c.mastery||{}); o.mastery.picks=migList(c.mastery&&c.mastery.picks,mkPick);
@@ -3364,19 +3385,20 @@ function fxSummary(c){
 function featsHTML(c){
   if(!c.features.length)return `<div class="empty">No features yet. Add class features, racial traits and feats, then open any entry to read it. Use Edit inside an entry to change it.</div>`;
   const fq=lc(ui.fq||"");
-  const shown=c.features.filter(f=>(!fq||lc(f.name+" "+f.source+" "+f.desc).includes(fq))&&(!ui.favF||f.fav)).length;
+  const shown=c.features.filter(f=>(!fq||featSearch(f).includes(fq))&&(!ui.favF||f.fav)).length;
   if(!shown)return `<div class="empty">${ui.favF?"No favourite features yet. Open a feature and tap Favourite.":"No features match that search."}</div>`;
   return fxSummary(c)+c.features.map((f,i)=>{
-    if((fq&&!lc(f.name+" "+f.source+" "+f.desc).includes(fq))||(ui.favF&&!f.fav))return "";
+    if((fq&&!featSearch(f).includes(fq))||(ui.favF&&!f.fav))return "";
     const ed=ui.edit.has(f.id), pend=chPending(c,f);
     const body=ed?`<div class="igrid">${fld(c,"Name","features."+i+".name")}${fld(c,"Source","features."+i+".source",{ph:"Where it comes from (class, feat, species)"})}<label class="fld"><span>Type</span><select data-f="features.${i}.type">${FKINDS.map(k=>`<option value="${k[0]}"${(f.type||"")===k[0]?" selected":""}>${k[1]}</option>`).join("")}</select></label></div>
       <label class="fld"><span>Details</span><textarea data-f="features.${i}.desc" placeholder="What it does, how it works, and any numbers to remember">${esc(f.desc)}</textarea></label>
+      ${featChoiceHTML(f,i,true)}
       ${fxEditor(f,"features",i)}
       <div class="btns">${editBtn(f.id,"feat","Done","pri")}<button class="btn sm danger" type="button" data-act="del-feat" data-i="${i}">Delete feature</button></div>`
-    :`${kv("Source",f.source)}${viewText(f.desc,"No details yet. Tap Edit to add them.")}${fxRows(f,"features",i)}<div class="btns">${pend?`<button class="btn sm pri" type="button" data-act="ch-open" data-id="${esc(f.id)}">Make your choice</button>`:""}${editBtn(f.id,"feat","Edit")}<button class="btn sm${f.fav?" pri":""}" type="button" data-act="fav" data-kind="features" data-i="${i}" aria-pressed="${!!f.fav}">${f.fav?"Favourite":"Favourite it"}</button></div>`;
+    :`${kv("Source",f.source)}${viewText(f.desc,"No details yet. Tap Edit to add them.")}${featChoiceHTML(f,i)}${fxRows(f,"features",i)}<div class="btns">${pend?`<button class="btn sm pri" type="button" data-act="ch-open" data-id="${esc(f.id)}">Make your choice</button>`:""}${editBtn(f.id,"feat","Edit")}<button class="btn sm${f.fav?" pri":""}" type="button" data-act="fav" data-kind="features" data-i="${i}" aria-pressed="${!!f.fav}">${f.fav?"Favourite":"Favourite it"}</button></div>`;
     return `<details class="item" data-fk="${featKind(c,f)}" data-id="${esc(f.id)}"${ui.open.has(f.id)?" open":""}>
       <summary><span class="sum-t" data-live="features.${i}.name">${esc(f.name||"Untitled feature")}</span>
-        <span class="sum-m">${f.fav?"&#9733; ":""}${pend?'<span class="tag chtag">Choose</span> ':""}<span data-live="features.${i}.source">${esc(f.source)}</span></span></summary>
+        <span class="sum-m">${f.fav?"&#9733; ":""}${pend?'<span class="tag chtag">Choose</span> ':""}${(f.opts||[]).length?`<span class="tag chpick">${esc(f.opts.map(o=>o.name).join(", "))}</span> `:""}<span data-live="features.${i}.source">${esc(f.source)}</span></span></summary>
       <div class="ibody">${body}</div></details>`;
   }).join("");
 }
@@ -3903,6 +3925,7 @@ document.addEventListener("click",e=>{
       if(a==="rest-long"){for(let l=1;l<=9;l++){if(c.spellcasting.slots[l])c.spellcasting.slots[l].used=0}}
       save(); rerender("res");
     } break;
+    case "opt-del": if(c){const f=c.features[num(b.dataset.i)];if(f&&f.opts){f.opts.splice(num(b.dataset.j),1);if(!f.opts.length){delete f.opts;f.chDone=false}chFx(f);save();rerender("feat")}} break;
     case "add-feat": if(c){
       const f=mkFeat("New feature"); c.features.push(f); ui.open.add(f.id); ui.edit.add(f.id); save();
       $("#featBox").innerHTML=featsHTML(c); focusItem(f.id);
@@ -4097,7 +4120,7 @@ async function applyClass(c,i){
   const n=Math.max(1,num(r.level)), have=new Set(c.features.map(f=>lc(f.name)+"|"+lc(f.source)));
   let added=0;
   const sd=subDef(d,r.sub), subNote=!sd&&String(r.sub||"").trim();
-  const SN=luSubNames(d), G=lvGuided(c)?Object.assign(luGroups((d.features||[]).filter(f=>!SN.has(lc(f.name)))),luGroups(sd?sd.features||[]:[])):{}, skipped=new Set();
+  const SN=luSubNames(d), G=Object.assign(luGroups((d.features||[]).filter(f=>!SN.has(lc(f.name)))),luGroups(sd?sd.features||[]:[])), skipped=new Set();
   const add=(arr,label,isSub)=>(arr||[]).filter(f=>num(f.lvl)<=n&&(isSub||!SN.has(lc(f.name)))).forEach(f=>{
     const og=luOptOf(G,f); if(og){skipped.add(og.name);return}
     const src=label+" "+f.lvl, k=lc(f.name)+"|"+lc(src); if(have.has(k))return; have.add(k);
@@ -4106,7 +4129,7 @@ async function applyClass(c,i){
   add(d.features,d.name);
   if(sd)add(sd.features,sd.name,1);
   const notes=[];
-  if(skipped.size)notes.push("options to choose for "+[...skipped].join(" and ")+" (use Level up, or add them by hand)");
+  if(skipped.size)notes.push("choose your "+[...skipped].join(" and ")+" option on the feature (tap Make your choice)");
   if(i===0&&d.saves&&d.saves.length){d.saves.forEach(s=>{const k=lc(s).slice(0,3);if(abMod(c,k)!==undefined&&ABIL.some(a=>a[0]===k))c.saveProf[k]=1});notes.push("saving throws set")}
   if(c.rules==="2024"&&d.mastery){let best=-1,v=0;Object.keys(d.mastery).forEach(k=>{if(num(k)<=n&&num(k)>best){best=num(k);v=num(d.mastery[k])}});if(best>=0){c.mastery.slots=v;notes.push(v+" weapon masteries")}}
   syncClassFields(c); const slotted=syncSlots(c); if(slotted)notes.push("spell slots filled");
@@ -5468,22 +5491,39 @@ async function chPrepare(c,specs){
       const opts=[];
       try{const D=await loadClasses("2014");const fi=D.find(x=>x.name==="Fighter");(fi.features||[]).filter(f=>/^fighting style:/i.test(f.name)).forEach(f=>opts.push([f.name.replace(/^fighting style:\s*/i,""),f.name.replace(/^fighting style:\s*/i,""),{name:f.name,desc:f.desc,type:"class"}]))}catch(e){}
       try{await crLoad5();libEnrich();crFeats(ed).filter(f=>f.t==="fighting-style").forEach(f=>{if(!opts.some(o=>lc(o[0])===lc(f.n)))opts.push([f.n,f.n+(f.src&&f.src!=="SRD"?" ("+f.src+")":""),{name:f.n,desc:f.d,type:"feat"}])})}catch(e){}
-      const have=new Set((c.features||[]).map(x=>lc(x.name).replace(/^fighting style:\s*/,"")));
-      sp.opts=opts.filter(o=>!have.has(lc(o[0])));
+      const have=new Set((c.features||[]).flatMap(x=>[lc(x.name).replace(/^fighting style:\s*/,"")].concat((x.opts||[]).map(o=>lc(o.name)))));
+      const feats=opts.filter(o=>o[2].type==="feat");
+      sp.opts=opts.filter(o=>!have.has(lc(o[0]))).sort((a,b)=>a[0].localeCompare(b[0]));
     }
   }
   return specs;
 }
 /* rendering: st is {fkey:{specKey:[values] | "text"}} */
-function chHTML(groups,st){
+/* dropdowns for choices: n selects, each option once; locked options are shown but disabled with the reason */
+function chPickSel(attr,n,picked,opts){
+  picked=(picked||[]).filter(Boolean); let h="";
+  for(let i=0;i<n;i++){
+    const cur=picked[i]||"";
+    h+=`<select class="chsel" ${attr} data-i="${i}" aria-label="Choice ${i+1}"><option value="">${n>1?"Choice "+(i+1)+": choose…":"Choose…"}</option>${opts.map(o=>`<option value="${esc(o.v)}"${o.v===cur?" selected":""}${o.v!==cur&&(o.dis||picked.includes(o.v))?" disabled":""}>${esc(o.t)}${o.why?" ("+esc(o.why)+")":""}</option>`).join("")}</select>`;
+    if(cur){const o=opts.find(x=>x.v===cur);if(o&&o.desc)h+=`<div class="chdesc prose">${esc(o.desc)}</div>`}
+  }
+  return h;
+}
+function chOptRows(sp){
+  return (sp.opts||[]).map(o=>{const d=o[2],x=o[3]||{};let desc="";
+    if(d&&d.n!=null&&d.l!=null)desc=(d.l?"Level "+d.l:"Cantrip")+(d.s?" · "+d.s:"")+(d.desc?"\n"+String(d.desc).slice(0,240)+(String(d.desc).length>240?"…":""):"");
+    else if(d&&(d.desc||d.d))desc=String(d.desc||d.d).trim();
+    return {v:o[0],t:o[1],dis:!!x.dis,why:x.why||"",desc:desc}});
+}
+function chHTML(groups,st,o){
+  o=o||{};
   return groups.map(g=>{
     const fs=st[g.key]=st[g.key]||{};
-    return `<div class="chgrp"><h4>${esc(g.title)}</h4>${g.specs.map(sp=>{
+    return `<div class="chgrp">${o.noTitle?"":`<h4>${esc(g.title)}</h4>`}${g.specs.map(sp=>{
       const k=g.key+"|"+sp.key;
-      if(sp.kind==="free")return `<p class="hint" style="margin:4px 0">${esc(sp.label)}</p><label class="fld"><span>Your choice (written down on the feature)</span><input type="text" data-chf="${esc(k)}" value="${esc(fs[sp.key]||"")}" placeholder="What you chose"></label>`;
-      const pk=Array.isArray(fs[sp.key])?fs[sp.key]:[];
-      const opts=sp.opts||[];
-      return `<p class="chlbl">${esc(sp.label)} <span>(${pk.length} of ${sp.n})</span></p>${opts.length?`<div class="crgrid">${opts.map(o=>`<button class="crc${pk.includes(o[0])?" on":""}" type="button" data-ch="${esc(k)}" data-v="${esc(o[0])}" aria-pressed="${pk.includes(o[0])}"><b>${esc(o[1])}</b>${o[2]&&o[2].s?`<span>${esc(o[2].s)}</span>`:""}</button>`).join("")}</div>`:`<p class="hint">Nothing to choose from here. Add more sources to this campaign or write the choice in the feature.</p>`}`;
+      if(sp.kind==="free")return `<p class="chlbl">${esc(sp.label)}</p><input class="chsel" type="text" data-chf="${esc(k)}" value="${esc(fs[sp.key]||"")}" placeholder="Write what you chose">`;
+      const pk=Array.isArray(fs[sp.key])?fs[sp.key]:[], rows=chOptRows(sp);
+      return `<p class="chlbl">${esc(sp.label)}</p>${!sp.opts?`<p class="hint">Loading options…</p>`:!rows.length?`<p class="hint">Nothing to choose from here. Turn on more books for this campaign, or write the choice in the feature.</p>`:chPickSel(`data-chs="${esc(k)}"`,sp.n,pk,rows)}`;
     }).join("")}</div>`;
   }).join("");
 }
@@ -5499,6 +5539,39 @@ function chAuto(groups,st){
   groups.forEach(g=>{const fs=st[g.key]=st[g.key]||{};g.specs.forEach(sp=>{if(sp.kind!=="free"&&!(Array.isArray(fs[sp.key])&&fs[sp.key].length))fs[sp.key]=crShuffle(sp.opts||[]).slice(0,sp.n).map(o=>o[0])})});
 }
 let CHCTX=null;
+/* a chosen option lives on the feature that gave it: f.opts (options with their own text) and f.chosen (skills, languages and similar) */
+function optShort(n){return String(n||"").replace(/^[^:]{3,60}:\s*/,"")}
+function chFx(f){const t={name:f.name,desc:[f.desc].concat((f.opts||[]).map(o=>o.desc||"")).join("\n\n")};fxAttach(t);if(t.fx){f.fx=t.fx;f.fxq=t.fxq}else if(t.fxq)f.fxq=t.fxq}
+function featParent(c,name){const k=lc(name).replace(/\s*\(.*\)$/,"");return c.features.find(f=>!/:/.test(f.name||"")&&[k,k+"s"].includes(lc(f.name).replace(/\s*\(.*\)$/,"")))||c.features.find(f=>!/:/.test(f.name||"")&&lc(f.name).replace(/\s*\(.*\)$/,"")+"s"===k)}
+function attachOpt(c,parent,src,o,type){
+  let f=typeof parent==="object"?parent:featParent(c,parent);
+  if(!f){f=mkFeat(titleCase(String(parent)));f.source=src||"";f.type=type||"class";c.features.push(f)}
+  f.opts=f.opts||[];
+  if(!f.opts.some(x=>lc(x.full||x.name)===lc(o.full||o.name)))f.opts.push({name:optShort(o.name),full:o.full||o.name,desc:String(o.desc||"").trim(),type:o.type||""});
+  f.chDone=true; chFx(f); return f;
+}
+const featOptNames=f=>(f.opts||[]).flatMap(o=>[lc(o.full||""),lc(o.name)]).filter(Boolean);
+const charHas=(c,n)=>{n=lc(n);return (c.features||[]).some(f=>lc(f.name)===n||featOptNames(f).includes(n))};
+function featChoiceHTML(f,i,ed){
+  const O=f.opts||[], C=f.chosen||[]; if(!O.length&&!C.length)return "";
+  return `<div class="chosen"><span class="chosen-h">Your choice</span>${C.map(x=>`<p><b>${esc(x.k)}:</b> ${esc(x.v)}</p>`).join("")}${O.map((o,j)=>`<div class="chopt"><div class="chopt-h"><b>${esc(o.name)}</b>${ed?`<button class="btn sm danger" type="button" data-act="opt-del" data-i="${i}" data-j="${j}">Remove</button>`:""}</div>${o.desc?`<div class="prose">${esc(o.desc)}</div>`:""}</div>`).join("")}</div>`;
+}
+const featSearch=f=>lc([f.name,f.source,f.desc].concat((f.opts||[]).map(o=>o.name+" "+o.desc),(f.chosen||[]).map(x=>x.v)).join(" "));
+/* option lists a feature's class gives (Fighting Style: Archery and so on), worked out from the class data */
+function chClassGroup(c,f){
+  const m=String(f.source||"").match(/^(.+?)\s+(\d{1,2})$/); if(!m)return null;
+  const nm=lc(m[1]), rows=(c.classes||[]).filter(r=>String(r.name||"").trim()), ed=c.rules==="2024"?"2024":"2014";
+  const look=n=>{const l=libClass(n);if(l)return withAddOns(l,n);const D=CLASSDATA[ed];
+    if(!D){if(!chClassGroup.wait){chClassGroup.wait=1;loadClasses(ed).then(()=>{if(cur()&&ui.view==="sheet")rerender("feat")}).catch(()=>{})}return null}
+    const x=D.find(q=>lc(q.name)===lc(n));return x?withAddOns(x,n):null};
+  let row=rows.find(r=>lc(r.name)===nm), list=null;
+  if(row){const d=look(row.name);if(d){const SN=luSubNames(d);list=(d.features||[]).filter(q=>!SN.has(lc(q.name)))}}
+  else{row=rows.find(r=>lc(r.sub)===nm);if(row){const d=look(row.name),sd=d&&subDef(d,row.sub);if(sd)list=sd.features||[]}}
+  if(!list)return null;
+  const G=luGroups(list), k=lc(f.name).replace(/\s*\(.*\)$/,""), g=G[k]||G[k.replace(/s$/,"")]; if(!g)return null;
+  const parent=list.find(q=>lc(q.name)===lc(f.name)), lvl=num(row.level);
+  return {g:g,want:luGroupCount(g,parent,null,lvl),have:(f.opts||[]).length,lvl:lvl};
+}
 window.__chSpecs=chSpecs; /* used by tests */
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-ch]"); if(!b||!CHCTX)return;
@@ -5508,6 +5581,12 @@ document.addEventListener("click",e=>{
   if(i>=0)a.splice(i,1);else{if(a.length>=sp.n)a.shift();a.push(v)}
   CHCTX.render();
 });
+document.addEventListener("change",e=>{
+  const t=e.target; if(!t.dataset||t.dataset.chs==null||!CHCTX)return;
+  const k=t.dataset.chs, gk=k.slice(0,k.indexOf("|")), sk=k.slice(k.indexOf("|")+1);
+  const fs=CHCTX.st[gk]=CHCTX.st[gk]||{}, a=Array.isArray(fs[sk])?fs[sk].slice():[];
+  a[num(t.dataset.i)]=t.value; fs[sk]=a.filter(Boolean); CHCTX.render();
+});
 document.addEventListener("input",e=>{
   const t=e.target; if(!t.dataset||t.dataset.chf==null||!CHCTX)return;
   const k=t.dataset.chf, gk=k.slice(0,k.indexOf("|")), sk=k.slice(k.indexOf("|")+1);
@@ -5516,7 +5595,7 @@ document.addEventListener("input",e=>{
 /* apply picks to the character and write them on the feature */
 function chApply(c,f,specs,fs){
   if(!f||!fs)return;
-  const notes=[];
+  const KN={skill:"Skills",tool:"Tools",lang:"Languages",abil:"Ability increase",dmg:"Damage type",list:"Choice",exp:"Expertise",free:"Choice"};
   specs.forEach(sp=>{
     const v=fs[sp.key]; if(v==null||(Array.isArray(v)&&!v.length)||v==="")return;
     const vals=Array.isArray(v)?v:[v];
@@ -5525,22 +5604,27 @@ function chApply(c,f,specs,fs){
     if(sp.kind==="exp")vals.forEach(x=>{c.skills[x]=2});
     if(sp.kind==="abil")vals.forEach(k=>{if(CRAB.includes(k))c.abilities[k]=Math.min(20,num(c.abilities[k])+num(sp.v,1))});
     if(sp.kind==="spell")vals.forEach(n=>{const o=(sp.opts||[]).find(q=>q[0]===n),x=o&&o[2];if(x&&!c.spells.some(s=>lc(s.name)===lc(n)))c.spells.push(Object.assign(mkSpell(x.n),{level:x.l,school:x.s,time:x.t,range:x.r,components:x.c,duration:x.d,conc:x.k,ritual:x.ri,desc:x.desc,higher:x.hi,prepared:true}))});
-    if(sp.kind==="style")vals.forEach(n=>{const o=(sp.opts||[]).find(q=>q[0]===n),d=o&&o[2];if(d&&!c.features.some(x=>lc(x.name)===lc(d.name))){const x=mkFeat(d.name);x.source=f.source||"Fighting Style";x.desc=d.desc||"";x.type=d.type;fxAttach(x);c.features.push(x)}});
-    notes.push((sp.kind==="free"?"":sp.label.replace(/^Choose (an? |\d+ )?/i,"").replace(/^./,ch=>ch.toUpperCase())+": ")+vals.map(label).join(", "));
+    if(sp.kind==="style"||sp.kind==="opt"){vals.forEach(n=>{const o=(sp.opts||[]).find(q=>q[0]===n),d=o&&o[2];if(d)attachOpt(c,f,f.source,{name:d.name,full:d.name,desc:d.desc,type:d.type||""})});return}
+    f.chosen=(f.chosen||[]).concat([{k:sp.kind==="spell"?(sp.lv===0?"Cantrips":"Spells"):KN[sp.kind]||"Choice",v:vals.map(label).join(", ")}]);
   });
-  if(notes.length){f.desc=(f.desc?f.desc+"\n\n":"")+"Your choice: "+notes.join("; ")+".";f.chDone=true;fxAttach(f)}
+  f.chDone=true;
 }
-const chPending=(c,f)=>!f.chDone&&chSpecs(f,{handled:chHandled(c)}).length>0;
+function chPending(c,f){const cg=chClassGroup(c,f);if(cg)return cg.want>cg.have;return !f.chDone&&chSpecs(f,{handled:chHandled(c)}).length>0}
 function chHandled(c){
   /* features whose choices are already made another way: option groups and their parents */
-  const s=new Set(); (c.features||[]).forEach(f=>{const m=String(f.name||"").match(/^([^:]{3,60}):/);if(m)s.add(lc(m[1]));if(/^pact of the /i.test(f.name||""))s.add("pact boon")});
+  const s=new Set(); (c.features||[]).forEach(f=>{const m=String(f.name||"").match(/^([^:]{3,60}):/);if(m)s.add(lc(m[1]));if(/^pact of the /i.test(f.name||""))s.add("pact boon");if((f.opts||[]).length){s.add(lc(f.name));f.opts.forEach(o=>{const q=String(o.full||"").match(/^([^:]{3,60}):/);if(q)s.add(lc(q[1]))})}});
   return s;
 }
 /* make a choice for one feature already on the sheet */
 async function chOpenFeature(c,fid){
   PACKCAMP=c.campaign||null;
   const f=c.features.find(x=>x.id===fid); if(!f)return;
-  const specs=await chPrepare(c,chSpecs(f,{handled:chHandled(c)}));
+  try{await loadClasses(c.rules==="2024"?"2024":"2014")}catch(e){}
+  const cg=chClassGroup(c,f), specs=[];
+  if(cg&&cg.want>cg.have){const n=cg.want-cg.have;specs.push({kind:"opt",key:"opt:0",n:n,label:"Choose "+n+" option"+(n>1?"s":""),
+    opts:cg.g.opts.filter(q=>num(q.lvl)<=cg.lvl&&!charHas(c,q.name)).map(q=>{const pr=luPreCheck(c,q,cg.lvl,[]);return [q.name,optShort(q.name),{name:q.name,desc:q.desc},{dis:!pr.ok,why:pr.ok?"":luPreLine(pr).replace(/^Needs /,"needs ")}]})})}
+  if(!f.chDone)chSpecs(f,{handled:chHandled(c)}).forEach(x=>specs.push(x));
+  await chPrepare(c,specs);
   const st={}, groups=()=>[{key:"f",title:f.name,specs:specs}];
   const o=$("#lvlOv");
   const render=()=>{
@@ -5670,13 +5754,13 @@ function luGroupCount(g,parent,meta,L){
   if(meta&&meta.T){const w=lc(g.name).split(/\s+/).pop().replace(/s$/,""),H=meta.T.hdr.map(lc),ci=H.findIndex((h,j)=>j>0&&h.includes(w));if(ci>=0){const r=luRow(meta.T,L);if(r)return num(String(r[ci]||"").replace(/[^\d]/g,""))}}
   return luCount(parent&&parent.desc,1);
 }
-const luOwns=(c,name)=>c.features.some(f=>lc(f.name)===lc(name));
+const luOwns=(c,name)=>charHas(c,name);
 /* prerequisites: the SRD warlock invocations (the SRD data leaves them out) and "Prerequisite:" lines in any imported option or feat */
 const LUPRE={"agonizing blast":{sp:"eldritch blast"},"ascendant step":{l:9},"bewitching whispers":{l:7},"book of ancient secrets":{ft:"pact of the tome"},"chains of carceri":{l:15,ft:"pact of the chain"},"dreadful word":{l:7},"eldritch spear":{sp:"eldritch blast"},"lifedrinker":{l:12,ft:"pact of the blade"},"master of myriad forms":{l:15},"minions of chaos":{l:9},"mire the mind":{l:5},"one with shadows":{l:5},"otherworldly leap":{l:9},"repelling blast":{sp:"eldritch blast"},"sculptor of flesh":{l:7},"sign of ill omen":{l:5},"thirsting blade":{l:5,ft:"pact of the blade"},"visions of distant realms":{l:15},"voice of the chain master":{ft:"pact of the chain"},"whispers of the grave":{l:9},"witch sight":{l:15}};
 function luPreText(f){const m=String(f&&(f.desc||f.d)||"").match(/(?:^|\n)\s*\*{0,2}Prerequisites?\*{0,2}\s*[:.]\s*([^\n]+)/i);return m?m[1].trim().replace(/\.$/,""):""}
 function luPreCheck(c,f,lvl,extra){
   const nm=lc(String(f.name||f.n||"").replace(/^[^:]+:\s*/,"")), ex=(extra||[]).map(x=>lc(x).replace(/^[^:]+:\s*/,""));
-  const have=n=>{n=lc(n).replace(/^(the|a|an)\s+/,"");return c.features.some(x=>lc(x.name).replace(/^[^:]+:\s*/,"")===n||lc(x.name)===n)||ex.includes(n)};
+  const have=n=>{n=lc(n).replace(/^(the|a|an)\s+/,"");return c.features.some(x=>lc(x.name).replace(/^[^:]+:\s*/,"")===n||lc(x.name)===n||(x.opts||[]).some(o=>lc(o.name)===n||lc(o.full||"")===n))||ex.includes(n)};
   const spell=n=>{n=lc(n).replace(/^(the|a|an)\s+/,"");return c.spells.some(x=>lc(x.name)===n)||ex.includes(n)};
   const casts=()=>c.spells.length>0||calcSlots(c).any;
   const why=[], txt=luPreText(f), T=!txt&&LUPRE[nm];
@@ -5700,7 +5784,7 @@ function luPreCheck(c,f,lvl,extra){
 }
 const luPreLine=pr=>pr.ok?(pr.text?"Prerequisite: "+pr.text+(pr.check?" (check this yourself)":""):""):"Needs "+pr.why.join(", ");
 const luSnip=f=>{const t=String(f.desc||f.d||"").replace(/(?:^|\n)\s*\*{0,2}Prerequisites?[^\n]*/i,"").replace(/\s+/g," ").trim();return t.length<=80?t:t.slice(0,80).replace(/\s+\S*$/,"")+"…"};
-const luOwnsIn=(c,g)=>c.features.filter(f=>g.names.has(lc(f.name))).length;
+const luOwnsIn=(c,g)=>c.features.reduce((a,f)=>a+(g.names.has(lc(f.name))?1:0)+(f.opts||[]).filter(o=>g.names.has(lc(o.full||""))||g.names.has(lc(o.name))).length,0);
 /* everything a level brings: built from whatever class data exists (SRD, Library, add-on subclasses) */
 async function luPlan(c,sel){
   const P={sel:sel,err:""};
@@ -5738,12 +5822,12 @@ function luDetail(c,P,L){
     const want=luGroupCount(g,parent,P.meta,nl), have=luOwnsIn(c,g);
     if(g.un&&parent&&num(parent.lvl)!==nl&&have)return;
     const opts=g.opts.filter(f=>num(f.lvl)<=nl&&!luOwns(c,f.name)).filter((f,i,a)=>a.findIndex(o=>lc(o.name)===lc(f.name))===i);
-    if(want>have&&opts.length)groups.push({key:k,name:g.name,n:Math.min(want-have,opts.length),opts:opts,src:(sf.includes(g.opts[0])&&sd?sd.name:P.cls),un:!!g.un});
+    if(want>have&&opts.length)groups.push({key:k,name:g.name,parentName:parent?parent.name:g.name,n:Math.min(want-have,opts.length),opts:opts,src:(sf.includes(g.opts[0])&&sd?sd.name:P.cls),un:!!g.un});
   });
   const at=feats.map(x=>x.f);
   const asi=at.some(f=>/^ability score improvement/i.test(f.name));
   const boon=at.some(f=>/^epic boon/i.test(f.name));
-  const style=c.rules==="2024"&&at.some(f=>/^fighting style$/i.test(f.name))&&!groups.some(g=>/fighting style/i.test(g.name));
+  const style=false;
   const exp=at.filter(f=>/^expertise\b/i.test(f.name)).reduce((a,f)=>a+luCount(String(f.desc||"").replace(/choose\s+(one|two|three|four)\s+of your skill/i,"choose $1"),2),0);
   return {feats:feats,groups:groups,asi:asi,boon:boon,style:style,exp:exp,sd:sd};
 }
@@ -5771,13 +5855,40 @@ async function luChReady(c,L,groups){
   if(!need.length)return true;
   await chPrepare(c,need); return false;
 }
+/* the Features step: each new feature, with a dropdown under it for any choice it gives */
+function luFeatStep(c,L){
+  const P=L.P, D=L.D;
+  if(!D||!D.feats.length&&!D.groups.length)return `<p>No new features for ${esc(P.cls)} ${P.nl} in the class data.${P.d?"":" "+esc(P.err||"")}</p>`;
+  const box={}, extra=[], put=(k,h)=>{(box[k]=box[k]||[]).push(h)};
+  const parentKey=g=>{const ks=[g.key,g.key+"s",lc(g.parentName||"")];const hit=D.feats.find(x=>ks.includes(lc(x.f.name)));return hit?lc(hit.f.name):null};
+  const optHome={};
+  D.groups.forEach(g=>{
+    const pk=L.picks[g.key]||[], ex=Object.values(L.picks).flat().filter(n=>!pk.includes(n)).concat(L.sp.c,L.sp.s);
+    const rows=g.opts.map(f=>{const pr=luPreCheck(c,f,P.nl,ex);return {v:f.name,t:optShort(f.name),dis:!pr.ok,why:pr.ok?"":luPreLine(pr).replace(/^Needs /,"needs "),desc:String(f.desc||"").trim()}}).sort((a,b)=>(a.dis?1:0)-(b.dis?1:0));
+    const h=`<p class="chlbl">Choose ${g.n>1?g.n+" options":"an option"}</p>${chPickSel(`data-lug="${esc(g.key)}"`,g.n,pk,rows)}${rows.some(r=>r.dis)?`<p class="hint">Greyed-out options need something you do not have yet.</p>`:""}`;
+    const k=parentKey(g)||("x:"+g.key); if(k.indexOf("x:")===0&&!box[k])extra.push({k:k,title:titleCase(g.name)+(g.n>1?": "+g.n+" new picks":": new pick")});
+    put(k,h); g.opts.forEach(o=>{optHome[lc(o.name)]=k});
+  });
+  if(D.exp){
+    const ef=D.feats.find(x=>/^expertise/i.test(x.f.name)), k=ef?lc(ef.f.name):"x:exp", prof=SKILLS.filter(s=>num(c.skills[s[0]])===1);
+    if(!ef)extra.push({k:k,title:"Expertise"});
+    put(k,`<p class="chlbl">Choose ${D.exp} skill${D.exp>1?"s":""} for Expertise</p>${prof.length?chPickSel('data-luexp="1"',D.exp,L.exp,prof.map(s=>({v:s[0],t:s[1]}))):'<p class="hint">You have no skill proficiencies to double yet. Mark them on the Overview and come back, or set expertise there later.</p>'}`);
+  }
+  const CG=luChGroups(c,L);
+  if(CG.length){
+    CHCTX={st:L.chs,groups:()=>luChGroups(c,L),render:()=>luRender(c,1)};
+    luChReady(c,L,CG).then(r=>{if(!r&&ui.lvl===L)luRender(c,1)});
+    CG.forEach(g=>{const home=optHome[lc(g.f.name)];put(home||lc(g.f.name),chHTML([g],L.chs,{noTitle:!home}).replace('<div class="chgrp"><h4>','<div class="chgrp"><h4>From '))});
+  }
+  const row=(f,src,k)=>`<div class="lufeat">${luFeatRow(f,src)}${box[k]?`<div class="chbox">${box[k].join("")}</div>`:""}</div>`;
+  return `<p>These are added to your Features. Tap one to read it${Object.keys(box).length?", and make any choices underneath":""}.</p><div class="items">${D.feats.map(x=>row(x.f,x.src,lc(x.f.name))).join("")}${extra.map(e=>`<div class="lufeat"><div class="lufeat-t">${esc(e.title)}</div><div class="chbox">${(box[e.k]||[]).join("")}</div></div>`).join("")}</div>`;
+}
 function luSteps(c,L){
   const s=["cls","hp"];
   if(L.P&&L.P.subDue)s.push("sub");
   s.push("feat");
   const D=L.D;
   if(L.goal&&(L.goal.newC>0||L.goal.newS>0))s.push("spells");
-  if(D&&(D.groups.length||D.exp||D.style||luChGroups(c,L).length))s.push("choice");
   if(D&&(D.asi||D.boon))s.push("asi");
   s.push("rev");
   return s;
@@ -5804,7 +5915,7 @@ async function luFeatList(c,L){
   L.featHidden=0;
   try{await crLoad5()}catch(e){}
   try{libEnrich()}catch(e){}
-  const ed=luEd(c), tot=totalDice(c)+1, owned=new Set(c.features.map(f=>lc(f.name)));
+  const ed=luEd(c), tot=totalDice(c)+1, owned=new Set(c.features.flatMap(f=>[lc(f.name)].concat(featOptNames(f))));
   return crFeats(ed).filter(f=>{
     if(ed==="2024"&&lc(f.n)==="ability score improvement")return false;
     if(owned.has(lc(f.n))&&!/repeat/i.test(f.d||""))return false;
@@ -5818,7 +5929,7 @@ async function luFeatList(c,L){
 }
 function luStyleFeats(c){
   try{libEnrich()}catch(e){}
-  return crFeats(luEd(c)).filter(f=>f.t==="fighting-style"&&!c.features.some(x=>lc(x.name)===lc(f.n)));
+  return crFeats(luEd(c)).filter(f=>f.t==="fighting-style"&&!charHas(c,f.n));
 }
 /* feats that raise one of several abilities by 1 */
 function featAbils(f){
@@ -5894,26 +6005,8 @@ function luBody(c,L){
   }
   if(st==="feat"){
     const g=P.ol?null:P.meta;
-    return `${D&&D.feats.length?`<p>These are added to your Features. Tap one to read it.</p><div class="items">${D.feats.map(x=>luFeatRow(x.f,x.src)).join("")}</div>`:`<p>No new features for ${esc(P.cls)} ${P.nl} in the class data.${P.d?"":" "+esc(P.err)}</p>`}
-      ${L.slotTxt?`<p>Spell slots: ${esc(L.slotTxt)}</p>`:""}
+    return luFeatStep(c,L)+`${L.slotTxt?`<p>Spell slots: ${esc(L.slotTxt)}</p>`:""}
       ${!P.ol&&!P.first&&g&&g.prof&&g.prof.length?`<p class="hint">Multiclass note: you gain only some of ${esc(P.cls)}'s starting proficiencies. Check the class's multiclassing rules.</p>`:""}`;
-  }
-  if(st==="choice"){
-    let h="";
-    D.groups.forEach(g=>{
-      const pk=L.picks[g.key]||[];
-      const ex=Object.values(L.picks).flat().filter(n=>!pk.includes(n)).concat(L.sp.c,L.sp.s);
-      const rows=g.opts.map(f=>({f:f,pr:luPreCheck(c,f,P.nl,ex)})).sort((a,b)=>(b.pr.ok?1:0)-(a.pr.ok?1:0)), locked=rows.filter(r=>!r.pr.ok).length;
-      h+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${rows.map(({f,pr})=>luCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),(luPreLine(pr)?luPreLine(pr)+" · ":"")+luSnip(f),!pr.ok&&!pk.includes(f.name))).join("")}</div>${locked?`<p class="hint">${locked} greyed out at the end because you do not meet their prerequisites yet.</p>`:""}`;
-    });
-    if(D.style){const S=luStyleFeats(c);h+=`<h4>Fighting Style feat</h4><div class="crgrid">${S.map(f=>luCard("style",f.n,f.n,L.style===f.n,luSnip(f))).join("")||'<p class="hint">No Fighting Style feats found. Turn on more books for this campaign (Characters screen, tap the campaign, Books for this campaign).</p>'}</div>`}
-    const CG=luChGroups(c,L);
-    if(CG.length){h+=chHTML(CG,L.chs);CHCTX={st:L.chs,groups:()=>luChGroups(c,L),render:()=>luRender(c,1)};luChReady(c,L,CG).then(r=>{if(!r&&ui.lvl===L)luRender(c,1)})}
-    if(D.exp){
-      const prof=SKILLS.filter(s=>num(c.skills[s[0]])===1);
-      h+=`<h4>Expertise: choose ${D.exp} (${L.exp.length} chosen)</h4>${prof.length?`<div class="crgrid">${prof.map(s=>luCard("exp",s[0],s[1],L.exp.includes(s[0]))).join("")}${num(c.skills.thieves)===0&&/rogue/i.test(P.cls)?"":""}</div>`:'<p class="hint">You have no skill proficiencies to double yet. Mark them on the Overview and come back, or set expertise there later.</p>'}`;
-    }
-    return h;
   }
   if(st==="asi"){
     const A=L.asi, F=L.feats||[], tot=c.abilities;
@@ -5970,9 +6063,8 @@ function luValid(c,L){
   if(st==="cls")return !P?"Choose a class.":(!P.d&&P.err&&L.sel.i<0)?P.err:"";
   if(st==="sub")return L.sub?"":"Choose a subclass.";
   if(st==="hp"&&L.hpMode==="roll"&&!L.rolled)return "Roll your hit die first, or take the average.";
-  if(st==="choice"){
+  if(st==="feat"&&D){
     for(const g of D.groups){const okN=g.opts.filter(f=>luPreCheck(c,f,P.nl,Object.values(L.picks).flat()).ok).length;const need=Math.min(g.n,okN);if((L.picks[g.key]||[]).length<need)return "Choose "+need+" for "+g.name+".";}
-    if(D.style&&luStyleFeats(c).length&&!L.style)return "Choose a Fighting Style feat.";
     if(D.exp&&SKILLS.some(s=>num(c.skills[s[0]])===1)&&L.exp.length<Math.min(D.exp,SKILLS.filter(s=>num(c.skills[s[0]])===1).length))return "Choose "+D.exp+" skills for Expertise.";
     const cm=chMissing(luChGroups(c,L),L.chs); if(cm)return "Choose "+cm;
     return "";
@@ -6054,9 +6146,10 @@ function luApply(c,L){
   if(P.d){
     const D=luDetail(c,P,L), CG=luChGroups(c,L), FG=luFeatGroups(c,L);
     D.feats.forEach(x=>add(x.f,x.src,"class"));
-    D.groups.forEach(gr=>(L.picks[gr.key]||[]).forEach(n=>{const f=gr.opts.find(o=>o.name===n);if(f)add(f,gr.src+" "+P.nl,"class")}));
+    D.groups.forEach(gr=>(L.picks[gr.key]||[]).forEach(n=>{const f=gr.opts.find(o=>o.name===n);if(f)attachOpt(c,gr.parentName||gr.name,gr.src+" "+P.nl,{name:f.name,full:f.name,desc:f.desc,type:"class"})}));
     if(L.style){const f=crFeats(luEd(c)).find(x=>x.n===L.style);if(f)add({name:f.n,desc:f.d},"Fighting Style ("+P.cls+" "+P.nl+")","feat")}
     L.exp.forEach(k=>{c.skills[k]=2});
+    if(L.exp.length){const ef=c.features.slice().reverse().find(f=>/^expertise\b/i.test(f.name));if(ef){ef.chosen=(ef.chosen||[]).concat([{k:"Expertise",v:L.exp.map(crSkName).join(", ")}]);ef.chDone=true}}
     if(D.asi||D.boon){
       const A=L.asi, up=(k,v)=>{if(k&&CRAB.includes(k))c.abilities[k]=Math.min(20,num(c.abilities[k])+v)};
       if(A.k==="asi2")up(A.a,2);
@@ -6066,7 +6159,7 @@ function luApply(c,L){
       const af=c.features.slice().reverse().find(f=>/^(ability score improvement|epic boon)/i.test(f.name)&&/\s(\d+)$/.test(f.source||"")&&num((f.source.match(/(\d+)$/)||[])[1])===P.nl);
       if(af&&ch)af.desc=(af.desc?af.desc+"\n\n":"")+"Your choice at level "+totalDice(c)+": "+ch+".";
     }
-    CG.forEach(g=>{const f=c.features.slice().reverse().find(x=>lc(x.name)===lc(g.f.name)&&lc(x.source)===lc(g.src));if(f)chApply(c,f,g.specs,L.chs[g.key])});
+    CG.forEach(g=>{const f=c.features.slice().reverse().find(x=>lc(x.name)===lc(g.f.name)&&lc(x.source)===lc(g.src))||c.features.find(x=>(x.opts||[]).some(o=>lc(o.full||o.name)===lc(g.f.name)));if(f)chApply(c,f,g.specs,L.chs[g.key])});
     FG.forEach(g=>{const f=c.features.slice().reverse().find(x=>lc(x.name)===lc(g.f.name));if(f)chApply(c,f,g.specs,L.chs[g.key])});
     if(c.rules==="2024"&&P.d.mastery){let best=-1,v=0;Object.keys(P.d.mastery).forEach(k=>{if(num(k)<=P.nl&&num(k)>best){best=num(k);v=num(P.d.mastery[k])}});if(best>=0&&idx===0)c.mastery.slots=v}
   }
@@ -6196,6 +6289,13 @@ document.addEventListener("click",e=>{
 });
 document.addEventListener("input",e=>{if(e.target.id==="lvlGain"&&ui.lvl)ui.lvl.gain=num(e.target.value)});
 document.addEventListener("input",e=>{const t=e.target;if(!t.dataset||t.dataset.luf!=="gain"||!ui.lvl||!ui.lvl.g)return;ui.lvl.gain=num(t.value)});
+document.addEventListener("change",e=>{
+  const t=e.target, L=ui.lvl; if(!t.dataset||!L||!L.g||(t.dataset.lug==null&&t.dataset.luexp==null))return; const c=cur(); if(!c)return;
+  const set=(a,i,v)=>{a=(a||[]).slice();a[i]=v;return a.filter(Boolean)};
+  if(t.dataset.lug!=null){L.picks[t.dataset.lug]=set(L.picks[t.dataset.lug],num(t.dataset.i),t.value);L.chCache={}}
+  if(t.dataset.luexp!=null)L.exp=set(L.exp,num(t.dataset.i),t.value);
+  L.msg=""; luRender(c,1);
+});
 document.addEventListener("change",e=>{
   const t=e.target, L=ui.lvl; if(!t.dataset||!t.dataset.luf||!L||!L.g)return;
   const f=t.dataset.luf, c=cur(); if(!c)return;
@@ -7635,7 +7735,7 @@ function crOptGroups(s){
   const cl=s.L&&s.L.classes.find(x=>x.n===s.cls); if(!cl)return [];
   const d=cl.data||{}, sd=s.subcls?subDef(d,s.subcls):null, SN=luSubNames(d), cf=(d.features||[]).filter(f=>!SN.has(lc(f.name))), sf=sd?(sd.features||[]):[];
   const G=Object.assign(luGroups(cf.filter(f=>num(f.lvl)<=1)),luGroups(sf.filter(f=>num(f.lvl)<=1))), out=[];
-  Object.keys(G).forEach(k=>{const g=G[k],parent=cf.concat(sf).find(f=>lc(f.name)===k);const n=luGroupCount(g,parent,cl.meta,1);if(n>0)out.push({key:k,name:g.name,n:Math.min(n,g.opts.length),opts:g.opts,src:sf.includes(g.opts[0])&&sd?sd.name:cl.n})});
+  Object.keys(G).forEach(k=>{const g=G[k],parent=cf.concat(sf).find(f=>lc(f.name)===k);const n=luGroupCount(g,parent,cl.meta,1);if(n>0)out.push({key:k,name:g.name,parentName:parent?parent.name:g.name,n:Math.min(n,g.opts.length),opts:g.opts,src:sf.includes(g.opts[0])&&sd?sd.name:cl.n})});
   return out;
 }
 function crExpN(s){const cl=s.L&&s.L.classes.find(x=>x.n===s.cls);return cl?(cl.data.features||[]).filter(f=>num(f.lvl)<=1&&/^expertise\b/i.test(f.name)).reduce((a,f)=>a+luCount(String(f.desc||"").replace(/choose\s+(one|two|three|four)\s+of your skill/i,"choose $1"),2),0):0}
@@ -7865,7 +7965,7 @@ async function crBuild5(s){
   if(sp){
     sp.tr.forEach(t=>addF(t.n,s.species,t.d,"race"));
     if(s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb)(sb.tr||[]).forEach(t=>addF(t.n,s.sub,t.d,"race"));
-      const pre=lc(String(s.sub).split(":")[0]);c.features.forEach(f=>{if(lc(f.name)===pre){f.chDone=true;f.desc=(f.desc?f.desc+"\n\n":"")+"Your choice: "+String(s.sub).replace(/^[^:]+:\s*/,"")+"."}})}
+      const pre=lc(String(s.sub).split(":")[0]);c.features.forEach(f=>{if(lc(f.name)===pre){f.chDone=true;f.chosen=[{k:"Choice",v:String(s.sub).replace(/^[^:]+:\s*/,"")}]}})}
   }
   if(bg&&bg.feat){const f=s.L.feats.find(x=>lc(x.n)===lc(bg.feat));addF(bg.feat+(bg.fnote?" ("+bg.fnote+")":""),"Origin feat",f?f.d:(bg.d||""),"feat");c.originFeat=bg.feat}
   if(ed==="2014"&&bg&&bg.d)addF(bg.n+" background",bg.n,bg.d,"background");
@@ -7928,7 +8028,7 @@ async function crFinish(s){
   c.classes[0].level=1;
   await applyClass(c,0);
   /* level 1 choices made in the creator */
-  crOptGroups(s).forEach(g=>((s.opts||{})[g.key]||[]).forEach(n=>{const f=g.opts.find(o=>o.name===n);if(f&&!c.features.some(x=>lc(x.name)===lc(n))){const x=mkFeat(f.name);x.source=g.src+" 1";x.desc=f.desc||"";x.type="class";fxAttach(x);c.features.push(x)}}));
+  crOptGroups(s).forEach(g=>((s.opts||{})[g.key]||[]).forEach(n=>{const f=g.opts.find(o=>o.name===n);if(f&&!charHas(c,n))attachOpt(c,g.parentName||g.name,g.src+" 1",{name:f.name,full:f.name,desc:f.desc,type:"class"})}));
   (s.exp||[]).forEach(k=>{if(num(c.skills[k]))c.skills[k]=2});
   crChGroups(s).forEach(g=>{const fs=(s.chs||{})[g.key];if(!fs)return;let f=g.f?c.features.find(x=>lc(x.name)===lc(g.f.name)):null;
     if(!f){f=mkFeat(g.title);f.source=s.species||"";f.type="race";c.features.push(f)}
@@ -8626,7 +8726,7 @@ function printHTML(c){
   ${h("Skills",`<p>${SKILLS.map(x=>x[1]+" "+sgn(skillB(c,x))+(skillP(c,x[0])?"*":"")).join(", ")}</p>`)}
   ${h("Attacks",c.attacks.map(a=>`<p><b>${esc(a.name)}</b> ${esc(a.bonus)} \u00b7 ${esc(a.damage)}</p>`).join(""))}
   ${h("Spells",c.spells.length?[0,1,2,3,4,5,6,7,8,9].map(l=>{const g=c.spells.filter(x=>num(x.level)===l);return g.length?`<p><b>${l?"Level "+l:"Cantrips"}:</b> ${g.map(x=>esc(x.name)).join(", ")}</p>`:""}).join(""):"")}
-  ${h("Features",c.features.map(f=>`<p><b>${esc(f.name)}</b> <small>${esc(f.source||"")}</small><br>${esc(String(f.desc||"")).replace(/\n+/g," ")}</p>`).join(""))}
+  ${h("Features",c.features.map(f=>`<p><b>${esc(f.name)}</b> <small>${esc(f.source||"")}</small><br>${esc(String(f.desc||"")).replace(/\n+/g," ")}${(f.chosen||[]).map(x=>`<br><i>${esc(x.k)}:</i> ${esc(x.v)}`).join("")}${(f.opts||[]).map(o=>`<br><i>${esc(o.name)}:</i> ${esc(String(o.desc||"")).replace(/\n+/g," ")}`).join("")}</p>`).join(""))}
   ${h("Inventory",`<p>${c.inventory.map(i=>esc(i.name)+(num(i.qty)>1?" x"+i.qty:"")).join(", ")}</p>`)}
   ${c.notes?h("Notes",txt(c.notes)):""}`;
 }
