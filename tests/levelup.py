@@ -35,8 +35,8 @@ LIB={"updated":9999999999999,"packs":{"Valda Test":{"creator":True}},
 def run(pg,js,a=None): return pg.evaluate(js,a)
 FILLJS="""(()=>{for(const s of document.querySelectorAll('#lvlOv select.chsel, #crOv select.chsel')){if(s.value)continue;const o=[...s.options].find(o=>o.value&&!o.disabled);if(o){s.value=o.value;s.dispatchEvent(new Event('change',{bubbles:true}));return 1}}for(const i of document.querySelectorAll('#lvlOv input[data-chf], #crOv input[data-chf]')){if(!i.value){i.value='x';i.dispatchEvent(new Event('input',{bubbles:true}))}}return 0})()"""
 def fill(pg):
-    for i in range(30):
-        pg.wait_for_timeout(200)
+    for i in range(80):
+        pg.wait_for_timeout(150)
         if not pg.evaluate(FILLJS): pg.wait_for_timeout(300)
         if not pg.evaluate(FILLJS): return
 def step_through(pg,maxsteps=12,pick=0):
@@ -124,9 +124,9 @@ try:
         # go to Improvement and choose the library feat
         for _ in range(6):
             st=run(pg,"document.querySelector('#lvlOv .crbody h3').textContent")
-            if st=="Improvement":break
+            if st=="Features":break
             run(pg,"(()=>{const b=document.querySelector('#lvlOv [data-lu=next]');b&&b.click()})()");pg.wait_for_timeout(250)
-        run(pg,"document.querySelector('#lvlOv [data-lu=asik][data-v=feat]').click()");pg.wait_for_timeout(200)
+        run(pg,"(()=>{const s=document.querySelector('#lvlOv select[data-luf=k]');s.value='feat';s.dispatchEvent(new Event('change',{bubbles:true}))})()");pg.wait_for_timeout(300)
         opts=run(pg,"[...document.querySelectorAll('#lvlOv select[data-luf=f] option')].map(o=>o.value)")
         ok("Spirit Touched" in opts,f"library feat offered {opts[:5]}")
         run(pg,"(()=>{const s=document.querySelector('#lvlOv select[data-luf=f]');s.value='Spirit Touched';s.dispatchEvent(new Event('change',{bubbles:true}))})()");pg.wait_for_timeout(200)

@@ -5866,8 +5866,33 @@ async function luChReady(c,L,groups){
 /* the Features step: each new feature, with a dropdown under it for any choice it gives */
 function luFeatStep(c,L){
   const P=L.P, D=L.D;
-  if(!D||!D.feats.length&&!D.groups.length)return `<p>No new features for ${esc(P.cls)} ${P.nl} in the class data.${P.d?"":" "+esc(P.err||"")}</p>`;
-  const box={}, extra=[], put=(k,h)=>{(box[k]=box[k]||[]).push(h)};
+  if(!D)return `<p>No new features for ${esc(P.cls)} ${P.nl} in the class data.${P.d?"":" "+esc(P.err||"")}</p>`;
+  const box={}, extra=[], pre=[], put=(k,h)=>{(box[k]=box[k]||[]).push(h)};
+  const fromCls=x=>!D.sd||String(x.src).indexOf(D.sd.name)!==0;
+  /* subclass: under the feature that grants it */
+  if(P.subDue){
+    const host=D.feats.find(x=>fromCls(x)&&/\b(subclass|archetype|tradition|domain|college|circle|oath|patron|origin|conclave|path|bloodline|mystery|pact|calling|order)\b/i.test(x.f.name+" "+String(x.f.desc||"").slice(0,200)));
+    const k=host?lc(host.f.name):"x:sub"; if(!host)pre.push({k:k,title:"Subclass"});
+    const sd=subDef(P.d,L.sub);
+    put(k,`<p class="chlbl">Choose your subclass</p><select class="chsel" data-lusub="1" aria-label="Subclass"><option value="">Choose\u2026</option>${P.subs.map(x=>`<option value="${esc(x.name)}"${L.sub===x.name?" selected":""}>${esc(x.name)}${x.source?" ("+esc(x.source)+")":""}</option>`).join("")}</select>${sd?`<div class="chdesc">${esc((sd.features||[]).filter(f=>num(f.lvl)<=P.nl).map(f=>f.name).join(", ")||"No features listed yet.")}. Its features are listed below.</div>`:""}`);
+  }
+  /* ability score improvement or feat: under the feature */
+  if(D.asi||D.boon){
+    const host=D.feats.find(x=>/^(ability score improvement|epic boon)/i.test(x.f.name)), k=host?lc(host.f.name):"x:asi";
+    if(!host)extra.push({k:k,title:"Ability Score Improvement"});
+    put(k,luAsiHTML(c,L));
+  }
+  /* new spells: under Spellcasting or Pact Magic when it is new, otherwise at the end */
+  const G2=L.goal;
+  if(G2&&(G2.newC>0||G2.newS>0)){
+    const host=D.feats.find(x=>/spellcasting|pact magic|spellbook/i.test(x.f.name)), k=host?lc(host.f.name):"x:spells";
+    if(!host)extra.push({k:k,title:"New spells"});
+    const row=x=>({v:x.n,t:x.n+(x.l?" (level "+x.l+")":"")+(x.lib?" \u00b7 Library":""),desc:[x.s,String(x.desc||"").slice(0,220)+(String(x.desc||"").length>220?"\u2026":"")].filter(Boolean).join(" \u00b7 ")});
+    put(k,`${G2.newC?`<p class="chlbl">Choose ${G2.newC} new cantrip${G2.newC>1?"s":""}</p>${chPickSel('data-lusp="c"',G2.newC,L.sp.c,G2.can.map(row))}`:""}
+      ${G2.newS?`<p class="chlbl">Choose ${G2.newS} ${G2.book?"spell"+(G2.newS>1?"s":"")+" for your spellbook":"new spell"+(G2.newS>1?"s":"")} (up to level ${G2.maxl})</p>${chPickSel('data-lusp="s"',G2.newS,L.sp.s,G2.sp.map(row))}`:""}
+      ${L.spellAll?`<p class="hint">No spell list for ${esc(P.cls)} was found, so every spell is shown. To fix this, open Library, Spells, Class spell lists.</p>`:""}
+      <div class="btns" style="margin:0 0 8px"><button class="btn sm" type="button" data-lu="spauto">Pick spells for me</button></div><p class="hint">You can leave some empty and add them later on the Spells tab.</p>`);
+  }
   const parentKey=g=>{const ks=[g.key,g.key+"s",lc(g.parentName||"")];const hit=D.feats.find(x=>ks.includes(lc(x.f.name)));return hit?lc(hit.f.name):null};
   const optHome={};
   D.groups.forEach(g=>{
@@ -5882,24 +5907,37 @@ function luFeatStep(c,L){
     if(!ef)extra.push({k:k,title:"Expertise"});
     put(k,`<p class="chlbl">Choose ${D.exp} skill${D.exp>1?"s":""} for Expertise</p>${prof.length?chPickSel('data-luexp="1"',D.exp,L.exp,prof.map(s=>({v:s[0],t:s[1]}))):'<p class="hint">You have no skill proficiencies to double yet. Mark them on the Overview and come back, or set expertise there later.</p>'}`);
   }
-  const CG=luChGroups(c,L);
+  const CG=luChGroups(c,L), FG=luFeatGroups(c,L);
+  CHCTX={st:L.chs,groups:()=>luChGroups(c,L).concat(luFeatGroups(c,L)),render:()=>luRender(c,1)};
+  if(CG.length||FG.length)luChReady(c,L,CG.concat(FG)).then(r=>{if(!r&&ui.lvl===L)luRender(c,1)});
   if(CG.length){
-    CHCTX={st:L.chs,groups:()=>luChGroups(c,L),render:()=>luRender(c,1)};
-    luChReady(c,L,CG).then(r=>{if(!r&&ui.lvl===L)luRender(c,1)});
     CG.forEach(g=>{const home=optHome[lc(g.f.name)];put(home||lc(g.f.name),chHTML([g],L.chs,{noTitle:!home}).replace('<div class="chgrp"><h4>','<div class="chgrp"><h4>From '))});
   }
   const row=(f,src,k)=>`<div class="lufeat">${luFeatRow(f,src)}${box[k]?`<div class="chbox">${box[k].join("")}</div>`:""}</div>`;
-  return `<p>These are added to your Features. Tap one to read it${Object.keys(box).length?", and make any choices underneath":""}.</p><div class="items">${D.feats.map(x=>row(x.f,x.src,lc(x.f.name))).join("")}${extra.map(e=>`<div class="lufeat"><div class="lufeat-t">${esc(e.title)}</div><div class="chbox">${(box[e.k]||[]).join("")}</div></div>`).join("")}</div>`;
+  const xbox=e=>`<div class="lufeat"><div class="lufeat-t">${esc(e.title)}</div><div class="chbox">${(box[e.k]||[]).join("")}</div></div>`;
+  if(!D.feats.length&&!Object.keys(box).length)return `<p>No new features for ${esc(P.cls)} ${P.nl} in the class data.</p>`;
+  return `<p>These are added to your Features. Tap one to read it${Object.keys(box).length?", and make every choice underneath":""}.</p><div class="items">${pre.map(xbox).join("")}${D.feats.map(x=>row(x.f,x.src,lc(x.f.name))).join("")}${extra.map(e=>`<div class="lufeat"><div class="lufeat-t">${esc(e.title)}</div><div class="chbox">${(box[e.k]||[]).join("")}</div></div>`).join("")}</div>`;
+}
+function luAsiHTML(c,L){
+  const A=L.asi, F=L.feats||[], tot=c.abilities, FG=luFeatGroups(c,L);
+  const fup=k=>FG.flatMap(g=>g.specs.filter(sp=>sp.kind==="abil").map(sp=>(((L.chs[g.key]||{})[sp.key]||[]).includes(k)?num(sp.v,1):0))).reduce((a,b)=>a+b,0);
+  const prev=k=>{const add=(A.k==="asi2"&&A.a===k?2:0)+(A.k==="asi11"&&(A.a===k||A.b===k)?1:0)+(A.k==="feat"?fup(k):0);return Math.min(20,num(tot[k])+add)};
+  const fdef=F.find(f=>f.n===A.f);
+  const kinds=L.mode==="boon"?[["feat","Take an Epic Boon or feat"],["asi2","+2 to one ability score"],["asi11","+1 to two ability scores"]]:[["asi2","+2 to one ability score"],["asi11","+1 to two ability scores"],["feat","Take a feat instead"]];
+  const ab=ex=>CRAB.filter(k=>k!==ex&&num(tot[k])<20).map(k=>[k,crAbName(k)+" ("+num(tot[k])+")"]);
+  return `<p class="chlbl">Choose your improvement</p>${luSel("k",A.k,kinds)}
+    ${A.k==="feat"?`${luSel("f",A.f,F.map(f=>[f.n,f.n+(f.src&&f.src!=="SRD"?" ("+f.src+")":"")]),"Choose a feat\u2026")}
+      ${fdef?`<div class="chdesc prose">${esc(String(fdef.d||"").slice(0,900))}</div>`:""}
+      ${fdef&&luPreText({d:fdef.d})?`<p class="hint">Prerequisite: ${esc(luPreText({d:fdef.d}))}</p>`:""}
+      ${FG.length?chHTML(FG,L.chs,{noTitle:true}):""}
+      ${F.length?"":`<p class="hint">No feats found that you qualify for. Turn on more books for this campaign on the Characters screen.</p>`}
+      ${L.featHidden?`<p class="hint">${L.featHidden} feat${L.featHidden===1?" is":"s are"} not listed because you do not meet ${L.featHidden===1?"its":"their"} prerequisites yet.</p>`:""}`
+    :`${luSel("a",A.a,ab(""),A.k==="asi2"?"Ability to raise by 2\u2026":"First ability to raise by 1\u2026")}${A.k==="asi11"?luSel("b",A.b,ab(A.a),"Second ability to raise by 1\u2026"):""}`}
+    <p class="hint">${CRAB.map(k=>k.toUpperCase()+" "+prev(k)).join(" \u00b7 ")}. Scores cannot go above 20.</p>`;
 }
 function luSteps(c,L){
-  const s=["cls","hp"];
-  if(L.P&&L.P.subDue)s.push("sub");
-  s.push("feat");
-  const D=L.D;
-  if(L.goal&&(L.goal.newC>0||L.goal.newS>0))s.push("spells");
-  if(D&&(D.asi||D.boon))s.push("asi");
-  s.push("rev");
-  return s;
+  /* every choice (subclass, options, ability improvement or feat, spells) is made on the Features page */
+  return ["cls","hp","feat","rev"];
 }
 async function luSpellsPrep(c,L){
   const P=L.P, m=P.meta; L.goal=null;
@@ -5971,11 +6009,12 @@ async function luLoad(c,L){
   L.gain=L.P.avg; L.hpMode="avg";
   L.D=luDetail(c,L.P,L);
   await luSpellsPrep(c,L);
-  if(L.D&&(L.D.asi||L.D.boon)){L.mode=L.D.boon&&!L.D.asi?"boon":"";L.feats=await luFeatList(c,L)}
+  if(L.D&&(L.D.asi||L.D.boon)){L.mode=L.D.boon&&!L.D.asi?"boon":"";L.feats=await luFeatList(c,L);if(L.mode==="boon")L.asi.k="feat"}
+  L.slotTxt=luSlots(c,L);
 }
 function luSay(t,err){const m=$("#luMsg");if(m){m.textContent=t;m.className="msg"+(err?" err":"")}else if(typeof clsSay==="function")clsSay(t,err)}
 const luCard=(act,val,title,on,sub,dis)=>`<button class="crc${on?" on":""}" type="button" data-lu="${act}" data-v="${esc(val)}" aria-pressed="${!!on}"${dis?" disabled":""}><b>${esc(title)}</b>${sub?`<span>${esc(sub)}</span>`:""}</button>`;
-const luSel=(f,val,opts,ph)=>`<select data-luf="${f}">${ph!=null?`<option value="">${esc(ph)}</option>`:""}${opts.map(o=>{const v=Array.isArray(o)?o[0]:o,t=Array.isArray(o)?o[1]:o;return `<option value="${esc(v)}"${String(val)===String(v)?" selected":""}>${esc(t)}</option>`}).join("")}</select>`;
+const luSel=(f,val,opts,ph)=>`<select class="chsel" data-luf="${f}">${ph!=null?`<option value="">${esc(ph)}</option>`:""}${opts.map(o=>{const v=Array.isArray(o)?o[0]:o,t=Array.isArray(o)?o[1]:o;return `<option value="${esc(v)}"${String(val)===String(v)?" selected":""}>${esc(t)}</option>`}).join("")}</select>`;
 const luFeatRow=(f,src,k)=>`<details class="item"><summary><span class="sico" style="--ic:${k==="feat"?"#7fd6a0":"#6aa9ff"}">${ico(k==="feat"?"fFeat":"fClass")}</span><span class="sum-t">${esc(f.name)}</span><span class="sum-m">${esc(src)}</span></summary><div class="ibody">${viewText(f.desc||"","No details in the class data.")}</div></details>`;
 function luMulti(c,cls){
   const m=CRPRI[cls]; const k=m?m[0]:null;
@@ -6005,44 +6044,10 @@ function luBody(c,L){
       ${L.hpMode==="roll"?`<button class="btn sm" type="button" data-lu="hproll">${L.rolled?"Roll again":"Roll d"+P.die}</button>`:""}
       <p class="hint">Max HP goes from ${num(c.hpMax)} to ${num(c.hpMax)+Math.max(0,num(L.gain))}.</p>`;
   }
-  if(st==="sub"){
-    const sd=subDef(P.d,L.sub);
-    return `<p>${esc(P.cls)} ${P.nl} lets you choose a subclass.</p>
-      <div class="crgrid">${P.subs.map(s=>luCard("sub",s.name,s.name,L.sub===s.name,(s.features||[]).filter(f=>num(f.lvl)<=P.nl).map(f=>f.name).slice(0,3).join(", ")+(s.source?" · "+s.source:""))).join("")}</div>
-      ${sd?`<h4>${esc(sd.name)} at level ${P.nl}</h4>${(sd.features||[]).filter(f=>num(f.lvl)<=P.nl).map(f=>luFeatRow(f,sd.name+" "+num(f.lvl))).join("")||'<p class="hint">No features listed yet.</p>'}`:""}`;
-  }
   if(st==="feat"){
     const g=P.ol?null:P.meta;
     return luFeatStep(c,L)+`${L.slotTxt?`<p>Spell slots: ${esc(L.slotTxt)}</p>`:""}
       ${!P.ol&&!P.first&&g&&g.prof&&g.prof.length?`<p class="hint">Multiclass note: you gain only some of ${esc(P.cls)}'s starting proficiencies. Check the class's multiclassing rules.</p>`:""}`;
-  }
-  if(st==="asi"){
-    const A=L.asi, F=L.feats||[], tot=c.abilities;
-    const FG=luFeatGroups(c,L), fab=[];
-    const fup=k=>FG.flatMap(g=>g.specs.filter(sp=>sp.kind==="abil").map(sp=>(((L.chs[g.key]||{})[sp.key]||[]).includes(k)?num(sp.v,1):0))).reduce((a,b)=>a+b,0);
-    const prev=k=>{const add=(A.k==="asi2"&&A.a===k?2:0)+(A.k==="asi11"&&(A.a===k||A.b===k)?1:0)+(A.k==="feat"?fup(k):0);return Math.min(20,num(tot[k])+add)};
-    const fdef=F.find(f=>f.n===A.f);
-    if(FG.length){CHCTX={st:L.chs,groups:()=>luFeatGroups(c,L),render:()=>luRender(c,1)};luChReady(c,L,FG).then(r=>{if(!r&&ui.lvl===L)luRender(c,1)})}
-    const choices=L.mode==="boon"?[["feat","Take an Epic Boon or feat"],["asi2","+2 to one ability"],["asi11","+1 to two abilities"]]:[["asi2","+2 to one ability"],["asi11","+1 to two abilities"],["feat","Take a feat"]];
-    return `<div class="seg">${choices.map(([v,t])=>`<button class="btn sm${A.k===v?" pri":""}" type="button" data-lu="asik" data-v="${v}" aria-pressed="${A.k===v}">${t}</button>`).join("")}</div>
-      ${A.k==="feat"?`<label class="fld"><span>Feat</span>${luSel("f",A.f,F.map(f=>[f.n,f.n+(f.src&&f.src!=="SRD"?" ("+f.src+")":"")]),"Choose a feat")}</label>
-        ${fdef?`<div class="crd"><p class="prose">${esc(String(fdef.d||"").slice(0,900))}</p></div>`:""}
-        ${FG.length?chHTML(FG,L.chs):""}
-        ${F.length?"":`<p class="hint">No feats found that you qualify for. Turn on more books for this campaign on the Characters screen.</p>`}
-        ${L.featHidden?`<p class="hint">${L.featHidden} feat${L.featHidden===1?" is":"s are"} not listed because you do not meet ${L.featHidden===1?"its":"their"} prerequisites yet.</p>`:""}
-        ${fdef&&luPreText({d:fdef.d})?`<p class="hint">Prerequisite: ${esc(luPreText({d:fdef.d}))}</p>`:""}`
-      :`<div class="igrid"><label class="fld"><span>${A.k==="asi2"?"Ability":"First ability"}</span>${luSel("a",A.a,CRAB.filter(k=>num(tot[k])<20).map(k=>[k,crAbName(k)+" ("+num(tot[k])+")"]),"Choose")}</label>
-        ${A.k==="asi11"?`<label class="fld"><span>Second ability</span>${luSel("b",A.b,CRAB.filter(k=>k!==A.a&&num(tot[k])<20).map(k=>[k,crAbName(k)+" ("+num(tot[k])+")"]),"Choose")}</label>`:""}</div>`}
-      <p class="hint">${CRAB.map(k=>k.toUpperCase()+" "+prev(k)).join(" · ")}. Scores cannot go above 20.</p>`;
-  }
-  if(st==="spells"){
-    const g=L.goal, chip=(x,key)=>luCard("sp"+key,x.n,x.n,L.sp[key].includes(x.n),(x.l?"L"+x.l+" · ":"")+(x.s||"")+(x.lib?" · Library":""));
-    return `<p>${g.newC?"New cantrips: <b>"+L.sp.c.length+"</b> of "+g.newC+". ":""}${g.newS?(g.book?"Spells for your spellbook":"New spells")+": <b>"+L.sp.s.length+"</b> of "+g.newS+" (up to level "+g.maxl+").":""}</p>
-      ${L.spellAll?`<p class="hint">No spell list for ${esc(P.cls)} was found, so every spell is shown. To fix this, open Library, Spells, Class spell lists and add spells to ${esc(P.cls)}.</p>`:""}
-      <div class="btns"><button class="btn sm" type="button" data-lu="spauto">Pick for me</button></div>
-      ${g.newC?`<h4>Cantrips</h4><div class="crgrid">${g.can.map(x=>chip(x,"c")).join("")}</div>`:""}
-      ${g.newS?`<h4>Spells</h4><div class="crgrid">${g.sp.map(x=>chip(x,"s")).join("")}</div>`:""}
-      <p class="hint">You can pick fewer now and add the rest later on the Spells tab.</p>`;
   }
   if(st==="rev"){
     const sum=luSummary(c,L);
@@ -6069,15 +6074,14 @@ function luSummary(c,L){
 function luValid(c,L){
   const st=luSteps(c,L)[L.step], P=L.P, D=L.D;
   if(st==="cls")return !P?"Choose a class.":(!P.d&&P.err&&L.sel.i<0)?P.err:"";
-  if(st==="sub")return L.sub?"":"Choose a subclass.";
+  if(st==="feat"&&P&&P.subDue&&!L.sub)return "Choose your subclass.";
   if(st==="hp"&&L.hpMode==="roll"&&!L.rolled)return "Roll your hit die first, or take the average.";
   if(st==="feat"&&D){
     for(const g of D.groups){const okN=g.opts.filter(f=>luPreCheck(c,f,P.nl,Object.values(L.picks).flat()).ok).length;const need=Math.min(g.n,okN);if((L.picks[g.key]||[]).length<need)return "Choose "+need+" for "+g.name+".";}
     if(D.exp&&SKILLS.some(s=>num(c.skills[s[0]])===1)&&L.exp.length<Math.min(D.exp,SKILLS.filter(s=>num(c.skills[s[0]])===1).length))return "Choose "+D.exp+" skills for Expertise.";
     const cm=chMissing(luChGroups(c,L),L.chs); if(cm)return "Choose "+cm;
-    return "";
   }
-  if(st==="asi"){const A=L.asi;if(A.k==="feat"&&!A.f)return "Choose a feat.";if(A.k==="feat"){const cm=chMissing(luFeatGroups(c,L),L.chs);if(cm)return "Choose "+cm}if(A.k==="asi2"&&!A.a)return "Choose an ability.";if(A.k==="asi11"&&(!A.a||!A.b))return "Choose two abilities.";return ""}
+  if(st==="feat"&&D&&(D.asi||D.boon)){const A=L.asi;if(A.k==="feat"&&!A.f)return "Choose a feat.";if(A.k==="feat"){const cm=chMissing(luFeatGroups(c,L),L.chs);if(cm)return "Choose "+cm}if(A.k==="asi2"&&!A.a)return "Choose an ability.";if(A.k==="asi11"&&(!A.a||!A.b))return "Choose two abilities.";return ""}
   return "";
 }
 function luRender(c,keep){
@@ -6300,10 +6304,13 @@ document.addEventListener("click",e=>{
 document.addEventListener("input",e=>{if(e.target.id==="lvlGain"&&ui.lvl)ui.lvl.gain=num(e.target.value)});
 document.addEventListener("input",e=>{const t=e.target;if(!t.dataset||t.dataset.luf!=="gain"||!ui.lvl||!ui.lvl.g)return;ui.lvl.gain=num(t.value)});
 document.addEventListener("change",e=>{
-  const t=e.target, L=ui.lvl; if(!t.dataset||!L||!L.g||(t.dataset.lug==null&&t.dataset.luexp==null))return; const c=cur(); if(!c)return;
+  const t=e.target, L=ui.lvl; if(!t.dataset||!L||!L.g)return; const c=cur(); if(!c)return;
+  if(t.dataset.lusub!=null){L.sub=t.value;L.D=luDetail(c,L.P,L);L.picks={};L.chCache={};L.msg="";luSpellsPrep(c,L).then(()=>{L.slotTxt=luSlots(c,L);luRender(c,1)});return}
+  if(t.dataset.lug==null&&t.dataset.luexp==null&&t.dataset.lusp==null)return;
   const set=(a,i,v)=>{a=(a||[]).slice();a[i]=v;return a.filter(Boolean)};
   if(t.dataset.lug!=null){L.picks[t.dataset.lug]=set(L.picks[t.dataset.lug],num(t.dataset.i),t.value);L.chCache={}}
   if(t.dataset.luexp!=null)L.exp=set(L.exp,num(t.dataset.i),t.value);
+  if(t.dataset.lusp!=null){const k=t.dataset.lusp;L.sp[k]=set(L.sp[k],num(t.dataset.i),t.value)}
   L.msg=""; luRender(c,1);
 });
 document.addEventListener("change",e=>{
