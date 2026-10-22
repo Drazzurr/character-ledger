@@ -100,6 +100,7 @@ try:
         if r!="done": run(pg,"document.querySelector('#lvlOv [data-lu=cancel]')&&document.querySelector('#lvlOv [data-lu=cancel]').click()");break
     c=chars(pg)[0]
     ok(c["classes"][0]["level"]==6,f"{rules} {cls} level {c['classes'][0]['level']}")
+    ok(not any(f["name"]=="Ability Score Improvement" for f in c["features"]) and any(f["source"]==f"{cls} 4 \u00b7 Ability Score Improvement" and f["name"].startswith("+") for f in c["features"]),f"{cls} ASI shows only the choice with its level")
     print(rules,cls,"L",c["level"],"sub",c["classes"][0]["sub"],"hp",c["hpMax"],"abil",c["abilities"],"feats",len(c["features"]),"spells",len(c["spells"]))
     print("   ",[f["name"] for f in c["features"]])
   # 2) Library class Binder 1 -> 5, plus feat list and spells from Library
@@ -148,6 +149,8 @@ try:
   ok(any(c["skills"].get(k)==1 for k in ("arcana","history","religion")),"skill choice applied")
   ok(any(f.get("chosen") for f in c["features"] if f["name"]=="Spirit Lore"),"choice saved on the feature")
   ok(c["abilities"]["cha"]==17,"feat raised cha")
+  ok(not any(f["name"]=="Ability Score Improvement" for f in c["features"]),"no Ability Score Improvement entry on the sheet")
+  ok(any(f["name"]=="Spirit Touched" and f["source"]=="Binder 4 \u00b7 Ability Score Improvement" for f in c["features"]),"feat says which level it came from")
   ok(any(s["name"]=="Soul Lance" or s["name"]=="Ghost Chain" for s in c["spells"]),"library spells picked")
   icons=run(pg,"[...document.querySelectorAll('#featBox details.item>summary')].map(s=>s.querySelector('.sum-t').textContent+'='+s.title)")
   print(icons)
@@ -266,6 +269,12 @@ try:
   ok("Fighting Style: Protection" not in names and "Sentinel's Stand: Primal Toughness" not in names and "Spellcasting: Bard" in names,"old options merged "+str(names))
   picks=run(pg,"[...document.querySelectorAll('#featBox .chpick')].map(e=>e.textContent)")
   ok("Protection" in picks and "Primal Toughness" in picks,"choice shown on its feature "+str(picks))
+
+  # 8) older ASI entries become just the choice
+  old=base(features=[{"id":"a1","name":"Ability Score Improvement","source":"Fighter 4","desc":"Increase scores.\n\nYour choice at level 4: +2 Strength."},{"id":"a2","name":"Ability Score Improvement","source":"Fighter 6","desc":"x\n\nYour choice at level 6: took the Alert feat."},{"id":"a3","name":"Alert","source":"Level 6 feat","desc":"Alert."}])
+  pg=load(pg,old)
+  rows=run(pg,"[...document.querySelectorAll('#featBox details.item>summary')].map(e=>e.querySelector('.sum-t').textContent+' | '+e.querySelector('.sum-m').textContent.trim())")
+  ok(rows==["+2 Strength | Fighter 4 \u00b7 Ability Score Improvement","Alert | Fighter 6 \u00b7 Ability Score Improvement"],"older ASI entries migrated "+str(rows))
   print("errors",errs)
   ok(not errs,"page errors")
 finally:

@@ -2897,6 +2897,14 @@ function normChar(c){
     p.chDone=true; p._mfx=1; o.features.splice(o.features.indexOf(f),1);
   });
   o.features.forEach(p=>{if(p._mfx){delete p._mfx;try{chFx(p)}catch(e){}}});
+  /* Ability Score Improvements made by Level up: keep only the choice, labelled with the level it came from */
+  o.features.slice().forEach(f=>{
+    if(!/^(ability score improvement|epic boon)/i.test(f.name||""))return;
+    const m=String(f.desc||"").match(/Your choice at level (\d+): (.+?)\.\s*$/); if(!m)return;
+    const kind=/^epic/i.test(f.name)?"Epic Boon":"Ability Score Improvement", from=(f.source||"Level "+m[1])+" \u00b7 "+kind, ft=m[2].match(/^took the (.+) feat$/);
+    if(ft){const x=o.features.find(q=>lc(q.name)===lc(ft[1])&&/^level \d+ feat$/i.test(q.source||""));if(x)x.source=from;o.features.splice(o.features.indexOf(f),1);return}
+    f.name=m[2]; f.source=from; f.type="class"; f.asi=1; f.desc=kind+" from "+(f.source.split(" \u00b7 ")[0])+" (character level "+m[1]+"). Already added to your ability scores.";
+  });
   o.spellcasting=normSpellcasting(o);
   o.rules=c.rules==="2024"?"2024":"2014"; o.system="dnd5e";
   o.mastery=Object.assign({slots:0,picks:[]},c.mastery||{}); o.mastery.picks=migList(c.mastery&&c.mastery.picks,mkPick);
@@ -6145,7 +6153,9 @@ function luApply(c,L){
   const add=(f,src,type)=>{if(c.features.some(o=>lc(o.name)===lc(f.name)&&lc(o.source)===lc(src)))return;const x=mkFeat(f.name);x.source=src;x.desc=f.desc||f.d||"";x.type=type;fxAttach(x);c.features.push(x)};
   if(P.d){
     const D=luDetail(c,P,L), CG=luChGroups(c,L), FG=luFeatGroups(c,L);
-    D.feats.forEach(x=>add(x.f,x.src,"class"));
+    /* an Ability Score Improvement or Epic Boon is not kept as a feature: only what you chose is, labelled with the level it came from */
+    const isAsi=f=>(D.asi||D.boon)&&/^(ability score improvement|epic boon)/i.test(f.name);
+    D.feats.forEach(x=>{if(!isAsi(x.f))add(x.f,x.src,"class")});
     D.groups.forEach(gr=>(L.picks[gr.key]||[]).forEach(n=>{const f=gr.opts.find(o=>o.name===n);if(f)attachOpt(c,gr.parentName||gr.name,gr.src+" "+P.nl,{name:f.name,full:f.name,desc:f.desc,type:"class"})}));
     if(L.style){const f=crFeats(luEd(c)).find(x=>x.n===L.style);if(f)add({name:f.n,desc:f.d},"Fighting Style ("+P.cls+" "+P.nl+")","feat")}
     L.exp.forEach(k=>{c.skills[k]=2});
@@ -6154,10 +6164,10 @@ function luApply(c,L){
       const A=L.asi, up=(k,v)=>{if(k&&CRAB.includes(k))c.abilities[k]=Math.min(20,num(c.abilities[k])+v)};
       if(A.k==="asi2")up(A.a,2);
       else if(A.k==="asi11"){up(A.a,1);up(A.b,1)}
-      else if(A.k==="feat"&&A.f){const f=(L.feats||[]).find(x=>x.n===A.f);add({name:A.f,desc:f?f.d:""},"Level "+(totalDice(c))+" feat","feat")}
-      const ch=A.k==="feat"?(A.f?"took the "+A.f+" feat":""):A.k==="asi2"?"+2 "+crAbName(A.a):"+1 "+crAbName(A.a)+", +1 "+crAbName(A.b);
-      const af=c.features.slice().reverse().find(f=>/^(ability score improvement|epic boon)/i.test(f.name)&&/\s(\d+)$/.test(f.source||"")&&num((f.source.match(/(\d+)$/)||[])[1])===P.nl);
-      if(af&&ch)af.desc=(af.desc?af.desc+"\n\n":"")+"Your choice at level "+totalDice(c)+": "+ch+".";
+      const kind=D.asi?"Ability Score Improvement":"Epic Boon", from=P.cls+" "+P.nl+" \u00b7 "+kind;
+      if(A.k==="feat"&&A.f){const f=(L.feats||[]).find(x=>x.n===A.f);add({name:A.f,desc:f?f.d:""},from,"feat")}
+      else if(A.a){const nm=A.k==="asi2"?"+2 "+crAbName(A.a):"+1 "+crAbName(A.a)+", +1 "+crAbName(A.b);
+        const x=mkFeat(nm);x.source=from;x.type="class";x.asi=1;x.desc=kind+" from "+P.cls+" level "+P.nl+" (character level "+totalDice(c)+"). Already added to your ability scores.";c.features.push(x)}
     }
     CG.forEach(g=>{const f=c.features.slice().reverse().find(x=>lc(x.name)===lc(g.f.name)&&lc(x.source)===lc(g.src))||c.features.find(x=>(x.opts||[]).some(o=>lc(o.full||o.name)===lc(g.f.name)));if(f)chApply(c,f,g.specs,L.chs[g.key])});
     FG.forEach(g=>{const f=c.features.slice().reverse().find(x=>lc(x.name)===lc(g.f.name));if(f)chApply(c,f,g.specs,L.chs[g.key])});
@@ -6233,7 +6243,7 @@ async function luReset(c){
   c.features=c.features.filter(f=>{
     const m=String(f.source||"").match(/^(.+?)\s+(\d{1,2})$/);
     if(m&&labels.has(lc(m[1]))){if(num(m[2])>1)return false;if(sd&&lc(m[1])===lc(sd.name)&&!keepSub)return false;if(lc(m[1])!==lc(r0.name)&&!(sd&&lc(m[1])===lc(sd.name)))return false}
-    if(/^level \d+ (feat|improvement)$/i.test(f.source||""))return false;
+    if(/^level \d+ (feat|improvement)$/i.test(f.source||"")||/\u00b7 (ability score improvement|epic boon)$/i.test(f.source||""))return false;
     if(/^fighting style \(/i.test(f.source||""))return false;
     return true;
   });
@@ -7970,7 +7980,7 @@ async function crBuild5(s){
   if(bg&&bg.feat){const f=s.L.feats.find(x=>lc(x.n)===lc(bg.feat));addF(bg.feat+(bg.fnote?" ("+bg.fnote+")":""),"Origin feat",f?f.d:(bg.d||""),"feat");c.originFeat=bg.feat}
   if(ed==="2014"&&bg&&bg.d)addF(bg.n+" background",bg.n,bg.d,"background");
   if(ed==="2024"&&bg&&bg.lib&&bg.d)addF(bg.n+" background",bg.n,bg.d,"background");
-  crAsiLevels(s).forEach(l=>{const a=s.asi[l];if(a&&a.k==="feat"&&a.f){const f=s.L.feats.find(x=>x.n===a.f);addF(a.f,"Level "+l+" feat",f?f.d:"","feat")}});
+  crAsiLevels(s).forEach(l=>{const a=s.asi[l];if(a&&a.k==="feat"&&a.f){const f=s.L.feats.find(x=>x.n===a.f);addF(a.f,(s.cls||"Class")+" "+l+" \u00b7 Ability Score Improvement",f?f.d:"","feat")}});
   c.species=s.species||"";
   /* gear */
   const recs=await crItemRecs(ed);
