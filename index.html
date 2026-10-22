@@ -1816,6 +1816,16 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 .crc b{font-weight:600;font-size:14.5px;overflow-wrap:anywhere}
 .crc span{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
 .crc.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+/* levelling: guided or manual */
+.lvmode{display:flex;flex-direction:column;gap:8px;margin:0 0 14px;padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field)}
+.lvmode .lvlbl{font:600 12px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.lvmode .hint,.lvmode .btns{margin:0}
+.crow.crow-g{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--panel)}
+.cg-t{display:flex;flex-direction:column;gap:2px;min-width:0}.cg-t b{font-size:17px}.cg-t span{color:var(--muted);font-size:14px}
+.cg-l{display:flex;flex-direction:column;align-items:center;gap:2px}.cg-l span{font:600 11px/1 var(--body);letter-spacing:.14em;color:var(--muted)}.cg-l b{font-size:22px}
+.pc-lvbtns{display:flex;gap:8px;flex-wrap:wrap}
+.lubig{font-size:28px;font-weight:700;margin:6px 0}
+#lvlOv .crbody .item{margin-bottom:6px}
 .crc:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .crd{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--panel);display:flex;flex-direction:column;gap:6px}
 .crd p{margin:0}
@@ -3195,17 +3205,13 @@ function renderHome(){
 
   let strip="";
   if(ui.newChar){
-    strip=`<div class="rulepick"><b>Build a character</b>
-      <button class="btn pri" type="button" data-act="creator" data-rules="2024">Guided: D&amp;D 5.5e</button>
-      <button class="btn pri" type="button" data-act="creator" data-rules="2014">Guided: D&amp;D 5e</button>
-      <button class="btn pri" type="button" data-act="creator" data-sys="pf2e">Guided: Pathfinder 2e</button>
-      <button class="btn" type="button" data-act="creator-rand" data-rules="2024">Random 5.5e</button>
-      <button class="btn" type="button" data-act="creator-rand" data-rules="2014">Random 5e</button>
-      <button class="btn" type="button" data-act="creator-rand" data-sys="pf2e">Random PF2e</button>
-      <b style="margin-top:6px;font-size:14px;color:var(--muted)">Or start with a blank sheet</b>
-      <button class="btn" type="button" data-act="create-char" data-rules="2014">D&amp;D 5e (2014)</button>
-      <button class="btn" type="button" data-act="create-char" data-rules="2024">D&amp;D 5.5e (2024)</button>
-      <button class="btn" type="button" data-act="create-char" data-sys="pf2e">Pathfinder 2e (Remaster)</button>
+    const gm=ui.newGame||"2024", ga=gm==="pf2e"?'data-sys="pf2e"':'data-rules="'+gm+'"';
+    strip=`<div class="rulepick"><b>New character</b>
+      <div class="seg" role="group" aria-label="Game">${[["2024","D&amp;D 5.5e"],["2014","D&amp;D 5e"],["pf2e","Pathfinder 2e"]].map(([v,t])=>`<button class="btn sm${gm===v?" pri":""}" type="button" data-act="new-game" data-v="${v}" aria-pressed="${gm===v}">${t}</button>`).join("")}</div>
+      <button class="btn pri" type="button" data-act="creator" ${ga}>Build step by step</button>
+      <button class="btn" type="button" data-act="creator-rand" ${ga}>Random character</button>
+      <button class="btn" type="button" data-act="create-char" ${ga}>Blank sheet</button>
+      <p class="hint" style="margin:0">${gm==="pf2e"?"Pathfinder characters level up from their Feats section.":"Every character can switch between Guided and Manual levelling at any time, under More, Details."}</p>
       <button class="btn" type="button" data-act="cancel-new">Cancel</button></div>`;
   }else if(ui.addCamp){
     strip=`<div class="strip"><label class="fld"><span>New campaign name</span><input id="newCampName" type="text" maxlength="60" placeholder="Curse of Strahd"></label>
@@ -3280,7 +3286,8 @@ function profileCard(c){
   return `<section class="panel pcard"><button class="pc-port" type="button" data-act="tab" data-tab="details" aria-label="Edit portrait and details">${portAv(c,ini,av,"")}</button>
     <div class="pc-info"><div class="pc-lvl">${hex}<span>LEVEL<br><b>${lv}</b></span></div>
       <div class="pc-xp"><span>XP</span><label class="xpin"><input type="number" inputmode="numeric" data-t="n" data-f="${pf?"pf.xp":"xp"}" value="${esc(xp)}" aria-label="Experience points"> <small>${nxt?"/ "+nxt:"max"}</small></label><span class="hpbar" aria-hidden="true"><i style="width:${pct}%"></i></span></div>
-      <div class="pc-chips"><span class="tag">${esc(c.campaign?campName(c.campaign):"No campaign")}</span><span class="tag">${pf?"PF2e":c.rules==="2024"?"5.5e":"5e"}</span></div></div></section>`;
+      <div class="pc-chips"><span class="tag">${esc(c.campaign?campName(c.campaign):"No campaign")}</span><span class="tag">${pf?"PF2e":c.rules==="2024"?"5.5e":"5e"}</span>${pf?"":`<span class="tag">${lvGuided(c)?"Guided":"Manual"}</span>`}</div>
+      ${pf||lv>=20?"":`<div class="pc-lvbtns"><button class="btn sm pri" type="button" data-act="lvl-start">Level up</button>${lvGuided(c)&&Array.isArray(c.lvlHist)&&c.lvlHist.length?`<button class="btn sm" type="button" data-act="lvl-undo">Undo level up</button>`:""}</div>`}</div></section>`;
 }
 function barHTML(c){
   const _tabs=[["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["more","More"]], _cur=MORE.includes(ui.tab)?"more":ui.tab;
@@ -3371,8 +3378,16 @@ function featKind(c,f){
   const src=lc(f.source||""), nm=lc(f.name||""), all=src+" "+nm;
   if(/transformation|transform|grim hollow|lycan|werewolf|vampir|dhampir|beast form|curse of|hybrid form/.test(all))return "transformation";
   if(/\bfeat\b|origin feat|general feat|ancestry feat|skill feat/.test(src))return "feat";
+  /* imported content: look the entry up in the Library so it gets the same kind as built-in content */
+  if(src||nm){
+    const ls=LIB.sections.find(x=>lc(x.name)===nm&&(!src||lc(x.source)===src||!x.source));
+    const lt=ls&&({feat:"feat",species:"race",background:"background"}[ls.cat]||(ls.kind==="feat"?"feat":ls.kind==="species"?"race":""));
+    if(lt)return lt;
+    if(LIB.classes.some(x=>(!src||lc(x.source)===src)&&(x.features||[]).concat(...(x.subclasses||[]).map(q=>q.features||[])).some(q=>lc(q.name)===nm)))return "class";
+  }
   if(c.background&&src&&src===lc(c.background)||/background/.test(src))return "background";
-  if(c.race&&src&&(src===lc(c.race)||src.indexOf(lc(c.race))>=0)||/species|race|ancestry|heritage|racial/.test(src))return "race";
+  const rc=lc(c.race), sp=lc(c.species);
+  if(src&&((rc&&(src===rc||src.indexOf(rc)>=0||(src.length>2&&rc.indexOf(src)>=0)))||(sp&&(src===sp||src.indexOf(sp)>=0))||(rc&&rc.split(/[\s()\/,-]+/).filter(w=>w.length>2).some(w=>src===w)))||/species|race|ancestry|heritage|racial|lineage|subrace/.test(src))return "race";
   if((c.classes||[]).some(r=>(r.name&&src.indexOf(lc(r.name))>=0)||(r.sub&&src.indexOf(lc(r.sub))>=0))||(c.cls&&src.indexOf(lc(c.cls))>=0)||(c.subclass&&String(c.subclass).split(" / ").some(x=>x&&(src.indexOf(lc(x))>=0||nm.indexOf(lc(x))>=0)))||/class|subclass|archetype|\bpath of\b|\bcircle of\b|\bcollege of\b|\boath of\b|\bdomain\b|\bway of\b|\bschool of\b|\bpatron\b|\bcollege\b|\bconclave\b|\bbloodline\b|\bmystery\b|\blevel \d/.test(src))return "class";
   return "general";
 }
@@ -3956,7 +3971,7 @@ document.addEventListener("click",e=>{
     case "lib-del": if(confirmTwice(b,"Tap again to delete")){LIB[ui.lib.tab].splice(num(b.dataset.i),1);saveLib();renderLib()} break;
     case "lib-save": commitDraft(); break;
     case "lib-cancel": ui.lib.draft=null; ui.lib.msg=""; renderLib(); break;
-    case "lib-addfeat": if(c){const x=LIB.sections[num(b.dataset.i)];if(x&&sysOf(x)!==sysOf(c)){}else if(x&&isPf(c)){pfAddFeat(c,{n:x.name,lvl:"",d:x.text,src:x.source||"Library"},"bonus");save();b.textContent="Added";b.disabled=true}else if(x){const f=mkFeat(x.name);f.source=x.source||"Library";f.desc=x.text||"";if(x.fx)f.fx=JSON.parse(JSON.stringify(x.fx));else fxAttach(f);c.features.push(f);save();if(ui.view==="sheet"&&(ui.tab==="feats"||ui.tab==="sheet"))rerender("feat");b.textContent="Added";b.disabled=true}} break;
+    case "lib-addfeat": if(c){const x=LIB.sections[num(b.dataset.i)];if(x&&sysOf(x)!==sysOf(c)){}else if(x&&isPf(c)){pfAddFeat(c,{n:x.name,lvl:"",d:x.text,src:x.source||"Library"},"bonus");save();b.textContent="Added";b.disabled=true}else if(x){const f=mkFeat(x.name);f.source=x.source||"Library";f.desc=x.text||"";const ty={feat:"feat",species:"race",background:"background"}[x.cat]||(x.kind==="feat"?"feat":x.kind==="species"?"race":"");if(ty)f.type=ty;if(x.fx)f.fx=JSON.parse(JSON.stringify(x.fx));else fxAttach(f);c.features.push(f);save();if(ui.view==="sheet"&&(ui.tab==="feats"||ui.tab==="sheet"))rerender("feat");b.textContent="Added";b.disabled=true}} break;
     case "bk-run": bookRun(); break;
     case "bk-add": bookAdd(); break;
     case "bk-sel": {const e=bookState().entries&&bookState().entries[num(b.dataset.i)];if(e){e.sel=b.checked;const bt=document.querySelector('[data-act="bk-add"]');if(bt)bt.textContent="Add "+bookState().entries.filter(x=>x.sel).length+" selected to library"}break;}
@@ -3981,6 +3996,7 @@ document.addEventListener("click",e=>{
       } break;
     case "new-char": ui.newChar=true; ui.addCamp=false; renderHome(); break;
     case "cancel-new": ui.newChar=false; renderHome(); break;
+    case "new-game": ui.newGame=b.dataset.v; renderHome(); break;
     case "create-char": {
       const camp0=S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"", ch=b.dataset.sys==="pf2e"?pfBlank(camp0):blankChar(camp0,b.dataset.rules);
       ui.newChar=false; S.characters.push(ch); ui.sel=ch.id; ui.tab="details"; ui.q=""; save(); renderSheet(); window.scrollTo(0,0);
@@ -4028,18 +4044,27 @@ function classOptions(){
   SRDCLASSES.concat(LIB.classes.filter(x=>!x.addOn&&sysOf(x)==='dnd5e').map(x=>x.name)).forEach(n=>{const k=lc(n);if(k&&!seen.has(k)){seen.add(k);out.push(n)}});
   return out;
 }
+function lvModeHTML(c){
+  const g=lvGuided(c), H=Array.isArray(c.lvlHist)&&c.lvlHist.length;
+  return `<div class="lvmode"><span class="lvlbl">Levelling</span><div class="seg" role="group" aria-label="Levelling mode">
+      <button class="btn sm${g?" pri":""}" type="button" data-act="lvl-modeset" data-v="guided" aria-pressed="${g}">Guided</button>
+      <button class="btn sm${g?"":" pri"}" type="button" data-act="lvl-modeset" data-v="manual" aria-pressed="${!g}">Manual</button></div>
+    <p class="hint">${g?"Levels change only through Level up, which walks you through hit points, subclass, features, choices, ability improvements and spells for that level, from the SRD or your Library.":"Type levels, classes and subclasses yourself. Apply features adds everything up to the level you set. Switch back to Guided at any time."}</p>
+    <div class="btns"><button class="btn pri" type="button" data-act="lvl-start"${totalDice(c)>=20?" disabled":""}>Level up</button>${g&&H?`<button class="btn" type="button" data-act="lvl-undo">Undo last level up</button>`:""}${g?`<button class="btn" type="button" data-act="lvl-reset">Start again from level 1</button>`:""}</div></div>`;
+}
 function classesHTML(c){
-  const rows=c.classes.map((r,i)=>`<div class="crow">
+  const g=lvGuided(c), named=c.classes.some(r=>String(r.name||"").trim());
+  const rows=c.classes.map((r,i)=>g&&named?(String(r.name||"").trim()?`<div class="crow crow-g"><div class="cg-t"><b>${esc(r.name)}</b><span>${esc(r.sub||"No subclass yet")}</span></div><div class="cg-l"><span>LEVEL</span><b>${num(r.level)}</b></div></div>`:""):`<div class="crow">
     <label class="fld"><span>Class</span><input data-f="classes.${i}.name" list="clsList" value="${esc(r.name)}"></label>
     <label class="fld"><span>Subclass</span><input data-f="classes.${i}.sub" list="subList${i}" value="${esc(r.sub)}"><datalist id="subList${i}"></datalist></label>
-    <label class="fld lv"><span>Level</span><input type="number" inputmode="numeric" min="1" max="20" data-t="n" data-f="classes.${i}.level" value="${esc(r.level)}"></label>
-    <div class="cbtns"><button class="btn sm" type="button" data-act="cls-lvl" data-i="${i}">Level up</button><button class="btn sm" type="button" data-act="cls-apply" data-i="${i}">Apply features</button>
+    <label class="fld lv"><span>Level</span><input type="number" inputmode="numeric" min="1" max="20" data-t="n" data-f="classes.${i}.level" value="${esc(r.level)}"${g?" readonly":""}></label>
+    <div class="cbtns">${g?"":`<button class="btn sm" type="button" data-act="cls-lvl" data-i="${i}">Level up</button>`}<button class="btn sm" type="button" data-act="cls-apply" data-i="${i}">Apply features</button>
       <button class="btn sm danger" type="button" data-act="cls-del" data-i="${i}">${c.classes.length>1?"Remove":"Clear"}</button></div></div>`).join("");
-  return `<datalist id="clsList">${classOptions().map(n=>`<option value="${esc(n)}">`).join("")}</datalist>${rows}
+  return `<datalist id="clsList">${classOptions().map(n=>`<option value="${esc(n)}">`).join("")}</datalist>${lvModeHTML(c)}${rows}
     ${c.classes.map(r=>{const k=libClass(r.name);return k&&(k.tableText||k.info)?`<details class="item cdet"><summary><span class="sum-t">${esc(k.name)}: class table and notes</span></summary><div class="ibody">${k.tableText?richHTML(k.tableText,num(r.level)):""}${k.info?`<details class="item"><summary><span class="sum-t">About this class</span></summary><div class="ibody">${viewText(k.info,"")}</div></details>`:""}</div></details>`:""}).join("")}
-    <div class="btns"><button class="btn sm" type="button" data-act="cls-add">Add a class (multiclass)</button></div>
+    ${g?(named?"":`<p class="hint">Type your first class above, then use Level up for every level after that.</p>`):`<div class="btns"><button class="btn sm" type="button" data-act="cls-add">Add a class (multiclass)</button></div>`}
     <div class="msg" id="clsMsg" role="status"></div>
-    <p class="hint">Apply features adds that class's features up to its level, sets saving throws for your first class, and fills spell slots. Custom classes come from the Library.</p>`;
+    <p class="hint">${g?"In Guided mode, multiclassing is a choice inside Level up.":"Apply features adds that class's features up to its level, sets saving throws for your first class, and fills spell slots."} Custom classes come from the Library.</p>`;
 }
 async function refreshSubLists(c){
   for(let i=0;i<c.classes.length;i++){
@@ -4057,14 +4082,17 @@ async function applyClass(c,i){
   if(!d){clsSay("No details for "+r.name+" yet. Add it under Library > Classes, or import it from a PDF, then apply again.",true);return}
   const n=Math.max(1,num(r.level)), have=new Set(c.features.map(f=>lc(f.name)+"|"+lc(f.source)));
   let added=0;
-  const add=(arr,label)=>(arr||[]).filter(f=>num(f.lvl)<=n).forEach(f=>{
+  const sd=subDef(d,r.sub), subNote=!sd&&String(r.sub||"").trim();
+  const SN=luSubNames(d), G=lvGuided(c)?Object.assign(luGroups((d.features||[]).filter(f=>!SN.has(lc(f.name)))),luGroups(sd?sd.features||[]:[])):{}, skipped=new Set();
+  const add=(arr,label,isSub)=>(arr||[]).filter(f=>num(f.lvl)<=n&&(isSub||!SN.has(lc(f.name)))).forEach(f=>{
+    const og=luOptOf(G,f); if(og){skipped.add(og.name);return}
     const src=label+" "+f.lvl, k=lc(f.name)+"|"+lc(src); if(have.has(k))return; have.add(k);
-    const x=mkFeat(f.name); x.source=src; x.desc=f.desc||""; fxAttach(x); c.features.push(x); added++;
+    const x=mkFeat(f.name); x.source=src; x.desc=f.desc||""; x.type="class"; fxAttach(x); c.features.push(x); added++;
   });
   add(d.features,d.name);
-  const sd=subDef(d,r.sub), subNote=!sd&&String(r.sub||"").trim();
-  if(sd)add(sd.features,sd.name);
+  if(sd)add(sd.features,sd.name,1);
   const notes=[];
+  if(skipped.size)notes.push("options to choose for "+[...skipped].join(" and ")+" (use Level up, or add them by hand)");
   if(i===0&&d.saves&&d.saves.length){d.saves.forEach(s=>{const k=lc(s).slice(0,3);if(abMod(c,k)!==undefined&&ABIL.some(a=>a[0]===k))c.saveProf[k]=1});notes.push("saving throws set")}
   if(c.rules==="2024"&&d.mastery){let best=-1,v=0;Object.keys(d.mastery).forEach(k=>{if(num(k)<=n&&num(k)>best){best=num(k);v=num(d.mastery[k])}});if(best>=0){c.mastery.slots=v;notes.push(v+" weapon masteries")}}
   syncClassFields(c); const slotted=syncSlots(c); if(slotted)notes.push("spell slots filled");
@@ -5275,23 +5303,456 @@ function playClick(c,b){
   if(a==="pactpip"){const s=c.spellcasting.pact,m=num(s.max),left=Math.max(0,m-num(s.used)),n=num(b.dataset.n);s.used=m-(left===n?n-1:n);save();renderPlay(c);return true}
   return false;
 }
-/* ----- level up ----- */
+/* ----- level up -----
+   Each character has a levelling mode. Guided (the default): levels only change through the Level up steps, which
+   offer exactly what the class (SRD or Library) gives at that level. Manual: levels and features are edited by hand.
+   Both modes work the same way for built-in and imported content. */
 const ASI=[4,8,12,16,19];
-async function openLevelUp(c,i){
-  const r=c.classes[i]; if(!r||!String(r.name).trim()){clsSay("Choose a class first.",true);return}
-  if(totalDice(c)>=20){clsSay("Already at level 20.",true);return}
+const lvGuided=c=>!!c&&!isPf(c)&&c.lvlMode!=="manual";
+const LUWORD={a:1,an:1,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8};
+const luWordNum=w=>LUWORD[lc(w)]||num(w,0);
+const luCount=(t,d)=>{const m=String(t||"").match(/\b(?:choose|select|learn|gain|pick)\s+(a|an|one|two|three|four|five|six|\d)\b/i);return m?luWordNum(m[1]):d};
+const luEd=c=>c.rules==="2024"?"2024":"2014";
+/* class table from imported text: header + rows by level */
+function luTable(x){
+  const t=String(x&&x.tableText||"").split("\n").filter(s=>s.includes("|"));
+  if(t.length<3)return null;
+  const R=tableRows(t), hdr=R[0], rows={};
+  R.slice(1).forEach(r=>{const m=String(r[0]||"").match(/^(\d{1,2})/);if(m&&num(m[1])>=1&&num(m[1])<=20)rows[num(m[1])]=r});
+  return Object.keys(rows).length?{hdr:hdr,rows:rows}:null;
+}
+const luRow=(T,l)=>{for(let k=Math.min(20,l);k>=1;k--)if(T.rows[k])return T.rows[k];return null};
+/* Work out creator / level-up data for an imported class the same way the SRD classes have it */
+function libMeta(x){
+  x=x||{};
+  const m={hd:num(x.hd,8),saves:(x.saves||[]).map(k=>lc(k).slice(0,3)),abil:lc(x.ability||"").slice(0,3)};
+  const trait=(x.features||[]).filter(f=>num(f.lvl)<=1&&/class traits|hit points|proficienc|equipment/i.test(f.name+" "+String(f.desc||"").slice(0,200))).map(f=>f.desc||"").join("\n");
+  const all=trait+"\n"+String(x.info||"");
+  try{
+    const k=all.match(/Skills?\s*[:.]\s*(?:Choose\s+)?(any\s+)?(\w+)\s*(?:skills?\s*)?(?:from\s+(?:among\s+)?)?([^\n]*)/i);
+    if(k){
+      const from=String(k[3]||"").replace(/\.$/,"").split(/,\s*(?:and\s+|or\s+)?|\s+and\s+|\s+or\s+/).map(s=>s.trim()).filter(n=>FXSK.some(q=>lc(q[1])===lc(n)));
+      const n=luWordNum(k[2]); if(n)m.sk={n:n,from:from.length?from.map(n=>FXSK.find(q=>lc(q[1])===lc(n))[1]):FXSK.map(q=>q[1])};
+    }
+    const prof=[];
+    ["Armor","Armour","Weapons","Tools"].forEach(h=>{const r=all.match(new RegExp("(?:^|\\n)\\s*"+h+"\\s*[:.]\\s*([^\\n]+)","i"));if(r&&!/^\s*none/i.test(r[1]))r[1].split(/,\s*(?:and\s+)?|\s+and\s+/).map(s=>s.trim().replace(/\.$/,"")).filter(Boolean).forEach(p=>prof.push(p))});
+    if(prof.length)m.prof=prof;
+    const em=all.match(/(?:^|\n)[^\n]*\bEquipment\b[^\n]*\n([\s\S]*?)(?:\n\s*\n|\n[A-Z][\w ]{2,30}\n|$)/);
+    if(em){
+      const eq=[], fixed=[];
+      const cleanItems=p=>parseEquipText(p.replace(/\s+and\s+/g,", ").replace(/[.;]\s*$/,"")).map(i=>[i.name.replace(/^(A|An|The)\s+/i,"").replace(/^./,ch=>ch.toUpperCase()),i.qty]).filter(i=>i[0]&&!/^\(?[a-d]\)?$/i.test(i[0]));
+      em[1].split(/\n|(?=\s*[•*]\s)/).map(l=>l.replace(/^[\s•*\-–]+/,"").trim()).filter(Boolean).slice(0,10).forEach(l=>{
+        if(/\(a\)/i.test(l)){
+          const parts=l.split(/\s*\([a-f]\)\s*/).slice(1).map(p=>p.replace(/^\s*or\s+/i,"").replace(/,?\s*or\s*$/i,"").trim()).filter(Boolean);
+          if(parts.length>1)eq.push({desc:l,opts:parts.map(p=>{const g=p.match(/(\d+)\s*gp/i);return {items:cleanItems(p.replace(/\d+\s*gp/i,"")),gp:g?num(g[1]):0}})});
+        }else if(!/:\s*$/.test(l)&&l.length<120&&!/^you start/i.test(l))cleanItems(l).forEach(i=>fixed.push(i));
+      });
+      if(eq.length)m.eq=eq; if(fixed.length)m.fixed=fixed.slice(0,8);
+    }
+  }catch(e){}
+  /* spellcasting from the class table */
+  const T=luTable(x);
+  if(T){
+    const H=T.hdr.map(lc), ci=H.findIndex(h=>/cantrips/.test(h)), si=H.findIndex(h=>/spells known/.test(h)), pi=H.findIndex(h=>/prepared/.test(h)), li=H.findIndex(h=>/slot level/.test(h));
+    const sl=[]; H.forEach((h,j)=>{const q=h.match(/^(\d)(?:st|nd|rd|th)/);if(q)sl.push([j,num(q[1])])});
+    if(ci>=0||si>=0||pi>=0||sl.length||li>=0){
+      m.sc=[];
+      for(let l=1;l<=20;l++){const r=luRow(T,l)||[];let maxl=0;sl.forEach(([j,sv])=>{if(num(String(r[j]||"").replace(/[^\d]/g,""))>0)maxl=Math.max(maxl,sv)});if(li>=0)maxl=Math.max(maxl,num(String(r[li]||"").replace(/[^\d]/g,"")));
+        m.sc.push([ci>=0?num(String(r[ci]||"").replace(/[^\d]/g,"")):0,si>=0?num(String(r[si]||"").replace(/[^\d]/g,"")):pi>=0?num(String(r[pi]||"").replace(/[^\d]/g,"")):0,maxl])}
+      m.spk=si>=0?"known":pi>=0?"prep24":"prep";
+      if(!m.abil)m.abil=lc(x.ability||"int").slice(0,3);
+      if(m.sc.every(r=>!r[0]&&!r[1]&&!r[2]))delete m.sc;
+    }
+    m.T=T;
+  }
+  if(!m.sc&&x.caster&&x.caster!=="none"&&m.abil){
+    m.sc=[]; for(let l=1;l<=20;l++){const s=x.caster==="custom"?customSlots(x,l):fullAt(x.caster==="full"?l:x.caster==="pact"?Math.min(9,Math.ceil(l/2)*2-1):x.caster==="third"?(l<3?0:Math.ceil(l/3)):Math.ceil(l/2));let maxl=0;s.forEach((v,i)=>{if(v)maxl=i+1});if(x.caster==="pact")maxl=PACTT[l][1];m.sc.push([0,0,maxl])}
+    m.spk="prep";
+  }
+  return m;
+}
+async function luMeta(c,name){
+  try{await crLoad5()}catch(e){}
+  const lib=libClass(name);
+  if(lib)return libMeta(lib);
+  const ed=luEd(c), T=CRD.c&&CRD.c[ed]||{}, k=Object.keys(T).find(n=>lc(n)===lc(name))||Object.keys((CRD.c&&CRD.c[ed==="2024"?"2014":"2024"])||{}).find(n=>lc(n)===lc(name));
+  return k?Object.assign({},T[k]||CRD.c[ed==="2024"?"2014":"2024"][k]):{};
+}
+function luSpellGoal(meta,L,mod,cls){
+  if(!meta||!meta.sc||L<1)return {cantrips:0,spells:0,maxl:0};
+  const row=meta.sc[Math.min(20,L)-1]||[0,0,0];
+  let k=row[1];
+  if(meta.spk==="prep")k=row[2]?Math.max(1,mod+(/paladin|ranger|half/i.test(cls)||meta.half?Math.floor(L/2):L)):0;
+  return {cantrips:row[0],spells:k,maxl:row[2],book:/wizard/i.test(cls)&&meta.spk!=="known"};
+}
+/* option groups such as "Fighting Style: Archery" or "Eldritch Invocation: Agonizing Blast" */
+const LUCOUNTS={"eldritch invocation":{2:2,5:3,7:4,9:5,12:6,15:7,18:8},"metamagic":{3:2,10:3,17:4}};
+const LUCHOICE=/\b(?:choose|gain|select|pick|learn)\s+(?:one|two|three|four|five|a|an|\d)\b[^.]{0,90}?(?:following|of your choice|options?)|\bof your choice\b|\bchoose one of\b/i;
+const LUKNOWN=new Set(["fighting style","eldritch invocation","metamagic","dragon ancestor","circle of the land","hunter's prey","defensive tactics","multiattack","superior hunter's defense"]);
+function luGroups(list){
+  const G={};
+  list.forEach(f=>{const m=String(f.name||"").match(/^([^:]{3,60}):\s*(.+)$/);if(m){const k=lc(m[1]);(G[k]=G[k]||{name:m[1].trim(),opts:[]}).opts.push(f)}});
+  Object.keys(G).forEach(k=>{const g=G[k],par=list.find(f=>lc(f.name)===k);if(g.opts.length<2||!(LUKNOWN.has(k)||(par&&LUCHOICE.test(String(par.desc||"").slice(0,600)))))delete G[k]});
+  /* options without a "Name:" prefix that follow a "choose one of the following" feature, such as Pact Boon */
+  const w2=n=>String(n||"").split(/\s+/).slice(0,2).join(" ").toLowerCase();
+  const claimed=new Set(); Object.values(G).forEach(g=>g.opts.forEach(o=>claimed.add(lc(o.name))));
+  list.forEach((f,i)=>{
+    const k=lc(f.name); if(G[k]||claimed.has(k)||!LUCHOICE.test(String(f.desc||"").slice(0,400)))return;
+    const run=[]; for(let j=i+1;j<list.length&&num(list[j].lvl)===num(f.lvl)&&run.length<12;j++){if(/:/.test(list[j].name))break;run.push(list[j])}
+    const same=[]; for(const x of run){if(w2(x.name)===w2(run[0].name))same.push(x);else break}
+    if(same.length>=2&&w2(run[0].name).includes(" ")){G[k]={name:f.name,opts:same,un:1};same.forEach(o=>claimed.add(lc(o.name)))}
+  });
+  Object.values(G).forEach(g=>{g.names=new Set(g.opts.map(o=>lc(o.name)))});
+  return G;
+}
+const luOptOf=(G,f)=>Object.values(G).find(g=>g.names.has(lc(f.name)));
+const luSubNames=d=>new Set(((d&&d.subclasses)||[]).flatMap(s=>(s.features||[]).map(f=>lc(f.name))));
+function luGroupCount(g,parent,meta,L){
+  const t=LUCOUNTS[lc(g.name)]; if(t){let v=0;Object.keys(t).forEach(k=>{if(num(k)<=L)v=t[k]});return v}
+  const minL=Math.min(...g.opts.map(f=>num(f.lvl)||1)); if(L<minL)return 0;
+  if(meta&&meta.T){const w=lc(g.name).split(/\s+/).pop().replace(/s$/,""),H=meta.T.hdr.map(lc),ci=H.findIndex((h,j)=>j>0&&h.includes(w));if(ci>=0){const r=luRow(meta.T,L);if(r)return num(String(r[ci]||"").replace(/[^\d]/g,""))}}
+  return luCount(parent&&parent.desc,1);
+}
+const luOwns=(c,name)=>c.features.some(f=>lc(f.name)===lc(name));
+const luOwnsIn=(c,g)=>c.features.filter(f=>g.names.has(lc(f.name))).length;
+/* everything a level brings: built from whatever class data exists (SRD, Library, add-on subclasses) */
+async function luPlan(c,sel){
+  const P={sel:sel,err:""};
+  let r, idx=-1;
+  if(sel.i!=null&&sel.i>=0){idx=sel.i;r=c.classes[idx]}else r={name:sel.name,sub:"",level:0};
+  if(!r||!String(r.name||"").trim()){P.err="Choose a class first.";return P}
+  const d=await findClass(c,r.name);
+  P.d=d; P.idx=idx; P.cls=String(r.name).trim(); P.ol=num(r.level); P.nl=P.ol+1; P.sub=String(r.sub||"").trim();
+  P.meta=await luMeta(c,P.cls);
+  if(!d){P.err="No details for "+P.cls+" yet. Add it under Library, Classes, or import it from a book. You can still take the level and add features yourself.";}
+  P.die=num((d&&d.hd)||P.meta.hd||hdOf(r),8); P.mod=abMod(c,"con");
+  P.avg=Math.max(1,Math.floor(P.die/2)+1+P.mod);
+  const subs=(d&&d.subclasses)||[];
+  P.subs=subs; P.subLv=subs.length?Math.min(...subs.flatMap(s=>(s.features||[]).map(f=>num(f.lvl)||99)).concat([99])):99;
+  if(P.subLv===99&&subs.length)P.subLv=3;
+  P.subDue=!P.sub&&subs.length>0&&P.nl>=P.subLv;
+  return P;
+}
+/* features and choices once the subclass is known */
+function luDetail(c,P,L){
+  const d=P.d||{features:[]}, nl=P.nl, sd=subDef(d,L.sub||P.sub), SN=luSubNames(d);
+  const cf=(d.features||[]).filter(f=>!SN.has(lc(f.name))), sf=sd?(sd.features||[]):[];
+  const G=Object.assign(luGroups(cf),luGroups(sf));
+  const isOpt=f=>!!luOptOf(G,f);
+  const subNew=!!(sd&&!P.sub);
+  const got=[];
+  cf.filter(f=>num(f.lvl)===nl&&!isOpt(f)).forEach(f=>got.push({f:f,src:P.cls+" "+num(f.lvl)}));
+  sf.filter(f=>(subNew?num(f.lvl)<=nl:num(f.lvl)===nl)&&!isOpt(f)).forEach(f=>got.push({f:f,src:sd.name+" "+num(f.lvl)}));
+  const feats=got.filter(x=>!c.features.some(o=>lc(o.name)===lc(x.f.name)&&lc(o.source)===lc(x.src)));
+  /* option groups that need a pick at this level */
+  const groups=[];
+  Object.keys(G).forEach(k=>{
+    const g=G[k], parent=cf.concat(sf).find(f=>lc(f.name)===k&&!isOpt(f));
+    const want=luGroupCount(g,parent,P.meta,nl), have=luOwnsIn(c,g);
+    if(g.un&&parent&&num(parent.lvl)!==nl&&have)return;
+    const opts=g.opts.filter(f=>num(f.lvl)<=nl&&!luOwns(c,f.name)).filter((f,i,a)=>a.findIndex(o=>lc(o.name)===lc(f.name))===i);
+    if(want>have&&opts.length)groups.push({key:k,name:g.name,n:Math.min(want-have,opts.length),opts:opts,src:(sf.includes(g.opts[0])&&sd?sd.name:P.cls),un:!!g.un});
+  });
+  const at=feats.map(x=>x.f);
+  const asi=at.some(f=>/^ability score improvement/i.test(f.name));
+  const boon=at.some(f=>/^epic boon/i.test(f.name));
+  const style=c.rules==="2024"&&at.some(f=>/^fighting style$/i.test(f.name))&&!groups.some(g=>/fighting style/i.test(g.name));
+  const exp=at.filter(f=>/^expertise\b/i.test(f.name)).reduce((a,f)=>a+luCount(String(f.desc||"").replace(/choose\s+(one|two|three|four)\s+of your skill/i,"choose $1"),2),0);
+  return {feats:feats,groups:groups,asi:asi,boon:boon,style:style,exp:exp,sd:sd};
+}
+const LU_STEPS={cls:"Class",hp:"Hit points",sub:"Subclass",feat:"Features",choice:"Choices",asi:"Improvement",spells:"Spells",rev:"Review"};
+function luSteps(c,L){
+  const s=["cls","hp"];
+  if(L.P&&L.P.subDue)s.push("sub");
+  s.push("feat");
+  const D=L.D;
+  if(D&&(D.groups.length||D.exp||D.style))s.push("choice");
+  if(D&&(D.asi||D.boon))s.push("asi");
+  if(L.goal&&(L.goal.newC>0||L.goal.newS>0))s.push("spells");
+  s.push("rev");
+  return s;
+}
+async function luSpellsPrep(c,L){
+  const P=L.P, m=P.meta; L.goal=null;
+  if(!m||!m.sc)return;
+  const ab=m.abil||lc((P.d&&P.d.ability)||"").slice(0,3)||c.spellcasting&&c.spellcasting.ability||"int", mod=abMod(c,ab)||0;
+  const a=luSpellGoal(m,P.ol,mod,P.cls), b=luSpellGoal(m,P.nl,mod,P.cls);
+  const newC=Math.max(0,b.cantrips-a.cantrips), newS=b.book?(P.ol?2:6):Math.max(0,b.spells-a.spells);
+  try{await loadSpells(luEd(c))}catch(e){}
+  const have=new Set(c.spells.map(s=>lc(s.name)));
+  const ed=luEd(c), all=spellList(ed).filter(x=>(!x.ed||x.ed===ed||x.lib)).filter((x,i,arr)=>arr.findIndex(y=>lc(y.n)===lc(x.n))===i);
+  let list=all.filter(x=>(x.cl||[]).some(n=>lc(n)===lc(P.cls)));
+  const sdn=L.sub||P.sub; if(sdn)all.filter(x=>(x.cl||[]).some(n=>lc(n)===lc(sdn))).forEach(x=>{if(!list.includes(x))list.push(x)});
+  L.spellAll=!list.length; if(!list.length)list=all;
+  L.goal={newC:newC,newS:newS,maxl:Math.max(1,b.maxl),book:b.book,ab:ab,
+    can:list.filter(x=>x.l===0&&!have.has(lc(x.n))).sort((p,q)=>p.n.localeCompare(q.n)),
+    sp:list.filter(x=>x.l>=1&&x.l<=Math.max(1,b.maxl)&&!have.has(lc(x.n))).sort((p,q)=>p.l-q.l||p.n.localeCompare(q.n))};
+  if(!b.maxl)L.goal.newS=0;
+}
+async function luFeatList(c,L){
+  try{await crLoad5()}catch(e){}
+  try{libEnrich()}catch(e){}
+  const ed=luEd(c), tot=totalDice(c)+1, owned=new Set(c.features.map(f=>lc(f.name)));
+  return crFeats(ed).filter(f=>{
+    if(ed==="2024"&&lc(f.n)==="ability score improvement")return false;
+    if(owned.has(lc(f.n))&&!/repeat/i.test(f.d||""))return false;
+    if(num(f.lv)>tot)return false;
+    const pre=f.pre||{}; if(Object.keys(pre).some(k=>CRAB.includes(k)&&num(c.abilities[k])<num(pre[k])))return false;
+    if(L.mode==="boon")return ed==="2024"?f.t==="epic-boon":true;
+    if(ed==="2024")return f.t==="general"||f.t==="origin"||(f.t==="epic-boon"&&tot>=19);
+    return f.t!=="fighting-style"&&f.t!=="epic-boon";
+  });
+}
+function luStyleFeats(c){
+  try{libEnrich()}catch(e){}
+  return crFeats(luEd(c)).filter(f=>f.t==="fighting-style"&&!c.features.some(x=>lc(x.name)===lc(f.n)));
+}
+/* feats that raise one of several abilities by 1 */
+function featAbils(f){
+  const t=String(f&&f.d||"");
+  const m=t.match(/increase (?:your |one )?(?:ability score )?(?:of your choice )?([^.]{0,120}?)\s*(?:score)?\s*by 1/i)||t.match(/Ability Score Increase[.:*\s]+[^.]*?((?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)[^.]*?)\s*(?:score)?\s*by 1/i);
+  if(!m)return [];
+  if(/one ability score of your choice|any ability/i.test(m[0]))return CRAB.slice();
+  return CRAB.filter(k=>new RegExp(FXABN[k]||k,"i").test(m[1]||m[0]));
+}
+async function openLevelUp(c,i,opt){
+  opt=opt||{};
+  if(isPf(c))return;
+  if(totalDice(c)>=20){luSay("Already at level 20.",true);return}
+  if(!lvGuided(c)){openQuickLevel(c,i==null?0:i);return}
+  const first=c.classes.findIndex(r=>String(r.name||"").trim());
+  const L={g:1,step:0,mode:"",gain:0,hpMode:"avg",sel:{i:i!=null&&i>=0?i:(first>=0?first:-1)},sub:"",picks:{},exp:[],asi:{k:"asi2",a:"",b:"",f:"",fa:""},style:"",sp:{c:[],s:[]},busy:true,target:opt.target||0,auto:!!opt.auto};
+  if(L.sel.i<0){L.sel={i:-1,name:""};L.step=0}
+  ui.lvl=L; $("#lvlOv").hidden=!!L.auto; if(!L.auto)luRender(c);
+  try{await crLoad5();libEnrich();L.classes=await crClasses(luEd(c))}catch(e){L.classes=[]}
+  c.classes.forEach(r=>{if(String(r.name||"").trim()&&!L.classes.some(x=>lc(x.n)===lc(r.name)))L.classes.push({n:r.name,src:"On this sheet"})});
+  if(L.sel.i>=0||L.sel.name)await luLoad(c,L);
+  L.busy=false;
+  if(L.auto){luAuto(c,L);return}
+  luRender(c);
+}
+async function luLoad(c,L){
+  L.P=await luPlan(c,L.sel);
+  L.sub=""; L.picks={}; L.exp=[]; L.style=""; L.sp={c:[],s:[]};
+  L.asi={k:"asi2",a:"",b:"",f:"",fa:""};
+  if(L.P.err&&!L.P.d){L.D=null;L.goal=null;return}
+  L.gain=L.P.avg; L.hpMode="avg";
+  L.D=luDetail(c,L.P,L);
+  await luSpellsPrep(c,L);
+  if(L.D&&(L.D.asi||L.D.boon)){L.mode=L.D.boon&&!L.D.asi?"boon":"";L.feats=await luFeatList(c,L)}
+}
+function luSay(t,err){const m=$("#luMsg");if(m){m.textContent=t;m.className="msg"+(err?" err":"")}else if(typeof clsSay==="function")clsSay(t,err)}
+const luCard=(act,val,title,on,sub,dis)=>`<button class="crc${on?" on":""}" type="button" data-lu="${act}" data-v="${esc(val)}" aria-pressed="${!!on}"${dis?" disabled":""}><b>${esc(title)}</b>${sub?`<span>${esc(sub)}</span>`:""}</button>`;
+const luSel=(f,val,opts,ph)=>`<select data-luf="${f}">${ph!=null?`<option value="">${esc(ph)}</option>`:""}${opts.map(o=>{const v=Array.isArray(o)?o[0]:o,t=Array.isArray(o)?o[1]:o;return `<option value="${esc(v)}"${String(val)===String(v)?" selected":""}>${esc(t)}</option>`}).join("")}</select>`;
+const luFeatRow=(f,src,k)=>`<details class="item"><summary><span class="sico" style="--ic:${k==="feat"?"#7fd6a0":"#6aa9ff"}">${ico(k==="feat"?"fFeat":"fClass")}</span><span class="sum-t">${esc(f.name)}</span><span class="sum-m">${esc(src)}</span></summary><div class="ibody">${viewText(f.desc||"","No details in the class data.")}</div></details>`;
+function luMulti(c,cls){
+  const m=CRPRI[cls]; const k=m?m[0]:null;
+  return k&&num(c.abilities[k])<13?"Multiclassing into "+cls+" usually needs "+crAbName(k)+" 13 (you have "+num(c.abilities[k])+")":"";
+}
+function luBody(c,L){
+  const st=luSteps(c,L)[L.step], P=L.P, D=L.D;
+  if(L.busy)return `<p>Loading class data...</p>`;
+  if(st==="cls"){
+    const rows=c.classes.map((r,i)=>[r,i]).filter(([r])=>String(r.name||"").trim());
+    const others=(L.classes||[]).filter(x=>!c.classes.some(r=>lc(r.name)===lc(x.n)));
+    return `<p>Which class gains a level? You are level ${totalDice(c)}, so this is level ${totalDice(c)+1}.</p>
+      <div class="crgrid">${rows.map(([r,i])=>luCard("cls",String(i),r.name+" "+num(r.level)+" → "+(num(r.level)+1),L.sel.i===i,r.sub||"")).join("")}</div>
+      ${others.length?`<details class="item"${L.sel.i<0?" open":""}><summary><span class="sum-t">Take a level in a new class (multiclass)</span></summary><div class="ibody"><div class="crgrid">${others.map(x=>luCard("ncls",x.n,x.n,L.sel.i<0&&L.sel.name===x.n,luMulti(c,x.n)||(x.src&&x.src!=="SRD"?x.src:""))).join("")}</div></div></details>`:""}
+      ${P&&P.err?`<p class="msg err">${esc(P.err)}</p>`:""}`;
+  }
+  if(!P)return `<p>Choose a class first.</p>`;
+  if(st==="hp"){
+    const mode=(v,t)=>`<button class="btn sm${L.hpMode===v?" pri":""}" type="button" data-lu="hpmode" data-v="${v}" aria-pressed="${L.hpMode===v}">${t}</button>`;
+    return `<p>Hit die d${P.die}, Constitution ${sgn(P.mod)}.</p>
+      <div class="seg">${mode("avg","Take average ("+P.avg+")")}${mode("roll","Roll it")}${mode("hand","Enter it")}</div>
+      ${L.hpMode==="hand"?`<label class="fld" style="max-width:160px"><span>HP gained</span><input data-luf="gain" type="number" inputmode="numeric" value="${L.gain}"></label>`:`<p class="lubig">+${L.gain} HP</p>`}
+      ${L.hpMode==="roll"?`<button class="btn sm" type="button" data-lu="hproll">${L.rolled?"Roll again":"Roll d"+P.die}</button>`:""}
+      <p class="hint">Max HP goes from ${num(c.hpMax)} to ${num(c.hpMax)+Math.max(0,num(L.gain))}.</p>`;
+  }
+  if(st==="sub"){
+    const sd=subDef(P.d,L.sub);
+    return `<p>${esc(P.cls)} ${P.nl} lets you choose a subclass.</p>
+      <div class="crgrid">${P.subs.map(s=>luCard("sub",s.name,s.name,L.sub===s.name,(s.features||[]).filter(f=>num(f.lvl)<=P.nl).map(f=>f.name).slice(0,3).join(", ")+(s.source?" · "+s.source:""))).join("")}</div>
+      ${sd?`<h4>${esc(sd.name)} at level ${P.nl}</h4>${(sd.features||[]).filter(f=>num(f.lvl)<=P.nl).map(f=>luFeatRow(f,sd.name+" "+num(f.lvl))).join("")||'<p class="hint">No features listed yet.</p>'}`:""}`;
+  }
+  if(st==="feat"){
+    const g=P.ol?null:P.meta;
+    return `${D&&D.feats.length?`<p>These are added to your Features. Tap one to read it.</p><div class="items">${D.feats.map(x=>luFeatRow(x.f,x.src)).join("")}</div>`:`<p>No new features for ${esc(P.cls)} ${P.nl} in the class data.${P.d?"":" "+esc(P.err)}</p>`}
+      ${L.slotTxt?`<p>Spell slots: ${esc(L.slotTxt)}</p>`:""}
+      ${!P.ol&&g&&g.prof&&g.prof.length?`<p class="hint">Multiclass note: you gain only some of ${esc(P.cls)}'s starting proficiencies. Check the class's multiclassing rules.</p>`:""}`;
+  }
+  if(st==="choice"){
+    let h="";
+    D.groups.forEach(g=>{
+      const pk=L.picks[g.key]||[];
+      h+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${g.opts.map(f=>luCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),String(f.desc||"").replace(/\s+/g," ").slice(0,70))).join("")}</div>`;
+    });
+    if(D.style){const S=luStyleFeats(c);h+=`<h4>Fighting Style feat</h4><div class="crgrid">${S.map(f=>luCard("style",f.n,f.n,L.style===f.n,String(f.d||"").replace(/\s+/g," ").slice(0,70))).join("")||'<p class="hint">No Fighting Style feats found. Turn on a source in Library, Sources, or add one later.</p>'}</div>`}
+    if(D.exp){
+      const prof=SKILLS.filter(s=>num(c.skills[s[0]])===1);
+      h+=`<h4>Expertise: choose ${D.exp} (${L.exp.length} chosen)</h4>${prof.length?`<div class="crgrid">${prof.map(s=>luCard("exp",s[0],s[1],L.exp.includes(s[0]))).join("")}${num(c.skills.thieves)===0&&/rogue/i.test(P.cls)?"":""}</div>`:'<p class="hint">You have no skill proficiencies to double yet. Mark them on the Overview and come back, or set expertise there later.</p>'}`;
+    }
+    return h;
+  }
+  if(st==="asi"){
+    const A=L.asi, F=L.feats||[], tot=c.abilities;
+    const prev=k=>{const add=(A.k==="asi2"&&A.a===k?2:0)+(A.k==="asi11"&&(A.a===k||A.b===k)?1:0)+(A.k==="feat"&&A.fa===k?1:0);return Math.min(20,num(tot[k])+add)};
+    const fdef=F.find(f=>f.n===A.f), fab=featAbils(fdef);
+    const choices=L.mode==="boon"?[["feat","Take an Epic Boon or feat"],["asi2","+2 to one ability"],["asi11","+1 to two abilities"]]:[["asi2","+2 to one ability"],["asi11","+1 to two abilities"],["feat","Take a feat"]];
+    return `<div class="seg">${choices.map(([v,t])=>`<button class="btn sm${A.k===v?" pri":""}" type="button" data-lu="asik" data-v="${v}" aria-pressed="${A.k===v}">${t}</button>`).join("")}</div>
+      ${A.k==="feat"?`<label class="fld"><span>Feat</span>${luSel("f",A.f,F.map(f=>[f.n,f.n+(f.src&&f.src!=="SRD"?" ("+f.src+")":"")]),"Choose a feat")}</label>
+        ${fdef?`<div class="crd"><p class="prose">${esc(String(fdef.d||"").slice(0,900))}</p></div>`:""}
+        ${fab.length?`<label class="fld"><span>This feat also raises one ability by 1</span>${luSel("fa",A.fa,fab.filter(k=>num(tot[k])<20).map(k=>[k,crAbName(k)]),"Choose")}</label>`:""}
+        ${F.length?"":`<p class="hint">No feats found that you qualify for. Turn on more sources in Library, Sources.</p>`}`
+      :`<div class="igrid"><label class="fld"><span>${A.k==="asi2"?"Ability":"First ability"}</span>${luSel("a",A.a,CRAB.filter(k=>num(tot[k])<20).map(k=>[k,crAbName(k)+" ("+num(tot[k])+")"]),"Choose")}</label>
+        ${A.k==="asi11"?`<label class="fld"><span>Second ability</span>${luSel("b",A.b,CRAB.filter(k=>k!==A.a&&num(tot[k])<20).map(k=>[k,crAbName(k)+" ("+num(tot[k])+")"]),"Choose")}</label>`:""}</div>`}
+      <p class="hint">${CRAB.map(k=>k.toUpperCase()+" "+prev(k)).join(" · ")}. Scores cannot go above 20.</p>`;
+  }
+  if(st==="spells"){
+    const g=L.goal, chip=(x,key)=>luCard("sp"+key,x.n,x.n,L.sp[key].includes(x.n),(x.l?"L"+x.l+" · ":"")+(x.s||"")+(x.lib?" · Library":""));
+    return `<p>${g.newC?"New cantrips: <b>"+L.sp.c.length+"</b> of "+g.newC+". ":""}${g.newS?(g.book?"Spells for your spellbook":"New spells")+": <b>"+L.sp.s.length+"</b> of "+g.newS+" (up to level "+g.maxl+").":""}</p>
+      ${L.spellAll?`<p class="hint">No spell list for ${esc(P.cls)} was found, so every spell is shown. Library spells list their classes under Library, Spells.</p>`:""}
+      <div class="btns"><button class="btn sm" type="button" data-lu="spauto">Pick for me</button></div>
+      ${g.newC?`<h4>Cantrips</h4><div class="crgrid">${g.can.map(x=>chip(x,"c")).join("")}</div>`:""}
+      ${g.newS?`<h4>Spells</h4><div class="crgrid">${g.sp.map(x=>chip(x,"s")).join("")}</div>`:""}
+      <p class="hint">You can pick fewer now and add the rest later on the Spells tab.</p>`;
+  }
+  if(st==="rev"){
+    const sum=luSummary(c,L);
+    return `<div class="crd"><p><b>${esc(P.cls)} ${P.ol} → ${P.nl}</b> · character level ${totalDice(c)+1}</p>${sum.map(t=>`<p>${esc(t)}</p>`).join("")}</div>
+      <p class="hint">You can undo this level up afterwards from the Overview.</p>`;
+  }
+  return "";
+}
+function luSummary(c,L){
+  const P=L.P, D=L.D, out=["Hit points +"+Math.max(0,num(L.gain))+" (max "+(num(c.hpMax)+Math.max(0,num(L.gain)))+")"];
+  if(L.sub)out.push("Subclass: "+L.sub);
+  if(D){
+    const fs=luDetail(c,P,L).feats.map(x=>x.f.name).concat(Object.values(L.picks).flat().map(n=>n.replace(/^[^:]+:\s*/,"")));
+    if(L.style)fs.push(L.style);
+    if(fs.length)out.push("Features: "+fs.join(", "));
+    if(L.exp.length)out.push("Expertise: "+L.exp.map(crSkName).join(", "));
+    if(D.asi||D.boon){const A=L.asi;out.push(A.k==="feat"?(A.f?"Feat: "+A.f+(A.fa?" (+1 "+crAbName(A.fa)+")":""):"No feat chosen"):A.k==="asi2"?(A.a?"+2 "+crAbName(A.a):"No ability chosen"):((A.a?"+1 "+crAbName(A.a):"")+(A.b?", +1 "+crAbName(A.b):"")||"No abilities chosen"))}
+  }
+  if(L.sp.c.length||L.sp.s.length)out.push("Spells: "+L.sp.c.concat(L.sp.s).join(", "));
+  if(L.slotTxt)out.push("Spell slots: "+L.slotTxt);
+  return out;
+}
+function luValid(c,L){
+  const st=luSteps(c,L)[L.step], P=L.P, D=L.D;
+  if(st==="cls")return !P?"Choose a class.":(!P.d&&P.err&&L.sel.i<0)?P.err:"";
+  if(st==="sub")return L.sub?"":"Choose a subclass.";
+  if(st==="choice"){
+    for(const g of D.groups){if((L.picks[g.key]||[]).length<g.n)return "Choose "+g.n+" for "+g.name+".";}
+    if(D.style&&luStyleFeats(c).length&&!L.style)return "Choose a Fighting Style feat.";
+    if(D.exp&&SKILLS.some(s=>num(c.skills[s[0]])===1)&&L.exp.length<Math.min(D.exp,SKILLS.filter(s=>num(c.skills[s[0]])===1).length))return "Choose "+D.exp+" skills for Expertise.";
+    return "";
+  }
+  if(st==="asi"){const A=L.asi;if(A.k==="feat"&&!A.f)return "Choose a feat.";if(A.k==="feat"&&featAbils((L.feats||[]).find(f=>f.n===A.f)).length&&!A.fa)return "Choose which ability the feat raises.";if(A.k==="asi2"&&!A.a)return "Choose an ability.";if(A.k==="asi11"&&(!A.a||!A.b))return "Choose two abilities.";return ""}
+  return "";
+}
+function luRender(c,keep){
+  const L=ui.lvl, o=$("#lvlOv"); if(!L||!L.g||!o)return;
+  const steps=luSteps(c,L); L.step=Math.max(0,Math.min(steps.length-1,L.step));
+  const prev=keep&&o.querySelector(".sheet")?o.querySelector(".sheet").scrollTop:0;
+  let body; try{body=luBody(c,L)}catch(e){body=`<p class="msg err">Something went wrong on this step. ${esc(e.message||"")}</p>`}
+  const last=L.step===steps.length-1, P=L.P;
+  o.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="lvlT">
+    <div class="bar" style="margin:0"><h2 id="lvlT">Level up${P&&!L.busy?": "+esc(P.cls)+" "+P.ol+" → "+P.nl:""}</h2><button class="btn sm" type="button" data-lu="cancel">Close</button></div>
+    <div class="crprog" role="list" aria-label="Steps">${steps.map((t,i)=>`<span role="listitem" class="${i===L.step?"on":i<L.step?"done":""}"${i===L.step?' aria-current="step"':""}>${LU_STEPS[t]}</span>`).join("")}</div>
+    <section class="crbody"><h3>${LU_STEPS[steps[L.step]]}</h3>${body}</section>
+    <div class="msg${L.msg?" err":""}" id="luMsg" role="status">${esc(L.msg||"")}</div>
+    <div class="crnav"><button class="btn" type="button" data-lu="manual" title="Edit levels by hand on this character instead">Manual</button><span class="sp"></span>
+      <button class="btn" type="button" data-lu="back"${L.step?"":" disabled"}>Back</button>
+      <button class="btn pri" type="button" data-lu="${last?"ok":"next"}"${L.busy?" disabled":""}>${last?"Level up":"Next"}</button></div></div>`;
+  const sh=o.querySelector(".sheet"); if(sh)sh.scrollTop=keep?prev:0;
+}
+function luSlots(c,L){
+  const P=L.P; if(!P)return "";
+  const clone=JSON.parse(JSON.stringify({rules:c.rules,classes:c.classes}));
+  if(P.idx>=0){clone.classes[P.idx].level=P.nl;if(L.sub)clone.classes[P.idx].sub=L.sub}else clone.classes.push({name:P.cls,sub:"",level:1});
+  const a=calcSlots(c), b=calcSlots(clone);
+  const fmt=x=>x.slots.map((v,k)=>v?"L"+(k+1)+" ×"+v:"").filter(Boolean).join(", ")+(x.pact.max?(x.slots.some(Boolean)?", ":"")+"Pact "+x.pact.max+" × L"+x.pact.level:"");
+  return (a.any||b.any)&&fmt(a)!==fmt(b)?(fmt(a)||"none")+" → "+(fmt(b)||"none"):"";
+}
+function luAutoPick(c,L){
+  /* make sensible picks for every open choice (random characters, and "Pick for me") */
+  const P=L.P, D=L.D; if(!P)return;
+  if(P.subDue&&!L.sub&&P.subs.length){L.sub=crPick(P.subs).name;L.D=luDetail(c,P,L)}
+  const d2=L.D;
+  if(d2){
+    d2.groups.forEach(g=>{L.picks[g.key]=crShuffle(g.opts).slice(0,g.n).map(f=>f.name)});
+    if(d2.style){const S=luStyleFeats(c);if(S.length)L.style=crPick(S).n}
+    if(d2.exp){L.exp=crShuffle(SKILLS.filter(s=>num(c.skills[s[0]])===1).map(s=>s[0])).slice(0,d2.exp)}
+    if(d2.asi||d2.boon){const pri=(CRPRI[P.cls]||[]).concat(CRAB).filter(k=>num(c.abilities[k])<20);
+      if(d2.boon&&!d2.asi&&(L.feats||[]).length){L.asi={k:"feat",f:crPick(L.feats).n,a:"",b:"",fa:""};const fa=featAbils((L.feats||[]).find(f=>f.n===L.asi.f));if(fa.length)L.asi.fa=fa.find(k=>num(c.abilities[k])<20)||""}
+      else if(pri.length&&num(c.abilities[pri[0]])<=18)L.asi={k:"asi2",a:pri[0],b:"",f:"",fa:""};
+      else L.asi={k:"asi11",a:pri[0]||"con",b:pri.find(k=>k!==pri[0])||"dex",f:"",fa:""};}
+  }
+  luSpellAuto(L);
+}
+function luSpellAuto(L){
+  const g=L.goal; if(!g)return;
+  L.sp.c=crShuffle(g.can).slice(0,g.newC).map(x=>x.n);
+  const dmg=/damage|heal|bless|shield|cure|bane|sleep|charm|fog|web|mage armor|magic missile|thunder|hunter|command|fire|lightning/i;
+  const top=g.sp.filter(x=>x.l===g.maxl), pool=g.sp, pref=crShuffle(pool.filter(x=>dmg.test(x.n+" "+(x.desc||"").slice(0,120)))), rest=crShuffle(pool.filter(x=>!pref.includes(x)));
+  const first=crShuffle(top).slice(0,Math.min(1,g.newS)), pick=first.concat(pref.concat(rest).filter(x=>!first.includes(x))).slice(0,g.newS);
+  L.sp.s=pick.map(x=>x.n);
+}
+async function luAuto(c,L){
+  if(!L.P||!L.P.d){ui.lvl=null;return}
+  L.gain=L.P.avg; luAutoPick(c,L); await luSpellsPrep(c,L); luSpellAuto(L);
+  levelDone(c);
+}
+/* apply a finished guided level up */
+function luApply(c,L){
+  const P=L.P; if(!P)return;
+  const snap=JSON.stringify(Object.assign({},c,{lvlHist:undefined}));
+  c.lvlHist=(Array.isArray(c.lvlHist)?c.lvlHist:[]).concat([snap]).slice(-3);
+  let idx=P.idx;
+  if(idx<0){
+    const blank=c.classes.findIndex(r=>!String(r.name||"").trim());
+    if(blank>=0){idx=blank;c.classes[idx].name=P.cls;c.classes[idx].level=0}else{c.classes.push(mkClassRow(P.cls,"",0));idx=c.classes.length-1}
+  }
+  const r=c.classes[idx];
+  r.level=P.nl; if(L.sub)r.sub=L.sub;
+  const g=Math.max(0,num(L.gain)); c.hpMax=num(c.hpMax)+g; c.hp=num(c.hp)+g;
+  const add=(f,src,type)=>{if(c.features.some(o=>lc(o.name)===lc(f.name)&&lc(o.source)===lc(src)))return;const x=mkFeat(f.name);x.source=src;x.desc=f.desc||f.d||"";x.type=type;fxAttach(x);c.features.push(x)};
+  if(P.d){
+    const D=luDetail(c,P,L);
+    D.feats.forEach(x=>add(x.f,x.src,"class"));
+    D.groups.forEach(gr=>(L.picks[gr.key]||[]).forEach(n=>{const f=gr.opts.find(o=>o.name===n);if(f)add(f,gr.src+" "+P.nl,"class")}));
+    if(L.style){const f=crFeats(luEd(c)).find(x=>x.n===L.style);if(f)add({name:f.n,desc:f.d},"Fighting Style ("+P.cls+" "+P.nl+")","feat")}
+    L.exp.forEach(k=>{c.skills[k]=2});
+    if(D.asi||D.boon){
+      const A=L.asi, up=(k,v)=>{if(k&&CRAB.includes(k))c.abilities[k]=Math.min(20,num(c.abilities[k])+v)};
+      if(A.k==="asi2")up(A.a,2);
+      else if(A.k==="asi11"){up(A.a,1);up(A.b,1)}
+      else if(A.k==="feat"&&A.f){const f=(L.feats||[]).find(x=>x.n===A.f);add({name:A.f,desc:f?f.d:""},"Level "+(totalDice(c))+" feat","feat");up(A.fa,1)}
+      const ch=A.k==="feat"?(A.f?"took the "+A.f+" feat"+(A.fa?" (+1 "+crAbName(A.fa)+")":""):""):A.k==="asi2"?"+2 "+crAbName(A.a):"+1 "+crAbName(A.a)+", +1 "+crAbName(A.b);
+      const af=c.features.slice().reverse().find(f=>/^(ability score improvement|epic boon)/i.test(f.name)&&/\s(\d+)$/.test(f.source||"")&&num((f.source.match(/(\d+)$/)||[])[1])===P.nl);
+      if(af&&ch)af.desc=(af.desc?af.desc+"\n\n":"")+"Your choice at level "+totalDice(c)+": "+ch+".";
+    }
+    if(c.rules==="2024"&&P.d.mastery){let best=-1,v=0;Object.keys(P.d.mastery).forEach(k=>{if(num(k)<=P.nl&&num(k)>best){best=num(k);v=num(P.d.mastery[k])}});if(best>=0&&idx===0)c.mastery.slots=v}
+  }
+  if(L.goal){
+    const G=L.goal, recs=G.can.concat(G.sp);
+    L.sp.c.concat(L.sp.s).forEach(n=>{const x=recs.find(y=>y.n===n);if(x&&!c.spells.some(s=>lc(s.name)===lc(n)))c.spells.push(Object.assign(mkSpell(x.n),{level:x.l,school:x.s,time:x.t,range:x.r,components:x.c,duration:x.d,conc:x.k,ritual:x.ri,desc:x.desc,higher:x.hi,prepared:true}))});
+    if(!c.spellcasting.ability&&G.ab)c.spellcasting.ability=G.ab;
+  }
+  syncClassFields(c); syncSlots(c);
+}
+/* manual mode: the quick level up (hit points, then every feature of the new level is added) */
+async function openQuickLevel(c,i){
+  const r=c.classes[i]; if(!r||!String(r.name).trim()){luSay("Choose a class first.",true);return}
+  if(totalDice(c)>=20){luSay("Already at level 20.",true);return}
   const d=await findClass(c,r.name), nl=num(r.level)+1, die=d&&d.hd?num(d.hd):hdOf(r);
   const feats=[]; if(d){(d.features||[]).filter(f=>num(f.lvl)===nl).forEach(f=>feats.push(f.name));const sd=subDef(d,r.sub);if(sd)(sd.features||[]).filter(f=>num(f.lvl)===nl).forEach(f=>feats.push(f.name+" ("+sd.name+")"))}
-  const asi=ASI.concat(lc(r.name)==="fighter"?[6,14]:lc(r.name)==="rogue"?[10]:[]).includes(nl);
-  let subDue=false; if(d&&d.subclasses&&d.subclasses.length&&!String(r.sub||"").trim()){const m=Math.min(...d.subclasses.flatMap(s=>(s.features||[]).map(f=>num(f.lvl))).concat([99]));subDue=nl>=m}
-  const clone=JSON.parse(JSON.stringify(c)); clone.classes[i].level=nl; const before=calcSlots(c), after=calcSlots(clone);
-  const fmt=x=>x.slots.map((v,k)=>v?(k+1)+":"+v:"").filter(Boolean).join("  ")+(x.pact.max?"  Pact "+x.pact.max+"x L"+x.pact.level:"");
   const mod=abMod(c,"con"), avg=Math.max(1,Math.floor(die/2)+1+mod);
-  ui.lvl={i:i,nl:nl,die:die,mod:mod,gain:avg,avg:avg,mode:"avg",feats:feats,asi:asi,subDue:subDue,slots:before.any||after.any?(fmt(before)||"none")+"  \u2192  "+(fmt(after)||"none"):""};
-  renderLevelUp(c);
-  $("#lvlOv").hidden=false;
+  ui.lvl={quick:1,i:i,nl:nl,die:die,mod:mod,gain:avg,avg:avg,mode:"avg",feats:feats};
+  renderQuickLevel(c); $("#lvlOv").hidden=false;
 }
-function renderLevelUp(c){
+function renderQuickLevel(c){
   const L=ui.lvl, r=c.classes[L.i];
   const mode=(v,t)=>`<button class="btn sm${L.mode===v?" pri":""}" type="button" data-act="lvl-mode" data-v="${v}" aria-pressed="${L.mode===v}">${t}</button>`;
   $("#lvlOv").innerHTML=`<div class="sheet" role="dialog" aria-labelledby="lvlT">
@@ -5301,27 +5762,92 @@ function renderLevelUp(c){
       ${L.mode==="hand"?`<label class="fld" style="max-width:160px"><span>HP gained</span><input id="lvlGain" type="number" inputmode="numeric" value="${L.gain}"></label>`:`<p><b>HP gained: ${L.gain}</b></p>`}
       ${L.mode==="roll"?`<button class="btn sm" type="button" data-act="lvl-roll">${L.rolled?"Roll again":"Roll"}</button>`:""}</section>
     <section><h3>What you gain</h3>
-      <p>${L.feats.length?"New features: "+esc(L.feats.join(", "))+". They are added to your Features list.":"No new features found for this level in the class data."}</p>
-      ${L.slots?`<p>Spell slots: ${esc(L.slots)}</p>`:""}
-      ${L.asi?`<p><b>Ability Score Improvement:</b> raise your scores on the Sheet tab, or take a feat.</p>`:""}
-      ${L.subDue?`<p><b>Subclass:</b> choose one in the Subclass box on the Sheet tab.</p>`:""}</section>
+      <p>${L.feats.length?"New features: "+esc(L.feats.join(", "))+". All of them are added to your Features; remove any you did not pick.":"No new features found for this level in the class data."}</p>
+      <p class="hint">Manual levelling. Switch this character to Guided under More, Details to choose options step by step.</p></section>
     <div class="btns"><button class="btn pri" type="button" data-act="lvl-ok">Level up</button><button class="btn" type="button" data-act="lvl-cancel">Cancel</button></div></div>`;
 }
 function levelDone(c){
   const L=ui.lvl; if(!L)return;
   if(L.pf){pfLevelDone(c);return}
-  const g=Math.max(0,num(L.gain));
-  c.classes[L.i].level=L.nl; c.hpMax=num(c.hpMax)+g; c.hp=num(c.hp)+g;
-  syncClassFields(c); syncSlots(c);
-  $("#lvlOv").hidden=true; ui.lvl=null; save(); renderSheet();
-  applyClass(c,L.i);
+  if(L.quick){
+    const g=Math.max(0,num(L.gain));
+    c.classes[L.i].level=L.nl; c.hpMax=num(c.hpMax)+g; c.hp=num(c.hp)+g;
+    syncClassFields(c); syncSlots(c);
+    $("#lvlOv").hidden=true; ui.lvl=null; save(); renderSheet();
+    applyClass(c,L.i); return;
+  }
+  luApply(c,L);
+  const target=L.target, auto=L.auto;
+  $("#lvlOv").hidden=true; ui.lvl=null; c.updated=Date.now(); save();
+  if(target&&totalDice(c)<target){
+    if(!auto)renderSheet();
+    openLevelUp(c,c.classes.findIndex(r=>String(r.name||"").trim()),{target:target,auto:auto});
+    return;
+  }
+  renderSheet();
+}
+/* undo and start-again for guided characters */
+function luUndo(c){
+  const H=Array.isArray(c.lvlHist)?c.lvlHist:[]; if(!H.length)return false;
+  let o; try{o=JSON.parse(H[H.length-1])}catch(e){return false}
+  const rest=H.slice(0,-1);
+  Object.keys(c).forEach(k=>{delete c[k]}); Object.assign(c,normChar(o),{lvlHist:rest});
+  save(); renderSheet(); return true;
+}
+async function luReset(c){
+  const r0=c.classes.find(r=>String(r.name||"").trim()); if(!r0)return;
+  const snap=JSON.stringify(Object.assign({},c,{lvlHist:undefined}));
+  c.lvlHist=(Array.isArray(c.lvlHist)?c.lvlHist:[]).concat([snap]).slice(-3);
+  const d=await findClass(c,r0.name), sd=subDef(d,r0.sub);
+  const labels=new Set(); c.classes.forEach(r=>{if(r.name)labels.add(lc(r.name));if(r.sub)labels.add(lc(r.sub))}); if(d)labels.add(lc(d.name)); if(sd)labels.add(lc(sd.name));
+  (d&&d.subclasses||[]).forEach(s=>labels.add(lc(s.name)));
+  const keepSub=sd&&(sd.features||[]).some(f=>num(f.lvl)<=1);
+  c.features=c.features.filter(f=>{
+    const m=String(f.source||"").match(/^(.+?)\s+(\d{1,2})$/);
+    if(m&&labels.has(lc(m[1]))){if(num(m[2])>1)return false;if(sd&&lc(m[1])===lc(sd.name)&&!keepSub)return false;if(lc(m[1])!==lc(r0.name)&&!(sd&&lc(m[1])===lc(sd.name)))return false}
+    if(/^level \d+ (feat|improvement)$/i.test(f.source||""))return false;
+    if(/^fighting style \(/i.test(f.source||""))return false;
+    return true;
+  });
+  c.classes=[Object.assign(r0,{level:1,sub:keepSub?r0.sub:""})];
+  const die=num((d&&d.hd)||hdOf(r0),8); c.hpMax=Math.max(1,die+abMod(c,"con")); c.hp=Math.min(num(c.hp),c.hpMax)||c.hpMax; c.hdUsed={};
+  syncClassFields(c); syncSlots(c); c.lvlMode="guided"; c.updated=Date.now(); save(); renderSheet();
+}
+function luClick(c,b){
+  const L=ui.lvl, a=b.dataset.lu, v=b.dataset.v; if(!L||!L.g)return;
+  L.msg="";
+  const reload=async()=>{L.busy=true;luRender(c);await luLoad(c,L);L.busy=false;L.slotTxt=luSlots(c,L);luRender(c)};
+  if(a==="cancel"){$("#lvlOv").hidden=true;ui.lvl=null;return}
+  if(a==="manual"){c.lvlMode="manual";save();$("#lvlOv").hidden=true;ui.lvl=null;renderSheet();showUndo("Levelling set to manual for "+(c.name||"this character")+". Switch back under More, Details.",null);return}
+  if(a==="cls"){L.sel={i:num(v)};reload();return}
+  if(a==="ncls"){L.sel={i:-1,name:v};reload();return}
+  if(a==="hpmode"){L.hpMode=v;if(v==="avg")L.gain=L.P.avg;if(v==="roll"){L.rolled=false;L.gain=0}luRender(c,1);return}
+  if(a==="hproll"){L.gain=Math.max(1,rd(L.P.die)+L.P.mod);L.rolled=true;luRender(c,1);return}
+  if(a==="sub"){L.sub=v;L.D=luDetail(c,L.P,L);L.picks={};luSpellsPrep(c,L).then(()=>{L.slotTxt=luSlots(c,L);luRender(c,1)});return}
+  if(a==="opt"){const [k,n]=[v.slice(0,v.indexOf("|")),v.slice(v.indexOf("|")+1)],g=L.D.groups.find(x=>x.key===k),pk=L.picks[k]=L.picks[k]||[],i=pk.indexOf(n);if(i>=0)pk.splice(i,1);else{if(g&&pk.length>=g.n)pk.shift();pk.push(n)}luRender(c,1);return}
+  if(a==="style"){L.style=v;luRender(c,1);return}
+  if(a==="exp"){const i=L.exp.indexOf(v);if(i>=0)L.exp.splice(i,1);else{if(L.exp.length>=L.D.exp)L.exp.shift();L.exp.push(v)}luRender(c,1);return}
+  if(a==="asik"){L.asi.k=v;luRender(c,1);return}
+  if(a==="spc"||a==="sps"){const key=a.slice(2),arr=L.sp[key],max=key==="c"?L.goal.newC:L.goal.newS,i=arr.indexOf(v);if(i>=0)arr.splice(i,1);else{if(arr.length>=max)arr.shift();arr.push(v)}luRender(c,1);return}
+  if(a==="spauto"){luSpellAuto(L);luRender(c,1);return}
+  if(a==="back"){L.step--;luRender(c);return}
+  if(a==="next"||a==="ok"){
+    const err=luValid(c,L); if(err){L.msg=err;luRender(c,1);return}
+    if(a==="ok"){levelDone(c);return}
+    L.step++; if(!L.slotTxt)L.slotTxt=luSlots(c,L); luRender(c); return;
+  }
 }
 document.addEventListener("click",e=>{
+  const lb=e.target.closest("[data-lu]"); if(lb){const c=cur();if(c)luClick(c,lb);return}
   const b=e.target.closest("[data-act]"); if(!b)return;
   const c=cur(), a=b.dataset.act;
   if(a==="cls-lvl"&&c){openLevelUp(c,num(b.dataset.i));return}
-  if(a==="lvl-mode"&&ui.lvl&&c){ui.lvl.mode=b.dataset.v;if(b.dataset.v==="avg")ui.lvl.gain=ui.lvl.avg;if(b.dataset.v==="roll"){ui.lvl.rolled=false;ui.lvl.gain=0}renderLevelUp(c);return}
-  if(a==="lvl-roll"&&ui.lvl&&c){const L=ui.lvl;L.gain=Math.max(1,rd(L.die)+L.mod);L.rolled=true;renderLevelUp(c);return}
+  if(a==="lvl-start"&&c){if(isPf(c)){openPfLevelUp(c);return}openLevelUp(c,null);return}
+  if(a==="lvl-undo"&&c){if(luUndo(c))showUndo("Last level up undone.",null);return}
+  if(a==="lvl-reset"&&c){if(confirm("Take "+(c.name||"this character")+" back to level 1 in their first class? Class features above level 1, extra classes and level-up feats are removed and hit points are reset. Ability scores and spells stay as they are. You can undo this."))luReset(c);return}
+  if(a==="lvl-modeset"&&c){c.lvlMode=b.dataset.v==="manual"?"manual":"guided";save();renderSheet();return}
+  if(a==="lvl-mode"&&ui.lvl&&c){ui.lvl.mode=b.dataset.v;if(b.dataset.v==="avg")ui.lvl.gain=ui.lvl.avg;if(b.dataset.v==="roll"){ui.lvl.rolled=false;ui.lvl.gain=0}renderQuickLevel(c);return}
+  if(a==="lvl-roll"&&ui.lvl&&c){const L=ui.lvl;L.gain=Math.max(1,rd(L.die)+L.mod);L.rolled=true;renderQuickLevel(c);return}
   if(a==="lvl-ok"&&ui.lvl&&c){levelDone(c);return}
   if(a==="lvl-cancel"){$("#lvlOv").hidden=true;ui.lvl=null;return}
   if(c&&!isPf(c)&&ui.view==="sheet"&&ui.tab==="play")playClick(c,b);
@@ -5334,6 +5860,14 @@ document.addEventListener("click",e=>{
   }
 });
 document.addEventListener("input",e=>{if(e.target.id==="lvlGain"&&ui.lvl)ui.lvl.gain=num(e.target.value)});
+document.addEventListener("input",e=>{const t=e.target;if(!t.dataset||t.dataset.luf!=="gain"||!ui.lvl||!ui.lvl.g)return;ui.lvl.gain=num(t.value)});
+document.addEventListener("change",e=>{
+  const t=e.target, L=ui.lvl; if(!t.dataset||!t.dataset.luf||!L||!L.g)return;
+  const f=t.dataset.luf, c=cur(); if(!c)return;
+  if(f==="gain"){L.gain=num(t.value);return}
+  L.asi[f]=t.value; if(f==="a"&&L.asi.b===t.value)L.asi.b=""; if(f==="f")L.asi.fa="";
+  L.msg=""; luRender(c,1);
+});
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&!$("#lvlOv").hidden){$("#lvlOv").hidden=true;ui.lvl=null}
   if(e.key==="Enter"&&e.target.id==="rollExpr"){const c=cur();if(c)doRoll(c,{dataset:{k:"expr"}})}
@@ -6470,7 +7004,35 @@ async function crLoad5(){
 const crLib=(cat,ed)=>LIB.sections.filter(x=>sysOf(x)==="dnd5e"&&x.cat===cat&&crPackOn(x.source)&&(!x.ed||x.ed===ed));
 function crSpecies(ed){
   const out=(CRD.o[ed].species||[]).map(x=>({n:x.n,sz:x.sz,sp:x.sp,ab:x.ab||{},abo:x.abo,lg:x.lg||[],tr:x.tr||[],sub:x.sub||[],src:"SRD"}));
-  crLib("species",ed).forEach(x=>out.push({n:x.name,sz:(x.data&&x.data.size)||"Medium",sp:(x.data&&x.data.speed)||30,ab:(x.data&&x.data.ab)||{},lg:[],tr:[{n:x.name,d:x.text||""}],sub:[],src:x.source||"Library",lib:x}));
+  crLib("species",ed).forEach(x=>{const p=libSpeciesParts(x);out.push({n:x.name,sz:(x.data&&x.data.size)||"Medium",sp:(x.data&&x.data.speed)||30,ab:p.sub.length&&Object.keys(p.ab).length?p.ab:(x.data&&x.data.ab)||{},lg:p.lg,tr:p.tr,sub:p.sub,src:x.source||"Library",lib:x})});
+  return out;
+}
+/* split an imported species write-up into separate traits (and subraces or lineages) like the SRD species */
+const SPSTAT=/^(ability score (increase|increases)|age|alignment|size|speed|languages?|creature type|life ?span|type)$/i;
+function libSpeciesParts(x){
+  const t=String(x.text||"").replace(/\r/g,"").replace(/\*\*/g,""), out={tr:[],lg:[],sub:[]};
+  const lgm=t.match(/(?:^|\n)\s*Languages?[.:]\s*([^\n]+)/i);
+  if(lgm){const L=["Common","Dwarvish","Elvish","Giant","Gnomish","Goblin","Halfling","Orc","Abyssal","Celestial","Draconic","Deep Speech","Infernal","Primordial","Sylvan","Undercommon"];out.lg=L.filter(l=>new RegExp("\\b"+l+"\\b","i").test(lgm[1]))}
+  let cur=null, tgt=out.tr, intro=[], ab={}, sb=null;
+  const abOf=(line,o)=>{const rx=/\b(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\b[^.\n]{0,30}?increases? by (\d)/ig;let r;while((r=rx.exec(line)))o[r[1].slice(0,3).toLowerCase()]=num(r[2])};
+  const lines=t.split("\n");
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim(); if(!line){continue}
+    const run=line.match(/^([A-Z][A-Za-z'\u2019 \-()]{1,48}?)\.\s+(.+)$/);
+    const head=!run&&line.length<=40&&!/[.:,;]$/.test(line)&&/^[A-Z]/.test(line)&&line.split(/\s+/).length<=5;
+    if(head&&/subrace|lineage|variant|heritage|subspecies/i.test(line)&&!/traits$/i.test(line)){cur=null;continue}
+    if(head&&out.tr.length&&i+1<lines.length&&/^(ability score|[A-Z][\w' ]{1,40}\.\s)/.test((lines[i+1]||"").trim())&&!/traits$/i.test(line)&&lc(line)!==lc(x.name)){
+      sb={n:titleCase(line),tr:[],ab:{}}; out.sub.push(sb); tgt=sb.tr; cur=null; continue;
+    }
+    if(run&&run[1].split(/\s+/).length<=6){
+      const nm=run[1].trim();
+      if(SPSTAT.test(nm)){if(/^ability/i.test(nm))abOf(run[2],sb?sb.ab:ab);cur=null;continue}
+      cur={n:nm,d:run[2]}; tgt.push(cur); continue;
+    }
+    if(cur)cur.d+="\n"+line; else if(!head)intro.push(line);
+  }
+  out.sub=out.sub.filter(x=>x.tr.length||Object.keys(x.ab).length); out.ab=ab;
+  if(!out.tr.length&&!out.sub.length)out.tr=[{n:x.name,d:x.text||""}];
   return out;
 }
 function crBgs(ed){
@@ -6486,7 +7048,8 @@ function crFeats(ed){
 async function crClasses(ed){
   const D=await loadClasses(ed), out=[];
   SRDCLASSES.forEach(n=>{const d=D.find(x=>x.name===n);if(d)out.push({n:n,data:d,meta:CRD.c[ed][n]||{},src:"SRD"})});
-  LIB.classes.filter(x=>!x.addOn&&sysOf(x)==="dnd5e"&&(!x.ed||x.ed===ed)&&crPackOn(x.source)).forEach(x=>out.push({n:x.name,data:x,meta:{hd:x.hd,saves:(x.saves||[]).map(lc),abil:lc(x.ability||"")},src:x.source||"Library",lib:1}));
+  LIB.classes.filter(x=>!x.addOn&&sysOf(x)==="dnd5e"&&(!x.ed||x.ed===ed)&&crPackOn(x.source)).forEach(x=>out.push({n:x.name,data:withAddOns(x,x.name)||x,meta:libMeta(x),src:x.source||"Library",lib:1}));
+  out.forEach(o=>{if(!o.lib)o.data=withAddOns(o.data,o.n)||o.data});
   return out;
 }
 function crBonus(s){
@@ -6533,7 +7096,8 @@ const crSel=(f,val,opts,ph)=>`<select data-crf="${f}">${ph!=null?`<option value=
 function crSrcNote(list){const n=new Set(list.filter(x=>x.src&&x.src!=="SRD").map(x=>x.src));return n.size?`<p class="hint">Includes content from: ${[...n].map(esc).join(", ")}.</p>`:`<p class="hint">Showing the free SRD options. Turn on your imported content under Library, Sources to see it here.</p>`}
 function crStepBasics(s){
   return `<div class="igrid"><label class="fld"><span>Character name</span><input data-crf="name" value="${esc(s.name)}" placeholder="Name"></label>
-    <label class="fld lv"><span>Level</span><input type="number" inputmode="numeric" min="1" max="20" data-crf="level" value="${s.level}"></label></div>
+    <label class="fld lv"><span>${s.sys==="pf2e"?"Level":"Starting level"}</span><input type="number" inputmode="numeric" min="1" max="20" data-crf="level" value="${s.sys==="pf2e"?s.level:(s.target||1)}"></label></div>
+    ${s.sys==="pf2e"?"":`<p class="hint">You build level 1 here. Above level 1, ${CR&&CR.rand?"the random character is levelled up for you":"Level up then walks you through each level's choices"}.</p>`}
     <div class="btns"><button class="btn sm" type="button" data-cr="rname">Random name</button></div>
     <div class="kv"><span>Game</span><div class="seg" role="group">${[["2014","D&amp;D 5e (2014)"],["2024","D&amp;D 5.5e (2024)"],["pf2e","Pathfinder 2e"]].map(([v,t])=>`<button class="btn sm${(s.sys==="pf2e"?"pf2e":s.ed)===v?" pri":""}" type="button" data-cr="game" data-v="${v}">${t}</button>`).join("")}</div></div>
     <p class="hint">Everything you pick can be changed later on the sheet.</p>`;
@@ -6550,6 +7114,15 @@ function crStepSpecies(s){
   }
   return `${crSrcNote(L)}<div class="crgrid">${L.map(x=>crCard("species",x.n,x.n,s.species===x.n,x.src==="SRD"?x.sz+" \u00b7 "+x.sp+" ft":x.src)).join("")}</div>${det}`;
 }
+const crSubLv=d=>{const subs=(d&&d.subclasses)||[];if(!subs.length)return 99;const m=Math.min(...subs.flatMap(x=>(x.features||[]).map(f=>num(f.lvl)||99)).concat([99]));return m===99?3:m};
+function crOptGroups(s){
+  const cl=s.L&&s.L.classes.find(x=>x.n===s.cls); if(!cl)return [];
+  const d=cl.data||{}, sd=s.subcls?subDef(d,s.subcls):null, SN=luSubNames(d), cf=(d.features||[]).filter(f=>!SN.has(lc(f.name))), sf=sd?(sd.features||[]):[];
+  const G=Object.assign(luGroups(cf.filter(f=>num(f.lvl)<=1)),luGroups(sf.filter(f=>num(f.lvl)<=1))), out=[];
+  Object.keys(G).forEach(k=>{const g=G[k],parent=cf.concat(sf).find(f=>lc(f.name)===k);const n=luGroupCount(g,parent,cl.meta,1);if(n>0)out.push({key:k,name:g.name,n:Math.min(n,g.opts.length),opts:g.opts,src:sf.includes(g.opts[0])&&sd?sd.name:cl.n})});
+  return out;
+}
+function crExpN(s){const cl=s.L&&s.L.classes.find(x=>x.n===s.cls);return cl?(cl.data.features||[]).filter(f=>num(f.lvl)<=1&&/^expertise\b/i.test(f.name)).reduce((a,f)=>a+luCount(String(f.desc||"").replace(/choose\s+(one|two|three|four)\s+of your skill/i,"choose $1"),2),0):0}
 function crStepClass(s){
   const L=s.L.classes, c=L.find(x=>x.n===s.cls);
   let det="";
@@ -6558,9 +7131,11 @@ function crStepClass(s){
     det=`<div class="crd"><p><b>${esc(c.n)}</b> \u00b7 d${m.hd||d.hd||"?"} \u00b7 saves ${(m.saves||[]).map(k=>k.toUpperCase()).join(", ")||"?"}${m.sc?" \u00b7 casts spells ("+(m.abil||"").toUpperCase()+")":""}</p>
       ${m.prof&&m.prof.length?`<p class="hint">Proficient with: ${m.prof.map(esc).join(", ")}</p>`:""}
       <p class="hint">${(d.features||[]).filter(f=>num(f.lvl)===1).map(f=>esc(f.name)).join(", ")||""}</p></div>`;
-    if(subs.length){
-      det+=`<h4>Subclass${s.level>=3?"":" (chosen at level 3 or later; optional now)"}</h4><div class="crgrid">${crCard("subcls","","None yet",!s.subcls)}${subs.map(x=>crCard("subcls",x.name,x.name,s.subcls===x.name)).join("")}</div>`;
-    }
+    const sl=crSubLv(d);
+    if(subs.length&&sl<=1){
+      det+=`<h4>Subclass</h4><div class="crgrid">${subs.map(x=>crCard("subcls",x.name,x.name,s.subcls===x.name)).join("")}</div>`;
+    }else if(subs.length)det+=`<p class="hint">You choose your ${esc(c.n)} subclass at level ${sl} with Level up.</p>`;
+    crOptGroups(s).forEach(g=>{const pk=(s.opts||{})[g.key]||[];det+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${g.opts.map(f=>crCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),String(f.desc||"").replace(/\s+/g," ").slice(0,70))).join("")}</div>`});
   }
   return `${crSrcNote(L)}<div class="crgrid">${L.map(x=>crCard("cls",x.n,x.n,s.cls===x.n,"d"+(x.meta.hd||x.data.hd||"?")+(x.meta.sc?" \u00b7 caster":""))).join("")}</div>${det}`;
 }
@@ -6604,7 +7179,8 @@ function crStepSkills(s){
   const c=s.L.classes.find(x=>x.n===s.cls), sk=c&&c.meta&&c.meta.sk?c.meta.sk:{n:2,from:FXSK.map(x=>x[1])};
   const bg=s.bgObj, bgs=new Set((bg&&bg.sk||[]).map(crSkId));
   return `<p>Choose <b>${sk.n}</b> class skills (${s.skills.length} chosen).${bgs.size?" Your background already gives "+[...bgs].map(crSkName).join(" and ")+".":""}</p>
-    <div class="crgrid">${sk.from.map(n=>{const id=crSkId(n);return crCard("skill",id,n,s.skills.includes(id),bgs.has(id)?"also from background":"")}).join("")}</div>`;
+    <div class="crgrid">${sk.from.map(n=>{const id=crSkId(n);return crCard("skill",id,n,s.skills.includes(id),bgs.has(id)?"also from background":"")}).join("")}</div>
+    ${crExpN(s)?`<h4>Expertise: choose ${crExpN(s)} (${(s.exp||[]).length} chosen)</h4><div class="crgrid">${s.skills.concat([...bgs]).filter((v,i,a)=>v&&a.indexOf(v)===i).map(id=>crCard("cexp",id,crSkName(id),(s.exp||[]).includes(id))).join("")||'<p class="hint">Pick skills above first.</p>'}</div>`:""}`;
 }
 function crEqGroups(s){
   const c=s.L.classes.find(x=>x.n===s.cls),m=c&&c.meta; return m&&m.eq?m.eq:[];
@@ -6644,7 +7220,7 @@ function crStepImprove(s){
 }
 function crStepReview5(s){
   const tot=crTotals(s); crApplyAsi(s,tot);
-  return `<div class="crd"><p><b>${esc(s.name||"New character")}</b></p><p>${esc((s.sub||s.species))} ${esc(s.cls)}${s.subcls?" ("+esc(s.subcls)+")":""}, level ${s.level} \u00b7 ${esc(s.bg)}</p>
+  return `<div class="crd"><p><b>${esc(s.name||"New character")}</b></p><p>${esc((s.sub||s.species))} ${esc(s.cls)}${s.subcls?" ("+esc(s.subcls)+")":""}, level 1${num(s.target)>1?", then up to level "+num(s.target):""} \u00b7 ${esc(s.bg)}</p>
     <p>${CRAB.map(k=>k.toUpperCase()+" "+tot[k]).join(" \u00b7 ")}</p>
     <p class="hint">Skills: ${s.skills.concat((s.bgObj&&s.bgObj.sk||[]).map(crSkId)).filter((v,i,a)=>v&&a.indexOf(v)===i).map(crSkName).join(", ")||"none"}</p></div>
     ${s.story?`<div class="crd"><b>Story</b><p>${esc(s.story.app)}</p><p>${esc(s.story.pers)}</p><p>${esc(s.story.back)}</p><div class="btns"><button class="btn sm" type="button" data-cr="restory">New story</button></div></div>`:""}
@@ -6683,14 +7259,14 @@ function crValid(s){
   if(s.sys==="pf2e")return crValidPf(s,st);
   if(st==="Basics")return "";
   if(st==="Species"){if(!s.species)return "Choose a species.";const sp=s.speciesObj;if(sp&&s.ed==="2014"&&sp.abo&&s.aboPicks.length!==sp.abo.n)return "Choose "+sp.abo.n+" abilities for the bonus.";return ""}
-  if(st==="Class")return s.cls?"":"Choose a class.";
+  if(st==="Class"){if(!s.cls)return "Choose a class.";const cl=s.L.classes.find(x=>x.n===s.cls);if(cl&&(cl.data.subclasses||[]).length&&crSubLv(cl.data)<=1&&!s.subcls)return "Choose a subclass.";for(const g of crOptGroups(s)){if(((s.opts||{})[g.key]||[]).length<g.n)return "Choose "+g.n+" for "+g.name+"."}return ""}
   if(st==="Background"){if(!s.bg)return "Choose a background.";const b=s.bgObj;if(s.ed==="2024"&&b&&b.ab&&b.ab.length===3&&s.bgMode==="21"&&(!s.bgA||!s.bgB))return "Choose where the +2 and +1 go.";return ""}
   if(st==="Abilities"){
     if(s.method==="buy"&&crPtCost(s)>27)return "That costs more than 27 points.";
     if((s.method==="array"||s.method==="roll")&&CRAB.some(k=>!s.base[k]))return "Assign a score to every ability.";
     return "";
   }
-  if(st==="Skills"){const c=s.L.classes.find(x=>x.n===s.cls),n=c&&c.meta.sk?c.meta.sk.n:2;return s.skills.length<n?"Choose "+n+" skills ("+s.skills.length+" so far).":""}
+  if(st==="Skills"){const c=s.L.classes.find(x=>x.n===s.cls),n=c&&c.meta.sk?c.meta.sk.n:2;if(s.skills.length<n)return "Choose "+n+" skills ("+s.skills.length+" so far).";const e=crExpN(s);return e&&(s.exp||[]).length<e?"Choose "+e+" skills for Expertise.":""}
   return "";
 }
 function crDefaults(s){
@@ -6734,15 +7310,16 @@ async function crBuild5(s){
   const bgSk=((bg&&bg.sk)||[]).map(crSkId);
   s.skills.concat(bgSk).filter(Boolean).forEach(id=>{c.skills[id]=1});
   /* species traits and background feat */
-  const addF=(name,src,desc)=>{const x=mkFeat(name);x.source=src;x.desc=desc||"";fxAttach(x);c.features.push(x)};
+  const addF=(name,src,desc,type)=>{const x=mkFeat(name);x.source=src;x.desc=desc||"";if(type)x.type=type;fxAttach(x);c.features.push(x)};
   if(sp){
-    sp.tr.forEach(t=>addF(t.n,s.species,t.d));
-    if(ed==="2014"&&s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb)(sb.tr||[]).forEach(t=>addF(t.n,s.sub,t.d))}
-    if(ed==="2024"&&s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb)(sb.tr||[]).forEach(t=>addF(t.n,s.sub,t.d))}
+    sp.tr.forEach(t=>addF(t.n,s.species,t.d,"race"));
+    if(s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb)(sb.tr||[]).forEach(t=>addF(t.n,s.sub,t.d,"race"))}
   }
-  if(bg&&bg.feat){const f=s.L.feats.find(x=>lc(x.n)===lc(bg.feat));addF(bg.feat+(bg.fnote?" ("+bg.fnote+")":""),"Origin feat",f?f.d:(bg.d||""));c.originFeat=bg.feat}
-  if(ed==="2014"&&bg&&bg.d)addF(bg.n+" background",bg.n,bg.d);
-  crAsiLevels(s).forEach(l=>{const a=s.asi[l];if(a&&a.k==="feat"&&a.f){const f=s.L.feats.find(x=>x.n===a.f);addF(a.f,"Level "+l+" feat",f?f.d:"")}});
+  if(bg&&bg.feat){const f=s.L.feats.find(x=>lc(x.n)===lc(bg.feat));addF(bg.feat+(bg.fnote?" ("+bg.fnote+")":""),"Origin feat",f?f.d:(bg.d||""),"feat");c.originFeat=bg.feat}
+  if(ed==="2014"&&bg&&bg.d)addF(bg.n+" background",bg.n,bg.d,"background");
+  if(ed==="2024"&&bg&&bg.lib&&bg.d)addF(bg.n+" background",bg.n,bg.d,"background");
+  crAsiLevels(s).forEach(l=>{const a=s.asi[l];if(a&&a.k==="feat"&&a.f){const f=s.L.feats.find(x=>x.n===a.f);addF(a.f,"Level "+l+" feat",f?f.d:"","feat")}});
+  c.species=s.species||"";
   /* gear */
   const recs=await crItemRecs(ed);
   const eq=crEqGroups(s), have=[];
@@ -6792,30 +7369,38 @@ async function crBuild5(s){
   return c;
 }
 async function crFinish(s){
+  s.level=1;
   const c=await crBuild5(s);
+  c.lvlMode="guided";
   S.characters.push(c); ui.sel=c.id; ui.tab="sheet"; ui.q=""; ui.newChar=false;
-  c.classes[0].level=s.level;
+  c.classes[0].level=1;
   await applyClass(c,0);
-  /* applyClass adds features up to level; recompute derived stuff */
+  /* level 1 choices made in the creator */
+  crOptGroups(s).forEach(g=>((s.opts||{})[g.key]||[]).forEach(n=>{const f=g.opts.find(o=>o.name===n);if(f&&!c.features.some(x=>lc(x.name)===lc(n))){const x=mkFeat(f.name);x.source=g.src+" 1";x.desc=f.desc||"";x.type="class";fxAttach(x);c.features.push(x)}}));
+  (s.exp||[]).forEach(k=>{if(num(c.skills[k]))c.skills[k]=2});
   syncClassFields(c); syncSlots(c);
   c.updated=Date.now(); save(); closeCreator(); renderSheet(); window.scrollTo(0,0);
+  const t=num(s.target);
+  if(t>1)await openLevelUp(c,0,{target:t,auto:!!s.rand});
 }
 /* ---- random (5e) ---- */
 const crPick=a=>a[rd(a.length)-1];
 const crShuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rd(i+1)-1;[a[i],a[j]]=[a[j],a[i]]}return a};
 async function crRandom5(s){
   await crPrepare(s);
-  const L=s.L;
+  const L=s.L; if(!s.target)s.target=s.level>1?s.level:1; s.level=1;
   s.name=s.name||crRandName();
   const sp=crPick(L.species); s.species=sp.n; s.sub=sp.sub&&sp.sub.length?crPick(sp.sub).n:"";
   s.aboPicks=[]; if(s.ed==="2014"&&sp.abo){s.aboPicks=crShuffle(CRAB.filter(k=>!(sp.ab&&sp.ab[k]))).slice(0,sp.abo.n)}
   const cl=crPick(L.classes); s.cls=cl.n;
-  const subs=cl.data.subclasses||[]; s.subcls=s.level>=3&&subs.length?crPick(subs).name:"";
+  const subs=cl.data.subclasses||[]; s.subcls=subs.length&&crSubLv(cl.data)<=1?crPick(subs).name:"";
   const bg=crPick(L.bgs); s.bg=bg.n; s.bgMode="21"; s.bgA=""; s.bgB="";
   crSync(s); s.method="array"; crSuggest(s); crDefaults(s);
   /* class skills */
   const m=cl.meta, sk=m.sk||{n:2,from:FXSK.map(x=>x[1])}, bgs=new Set((bg.sk||[]).map(crSkId));
   s.skills=crShuffle(sk.from.map(crSkId).filter(id=>id&&!bgs.has(id))).slice(0,sk.n);
+  s.opts={}; crOptGroups(s).forEach(g=>{s.opts[g.key]=crShuffle(g.opts).slice(0,g.n).map(f=>f.name)});
+  s.exp=crShuffle(s.skills.concat([...bgs])).slice(0,crExpN(s));
   s.eq={}; (m.eq||[]).forEach((g,i)=>{const kits=g.opts.map((o,j)=>j).filter(j=>g.opts[j].items.length);s.eq[i]=kits.length?crPick(kits):0}); s.bgEq="A";
   s.asi={}; crAsiLevels(s).forEach(l=>{const p=CRPRI[s.cls]||CRAB; s.asi[l]={k:"asi2",a:p[0],b:p[1],f:""}});
   crSync(s); crAutoSpells(s);
@@ -7083,7 +7668,7 @@ function closeCreator(){const o=crOv();if(o){o.hidden=true;o.innerHTML=""}CR=nul
 function crSetPath(s,f,v){
   const p=f.split("."), pf=s.pf;
   if(p[0]==="name"){s.name=v;return false}
-  if(p[0]==="level"){s.level=Math.max(1,Math.min(20,num(v,1)));return true}
+  if(p[0]==="level"){const n=Math.max(1,Math.min(20,num(v,1)));if(s.sys==="pf2e")s.level=n;else{s.target=n;s.level=1}return true}
   if(p[0]==="allSrc"){s.allSrc=!!v;return true}
   if(p[0]==="base"){s.base[p[1]]=num(v,0)||0;return true}
   if(p[0]==="bgA"||p[0]==="bgB"&&p.length===1){s[p[0]]=v;return true}
@@ -7131,8 +7716,10 @@ async function crAct(a,b){
     case "species": s.species=v; s.sub=""; s.aboPicks=[]; break;
     case "sub": s.sub=s.sub===v?"":v; break;
     case "abo": {const sp=s.speciesObj; crToggle(s.aboPicks,v,sp&&sp.abo?sp.abo.n:2); break;}
-    case "cls": s.cls=v; s.subcls=""; s.skills=[]; s.eq={}; s.spells={c:[],s:[]}; s.base={}; break;
-    case "subcls": s.subcls=v; break;
+    case "cls": s.cls=v; s.subcls=""; s.skills=[]; s.eq={}; s.spells={c:[],s:[]}; s.base={}; s.opts={}; s.exp=[]; break;
+    case "subcls": s.subcls=v; s.opts={}; break;
+    case "opt": {const k=v.slice(0,v.indexOf("|")),n=v.slice(v.indexOf("|")+1),g=crOptGroups(s).find(x=>x.key===k);s.opts=s.opts||{};const a=s.opts[k]=s.opts[k]||[];const i=a.indexOf(n);if(i>=0)a.splice(i,1);else{if(g&&a.length>=g.n)a.shift();a.push(n)}break;}
+    case "cexp": {s.exp=s.exp||[];const i=s.exp.indexOf(v);if(i>=0)s.exp.splice(i,1);else{if(s.exp.length>=crExpN(s))s.exp.shift();s.exp.push(v)}break;}
     case "bg": s.bg=v; s.bgA=""; s.bgB=""; break;
     case "bgmode": s.bgMode=v; break;
     case "method": s.method=v; s.base={}; s.rolled=false; if(v==="roll")s.pool=[]; else s.pool=CRARRAY.slice(); if(v==="buy")CRAB.forEach(k=>{s.base[k]=8}); break;
