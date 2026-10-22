@@ -1825,6 +1825,9 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 .cg-l{display:flex;flex-direction:column;align-items:center;gap:2px}.cg-l span{font:600 11px/1 var(--body);letter-spacing:.14em;color:var(--muted)}.cg-l b{font-size:22px}
 .pc-lvbtns{display:flex;gap:8px;flex-wrap:wrap}
 .lubig{font-size:28px;font-weight:700;margin:6px 0}
+.crc:disabled{opacity:.5;cursor:not-allowed;background:transparent;border-style:dashed}
+.prow div.plink{text-align:left;align-items:flex-start}
+.crc:disabled span{color:var(--danger,var(--muted))}
 #lvlOv .crbody .item{margin-bottom:6px}
 .crc:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .crd{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--panel);display:flex;flex-direction:column;gap:6px}
@@ -4053,11 +4056,11 @@ function lvModeHTML(c){
       <button class="btn sm${g?" pri":""}" type="button" data-act="lvl-modeset" data-v="guided" aria-pressed="${g}">Guided</button>
       <button class="btn sm${g?"":" pri"}" type="button" data-act="lvl-modeset" data-v="manual" aria-pressed="${!g}">Manual</button></div>
     <p class="hint">${g?"Levels change only through Level up, which walks you through hit points, subclass, features, choices, ability improvements and spells for that level, from the SRD or your Library.":"Type levels, classes and subclasses yourself. Apply features adds everything up to the level you set. Switch back to Guided at any time."}</p>
-    <div class="btns"><button class="btn pri" type="button" data-act="lvl-start"${totalDice(c)>=20?" disabled":""}>Level up</button>${g&&H?`<button class="btn" type="button" data-act="lvl-undo">Undo last level up</button>`:""}${g?`<button class="btn" type="button" data-act="lvl-reset">Start again from level 1</button>`:""}</div></div>`;
+    <div class="btns"><button class="btn pri" type="button" data-act="lvl-start"${totalDice(c)>=20?" disabled":""}>Level up</button>${g&&H?`<button class="btn" type="button" data-act="lvl-undo">Undo last level up</button>`:""}${g&&c.classes.some(r=>String(r.name||"").trim())&&totalDice(c)>1?`<button class="btn" type="button" data-act="lvl-reset">Start again from level 1</button>`:""}</div></div>`;
 }
 function classesHTML(c){
   const g=lvGuided(c), named=c.classes.some(r=>String(r.name||"").trim());
-  const rows=c.classes.map((r,i)=>g&&named?(String(r.name||"").trim()?`<div class="crow crow-g"><div class="cg-t"><b>${esc(r.name)}</b><span>${esc(r.sub||"No subclass yet")}</span></div><div class="cg-l"><span>LEVEL</span><b>${num(r.level)}</b></div></div>`:""):`<div class="crow">
+  const rows=c.classes.map((r,i)=>g?(String(r.name||"").trim()?`<div class="crow crow-g"><div class="cg-t"><b>${esc(r.name)}</b><span>${esc(r.sub||"No subclass yet")}</span></div><div class="cg-l"><span>LEVEL</span><b>${num(r.level)}</b></div></div>`:""):`<div class="crow">
     <label class="fld"><span>Class</span><input data-f="classes.${i}.name" list="clsList" value="${esc(r.name)}"></label>
     <label class="fld"><span>Subclass</span><input data-f="classes.${i}.sub" list="subList${i}" value="${esc(r.sub)}"><datalist id="subList${i}"></datalist></label>
     <label class="fld lv"><span>Level</span><input type="number" inputmode="numeric" min="1" max="20" data-t="n" data-f="classes.${i}.level" value="${esc(r.level)}"${g?" readonly":""}></label>
@@ -4065,7 +4068,7 @@ function classesHTML(c){
       <button class="btn sm danger" type="button" data-act="cls-del" data-i="${i}">${c.classes.length>1?"Remove":"Clear"}</button></div></div>`).join("");
   return `<datalist id="clsList">${classOptions().map(n=>`<option value="${esc(n)}">`).join("")}</datalist>${lvModeHTML(c)}${rows}
     ${c.classes.map(r=>{const k=libClass(r.name);return k&&(k.tableText||k.info)?`<details class="item cdet"><summary><span class="sum-t">${esc(k.name)}: class table and notes</span></summary><div class="ibody">${k.tableText?richHTML(k.tableText,num(r.level)):""}${k.info?`<details class="item"><summary><span class="sum-t">About this class</span></summary><div class="ibody">${viewText(k.info,"")}</div></details>`:""}</div></details>`:""}).join("")}
-    ${g?(named?"":`<p class="hint">Type your first class above, then use Level up for every level after that.</p>`):`<div class="btns"><button class="btn sm" type="button" data-act="cls-add">Add a class (multiclass)</button></div>`}
+    ${g?(named?"":`<p class="hint">No class yet. Tap Level up to choose your first class.</p>`):`<div class="btns"><button class="btn sm" type="button" data-act="cls-add">Add a class (multiclass)</button></div>`}
     <div class="msg" id="clsMsg" role="status"></div>
     <p class="hint">${g?"In Guided mode, multiclassing is a choice inside Level up.":"Apply features adds that class's features up to its level, sets saving throws for your first class, and fills spell slots."} Custom classes come from the Library.</p>`;
 }
@@ -4347,7 +4350,7 @@ function libClassViewHTML(x){
   const feats=(x.features||[]).slice().sort((a,b)=>num(a.lvl)-num(b.lvl));
   const nOpt=(x.features||[]).concat(...(x.subclasses||[]).map(q=>q.features||[])).filter(f=>/:/.test(f.name||"")).length;
   let h=`<div class="bar" style="margin:0"><h3 style="margin:0">${esc(x.name)}</h3><span class="status">${esc(x.source||"")}</span></div><p class="hint" style="margin:.2em 0 .4em">${facts}</p>
-    ${x.addOn?"":`<p class="hint" style="margin:0 0 .8em">${nOpt?nOpt+" options (named Feature: Option) are offered as choices in Level up. ":""}To change what Level up offers, tap Edit: a feature named like <b>Fighting Style: Archery</b> becomes one choice under Fighting Style, as long as Fighting Style's text says to choose. ${(x.spellList||[]).length?"Spell list: "+x.spellList.length+" spells. ":""}${x.caster&&x.caster!=="none"?"Edit which spells it can learn under Spells, Class spell lists.":""}</p>`}<div class="items">`;
+    ${x.addOn?"":`<div class="crd" style="margin:0 0 .8em"><p style="margin:0"><b>Level up choices:</b> ${nOpt?nOpt+" options.":"none found."} An option is a feature named like <i>Fighting Style: Archery</i>, under a feature whose text says to choose. Tap Edit to rename or add them.</p>${x.caster&&x.caster!=="none"?`<p style="margin:0"><b>Spell list:</b> ${(x.spellList||[]).length} spells${(x.spellFrom||[]).length?", plus the "+x.spellFrom.map(titleCase).join(" and ")+" list":""}. Change it under Spells, Class spell lists.</p>`:""}</div>`}<div class="items">`;
   if(x.tableText)h+=`<details class="item cdet"><summary><span class="sum-t">Class table</span></summary><div class="ibody">${richHTML(x.tableText,0)}</div></details>`;
   if(x.info)h+=`<details class="item"><summary><span class="sum-t">About this class</span></summary><div class="ibody">${viewText(x.info,"")}</div></details>`;
   h+=`</div>`;
@@ -5484,7 +5487,7 @@ function luPreCheck(c,f,lvl,extra){
   return {ok:!why.length,why:why,text:txt,check:check};
 }
 const luPreLine=pr=>pr.ok?(pr.text?"Prerequisite: "+pr.text+(pr.check?" (check this yourself)":""):""):"Needs "+pr.why.join(", ");
-const luSnip=f=>String(f.desc||f.d||"").replace(/(?:^|\n)\s*\*{0,2}Prerequisites?[^\n]*/i,"").replace(/\s+/g," ").trim().slice(0,70);
+const luSnip=f=>{const t=String(f.desc||f.d||"").replace(/(?:^|\n)\s*\*{0,2}Prerequisites?[^\n]*/i,"").replace(/\s+/g," ").trim();return t.length<=80?t:t.slice(0,80).replace(/\s+\S*$/,"")+"…"};
 const luOwnsIn=(c,g)=>c.features.filter(f=>g.names.has(lc(f.name))).length;
 /* everything a level brings: built from whatever class data exists (SRD, Library, add-on subclasses) */
 async function luPlan(c,sel){
@@ -5497,7 +5500,8 @@ async function luPlan(c,sel){
   P.meta=await luMeta(c,P.cls);
   if(!d){P.err="No details for "+P.cls+" yet. Add it under Library, Classes, or import it from a book. You can still take the level and add features yourself.";}
   P.die=num((d&&d.hd)||P.meta.hd||hdOf(r),8); P.mod=abMod(c,"con");
-  P.avg=Math.max(1,Math.floor(P.die/2)+1+P.mod);
+  P.first=!c.classes.some(q=>String(q.name||"").trim());
+  P.avg=P.first?Math.max(1,P.die+P.mod):Math.max(1,Math.floor(P.die/2)+1+P.mod);
   const subs=(d&&d.subclasses)||[];
   P.subs=subs; P.subLv=subs.length?Math.min(...subs.flatMap(s=>(s.features||[]).map(f=>num(f.lvl)||99)).concat([99])):99;
   if(P.subLv===99&&subs.length)P.subLv=3;
@@ -5558,7 +5562,7 @@ async function luSpellsPrep(c,L){
   L.spellAll=!list.length; if(!list.length)list=all;
   L.goal={newC:newC,newS:newS,maxl:Math.max(1,b.maxl),book:b.book,ab:ab,
     can:list.filter(x=>x.l===0&&!have.has(lc(x.n))).sort((p,q)=>p.n.localeCompare(q.n)),
-    sp:list.filter(x=>x.l>=1&&x.l<=Math.max(1,b.maxl)&&!have.has(lc(x.n))).sort((p,q)=>p.l-q.l||p.n.localeCompare(q.n))};
+    sp:list.filter(x=>x.l>=1&&x.l<=Math.max(1,b.maxl)&&!have.has(lc(x.n))).sort((p,q)=>q.l-p.l||p.n.localeCompare(q.n))};
   if(!b.maxl)L.goal.newS=0;
 }
 async function luFeatList(c,L){
@@ -5629,6 +5633,9 @@ function luBody(c,L){
   if(st==="cls"){
     const rows=c.classes.map((r,i)=>[r,i]).filter(([r])=>String(r.name||"").trim());
     const others=(L.classes||[]).filter(x=>!c.classes.some(r=>lc(r.name)===lc(x.n)));
+    if(!rows.length)return `<p>Choose your first class. This sheet has no class yet, so this sets up level 1.</p>
+      <div class="crgrid">${(L.classes||[]).map(x=>luCard("ncls",x.n,x.n,L.sel.name===x.n,x.src&&x.src!=="SRD"?x.src:"")).join("")}</div>
+      <p class="hint">For a full start with species, background, skills and gear, use New character, Build step by step instead.</p>${P&&P.err?`<p class="msg err">${esc(P.err)}</p>`:""}`;
     return `<p>Which class gains a level? You are level ${totalDice(c)}, so this is level ${totalDice(c)+1}.</p>
       <div class="crgrid">${rows.map(([r,i])=>luCard("cls",String(i),r.name+" "+num(r.level)+" → "+(num(r.level)+1),L.sel.i===i,r.sub||"")).join("")}</div>
       ${others.length?`<details class="item"${L.sel.i<0?" open":""}><summary><span class="sum-t">Take a level in a new class (multiclass)</span></summary><div class="ibody"><div class="crgrid">${others.map(x=>luCard("ncls",x.n,x.n,L.sel.i<0&&L.sel.name===x.n,luMulti(c,x.n)||(x.src&&x.src!=="SRD"?x.src:""))).join("")}</div></div></details>`:""}
@@ -5637,6 +5644,7 @@ function luBody(c,L){
   if(!P)return `<p>Choose a class first.</p>`;
   if(st==="hp"){
     const mode=(v,t)=>`<button class="btn sm${L.hpMode===v?" pri":""}" type="button" data-lu="hpmode" data-v="${v}" aria-pressed="${L.hpMode===v}">${t}</button>`;
+    if(P.first)return `<p>At level 1 you get the full hit die: d${P.die} (${P.die}) plus Constitution ${sgn(P.mod)}.</p><p class="lubig">${P.avg} HP</p>`;
     return `<p>Hit die d${P.die}, Constitution ${sgn(P.mod)}.</p>
       <div class="seg">${mode("avg","Take average ("+P.avg+")")}${mode("roll","Roll it")}${mode("hand","Enter it")}</div>
       ${L.hpMode==="hand"?`<label class="fld" style="max-width:160px"><span>HP gained</span><input data-luf="gain" type="number" inputmode="numeric" value="${L.gain}"></label>`:`<p class="lubig">+${L.gain} HP</p>`}
@@ -5653,17 +5661,17 @@ function luBody(c,L){
     const g=P.ol?null:P.meta;
     return `${D&&D.feats.length?`<p>These are added to your Features. Tap one to read it.</p><div class="items">${D.feats.map(x=>luFeatRow(x.f,x.src)).join("")}</div>`:`<p>No new features for ${esc(P.cls)} ${P.nl} in the class data.${P.d?"":" "+esc(P.err)}</p>`}
       ${L.slotTxt?`<p>Spell slots: ${esc(L.slotTxt)}</p>`:""}
-      ${!P.ol&&g&&g.prof&&g.prof.length?`<p class="hint">Multiclass note: you gain only some of ${esc(P.cls)}'s starting proficiencies. Check the class's multiclassing rules.</p>`:""}`;
+      ${!P.ol&&!P.first&&g&&g.prof&&g.prof.length?`<p class="hint">Multiclass note: you gain only some of ${esc(P.cls)}'s starting proficiencies. Check the class's multiclassing rules.</p>`:""}`;
   }
   if(st==="choice"){
     let h="";
     D.groups.forEach(g=>{
       const pk=L.picks[g.key]||[];
       const ex=Object.values(L.picks).flat().filter(n=>!pk.includes(n)).concat(L.sp.c,L.sp.s);
-      const rows=g.opts.map(f=>({f:f,pr:luPreCheck(c,f,P.nl,ex)})), locked=rows.filter(r=>!r.pr.ok).length;
-      h+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${rows.map(({f,pr})=>luCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),luPreLine(pr)||luSnip(f),!pr.ok&&!pk.includes(f.name))).join("")}</div>${locked?`<p class="hint">${locked} greyed out because you do not meet their prerequisites yet.</p>`:""}`;
+      const rows=g.opts.map(f=>({f:f,pr:luPreCheck(c,f,P.nl,ex)})).sort((a,b)=>(b.pr.ok?1:0)-(a.pr.ok?1:0)), locked=rows.filter(r=>!r.pr.ok).length;
+      h+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${rows.map(({f,pr})=>luCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),(luPreLine(pr)?luPreLine(pr)+" · ":"")+luSnip(f),!pr.ok&&!pk.includes(f.name))).join("")}</div>${locked?`<p class="hint">${locked} greyed out at the end because you do not meet their prerequisites yet.</p>`:""}`;
     });
-    if(D.style){const S=luStyleFeats(c);h+=`<h4>Fighting Style feat</h4><div class="crgrid">${S.map(f=>luCard("style",f.n,f.n,L.style===f.n,String(f.d||"").replace(/\s+/g," ").slice(0,70))).join("")||'<p class="hint">No Fighting Style feats found. Turn on a source in Library, Sources, or add one later.</p>'}</div>`}
+    if(D.style){const S=luStyleFeats(c);h+=`<h4>Fighting Style feat</h4><div class="crgrid">${S.map(f=>luCard("style",f.n,f.n,L.style===f.n,luSnip(f))).join("")||'<p class="hint">No Fighting Style feats found. Turn on a source in Library, Sources, or add one later.</p>'}</div>`}
     if(D.exp){
       const prof=SKILLS.filter(s=>num(c.skills[s[0]])===1);
       h+=`<h4>Expertise: choose ${D.exp} (${L.exp.length} chosen)</h4>${prof.length?`<div class="crgrid">${prof.map(s=>luCard("exp",s[0],s[1],L.exp.includes(s[0]))).join("")}${num(c.skills.thieves)===0&&/rogue/i.test(P.cls)?"":""}</div>`:'<p class="hint">You have no skill proficiencies to double yet. Mark them on the Overview and come back, or set expertise there later.</p>'}`;
@@ -5697,13 +5705,13 @@ function luBody(c,L){
   }
   if(st==="rev"){
     const sum=luSummary(c,L);
-    return `<div class="crd"><p><b>${esc(P.cls)} ${P.ol} → ${P.nl}</b> · character level ${totalDice(c)+1}</p>${sum.map(t=>`<p>${esc(t)}</p>`).join("")}</div>
+    return `<div class="crd"><p><b>${P.first?esc(P.cls)+" 1":esc(P.cls)+" "+P.ol+" → "+P.nl}</b> · character level ${P.first?1:totalDice(c)+1}</p>${sum.map(t=>`<p>${esc(t)}</p>`).join("")}</div>
       <p class="hint">You can undo this level up afterwards from the Overview.</p>`;
   }
   return "";
 }
 function luSummary(c,L){
-  const P=L.P, D=L.D, out=["Hit points +"+Math.max(0,num(L.gain))+" (max "+(num(c.hpMax)+Math.max(0,num(L.gain)))+")"];
+  const P=L.P, D=L.D, out=[P.first?"Hit points "+Math.max(1,num(L.gain)):"Hit points +"+Math.max(0,num(L.gain))+" (max "+(num(c.hpMax)+Math.max(0,num(L.gain)))+")"];
   if(L.sub)out.push("Subclass: "+L.sub);
   if(D){
     const fs=luDetail(c,P,L).feats.map(x=>x.f.name).concat(Object.values(L.picks).flat().map(n=>n.replace(/^[^:]+:\s*/,"")));
@@ -5720,6 +5728,7 @@ function luValid(c,L){
   const st=luSteps(c,L)[L.step], P=L.P, D=L.D;
   if(st==="cls")return !P?"Choose a class.":(!P.d&&P.err&&L.sel.i<0)?P.err:"";
   if(st==="sub")return L.sub?"":"Choose a subclass.";
+  if(st==="hp"&&L.hpMode==="roll"&&!L.rolled)return "Roll your hit die first, or take the average.";
   if(st==="choice"){
     for(const g of D.groups){const okN=g.opts.filter(f=>luPreCheck(c,f,P.nl,Object.values(L.picks).flat()).ok).length;const need=Math.min(g.n,okN);if((L.picks[g.key]||[]).length<need)return "Choose "+need+" for "+g.name+".";}
     if(D.style&&luStyleFeats(c).length&&!L.style)return "Choose a Fighting Style feat.";
@@ -5736,7 +5745,7 @@ function luRender(c,keep){
   let body; try{body=luBody(c,L)}catch(e){body=`<p class="msg err">Something went wrong on this step. ${esc(e.message||"")}</p>`}
   const last=L.step===steps.length-1, P=L.P;
   o.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="lvlT">
-    <div class="bar" style="margin:0"><h2 id="lvlT">Level up${P&&!L.busy?": "+esc(P.cls)+" "+P.ol+" → "+P.nl:""}</h2><button class="btn sm" type="button" data-lu="cancel">Close</button></div>
+    <div class="bar" style="margin:0"><h2 id="lvlT">${P&&!L.busy?(P.first?"First class: "+esc(P.cls):"Level up: "+esc(P.cls)+" "+P.ol+" \u2192 "+P.nl):"Level up"}</h2><button class="btn sm" type="button" data-lu="cancel">Close</button></div>
     <div class="crprog" role="list" aria-label="Steps">${steps.map((t,i)=>`<span role="listitem" class="${i===L.step?"on":i<L.step?"done":""}"${i===L.step?' aria-current="step"':""}>${LU_STEPS[t]}</span>`).join("")}</div>
     <section class="crbody"><h3>${LU_STEPS[steps[L.step]]}</h3>${body}</section>
     <div class="msg${L.msg?" err":""}" id="luMsg" role="status">${esc(L.msg||"")}</div>
@@ -5744,6 +5753,7 @@ function luRender(c,keep){
       <button class="btn" type="button" data-lu="back"${L.step?"":" disabled"}>Back</button>
       <button class="btn pri" type="button" data-lu="${last?"ok":"next"}"${L.busy?" disabled":""}>${last?"Level up":"Next"}</button></div></div>`;
   const sh=o.querySelector(".sheet"); if(sh)sh.scrollTop=keep?prev:0;
+  const on=o.querySelector(".crprog .on"); if(on&&on.parentNode)on.parentNode.scrollLeft=Math.max(0,on.offsetLeft-on.parentNode.offsetLeft-40);
 }
 function luSlots(c,L){
   const P=L.P; if(!P)return "";
@@ -5794,7 +5804,9 @@ function luApply(c,L){
   }
   const r=c.classes[idx];
   r.level=P.nl; if(L.sub)r.sub=L.sub;
-  const g=Math.max(0,num(L.gain)); c.hpMax=num(c.hpMax)+g; c.hp=num(c.hp)+g;
+  const g=Math.max(0,num(L.gain));
+  if(P.first){c.hpMax=g;c.hp=g;const sv=(P.d&&P.d.saves&&P.d.saves.length?P.d.saves:P.meta.saves)||[];sv.forEach(k=>{const kk=lc(k).slice(0,3);if(CRAB.includes(kk))c.saveProf[kk]=1})}
+  else{c.hpMax=num(c.hpMax)+g; c.hp=num(c.hp)+g;}
   const add=(f,src,type)=>{if(c.features.some(o=>lc(o.name)===lc(f.name)&&lc(o.source)===lc(src)))return;const x=mkFeat(f.name);x.source=src;x.desc=f.desc||f.d||"";x.type=type;fxAttach(x);c.features.push(x)};
   if(P.d){
     const D=luDetail(c,P,L);
@@ -5896,7 +5908,7 @@ function luClick(c,b){
   L.msg="";
   const reload=async()=>{L.busy=true;luRender(c);await luLoad(c,L);L.busy=false;L.slotTxt=luSlots(c,L);luRender(c)};
   if(a==="cancel"){$("#lvlOv").hidden=true;ui.lvl=null;return}
-  if(a==="manual"){c.lvlMode="manual";save();$("#lvlOv").hidden=true;ui.lvl=null;renderSheet();showUndo("Levelling set to manual for "+(c.name||"this character")+". Switch back under More, Details.",null);return}
+  if(a==="manual"){c.lvlMode="manual";save();$("#lvlOv").hidden=true;ui.lvl=null;renderSheet();showNote("Manual levelling is on for "+(c.name||"this character")+". Switch back under More, Details.");return}
   if(a==="cls"){L.sel={i:num(v)};reload();return}
   if(a==="ncls"){L.sel={i:-1,name:v};reload();return}
   if(a==="hpmode"){L.hpMode=v;if(v==="avg")L.gain=L.P.avg;if(v==="roll"){L.rolled=false;L.gain=0}luRender(c,1);return}
@@ -5921,7 +5933,7 @@ document.addEventListener("click",e=>{
   const c=cur(), a=b.dataset.act;
   if(a==="cls-lvl"&&c){openLevelUp(c,num(b.dataset.i));return}
   if(a==="lvl-start"&&c){if(isPf(c)){lvGuided(c)?openPfGuided(c):openPfLevelUp(c);return}openLevelUp(c,null);return}
-  if(a==="lvl-undo"&&c){if(luUndo(c))showUndo("Last level up undone.",null);return}
+  if(a==="lvl-undo"&&c){if(luUndo(c))showNote("Last level up undone.");return}
   if(a==="lvl-reset"&&c){if(confirm("Take "+(c.name||"this character")+" back to level 1 in their first class? Class features above level 1, extra classes and level-up feats are removed and hit points are reset. Ability scores and spells stay as they are. You can undo this."))luReset(c);return}
   if(a==="lvl-modeset"&&c){c.lvlMode=b.dataset.v==="manual"?"manual":"guided";save();renderSheet();return}
   if(a==="lvl-mode"&&ui.lvl&&c){ui.lvl.mode=b.dataset.v;if(b.dataset.v==="avg")ui.lvl.gain=ui.lvl.avg;if(b.dataset.v==="roll"){ui.lvl.rolled=false;ui.lvl.gain=0}renderQuickLevel(c);return}
@@ -6600,6 +6612,7 @@ function pfPreCheck(c,f,extra){
     const nm=lc(p.replace(/\s+(feat|class feature|feature)$/i,""));
     if(owned.has(nm)||owned.has(lc(p)))return;
     if(c.pf.feats.some(x=>lc(x.name).includes(nm)))return;
+    if(extra&&extra.names&&extra.names.has(nm)){why.push(p);return}
     check=true;
   });
   return {ok:!why.length,why:why,text:txt,check:check};
@@ -6632,6 +6645,7 @@ function pfgSteps(c,L){
   const s=["hp"]; if(L.cf&&L.cf.length)s.push("feat"); if(L.hasSki)s.push("ski"); if(L.hasBoost)s.push("boost"); if(L.slots&&L.slots.length)s.push("feats"); if(L.spN)s.push("spells"); s.push("rev"); return s;
 }
 function pfgFeatOpts(c,L,sl){
+  if(!L.names)L.names=new Set(L.feats.map(f=>lc(f.n)));
   const anc=pfSlug(c.race), cls=pfSlug(c.cls), owned=new Set(c.pf.feats.map(x=>lc(x.name)));
   const picked=Object.keys(L.fp).filter(k=>k!==sl.id).map(k=>lc(L.fp[k]));
   return L.feats.filter(f=>f.lv<=L.nl&&(L.all||/^Pathfinder (Player Core|GM Core)/.test(f.src||""))&&(
@@ -6654,13 +6668,13 @@ function pfgBody(c,L){
   if(st==="boost")return `<p>Choose four different attributes. Each goes up by 1, or by half a step if it is already +4 or higher (two half steps make +1). ${L.boost.length} of 4 chosen.</p><div class="crgrid">${CRAB.map(k=>{const m=pfMod(c,k),part=c.pf.partial&&c.pf.partial[k];return luCardP("boost",k,crAbName(k),L.boost.includes(k),sgn(m)+(L.boost.includes(k)?" → "+(m>=4?(part?sgn(m+1):sgn(m)+" and a half"):sgn(m+1)):""))}).join("")}</div>`;
   if(st==="feats"){
     return `<label class="chk" style="margin-bottom:8px"><input type="checkbox" data-pluf="all"${L.all?" checked":""}>Show feats from every book (not only Player Core and GM Core)</label>`+L.slots.map(sl=>{
-      const all=pfgFeatOpts(c,L,sl), extra={feats:Object.values(L.fp),ski:L.ski}, q=lc(L.q[sl.id]||"");
+      const all=pfgFeatOpts(c,L,sl), extra={feats:Object.values(L.fp),ski:L.ski,names:L.names}, q=lc(L.q[sl.id]||"");
       const rows=all.map(f=>({f:f,pr:pfPreCheck(c,f,extra)})), ok=rows.filter(r=>r.pr.ok), hid=rows.length-ok.length;
       const shown=ok.filter(r=>!q||lc(r.f.n).includes(q)||(r.f.t||[]).some(t=>lc(t).includes(q))).slice(0,40);
       const pick=L.fp[sl.id], pf=pick&&L.feats.find(f=>f.n===pick);
       return `<h4>${esc(sl.label)}${pick?": "+esc(pick):""}</h4>
         <label class="fld"><span>Search ${esc(sl.label.toLowerCase())}s</span><input type="search" data-plusq="${esc(sl.id)}" value="${esc(L.q[sl.id]||"")}" placeholder="Name or trait"></label>
-        <div class="crgrid">${shown.map(({f,pr})=>luCardP("feat",sl.id+"|"+f.n,f.n,pick===f.n,"Level "+f.lv+(pr.text?" · needs "+pr.text+(pr.check?" (check)":""):""))).join("")||'<p class="hint">No feats match.</p>'}</div>
+        <div class="crgrid">${shown.map(({f,pr})=>luCardP("feat",sl.id+"|"+f.n,f.n,pick===f.n,"Level "+f.lv+(pr.text?" · requires "+pr.text+(pr.check?" (check this yourself)":""):""))).join("")||'<p class="hint">No feats match.</p>'}</div>
         ${pf?`<div class="crd"><p class="prose">${esc(String(pf.d||"").slice(0,700))}</p></div>`:""}
         <p class="hint">${ok.length>40&&!q?"Showing 40 of "+ok.length+". Search to find others. ":""}${hid?hid+" hidden because you do not meet their prerequisites.":""}</p>`;
     }).join("");
@@ -6691,7 +6705,7 @@ function pfgValid(c,L){
   const st=pfgSteps(c,L)[L.step];
   if(st==="ski"&&!L.ski)return "Choose a skill to raise.";
   if(st==="boost"&&L.boost.length<4)return "Choose four attributes ("+L.boost.length+" so far).";
-  if(st==="feats"){const miss=L.slots.filter(sl=>!L.fp[sl.id]&&pfgFeatOpts(c,L,sl).some(f=>pfPreCheck(c,f,{feats:Object.values(L.fp),ski:L.ski}).ok));if(miss.length)return "Choose your "+miss.map(sl=>sl.label.toLowerCase()).join(" and ")+".";}
+  if(st==="feats"){const miss=L.slots.filter(sl=>!L.fp[sl.id]&&pfgFeatOpts(c,L,sl).some(f=>pfPreCheck(c,f,{feats:Object.values(L.fp),ski:L.ski,names:L.names}).ok));if(miss.length)return "Choose your "+miss.map(sl=>sl.label.toLowerCase()).join(" and ")+".";}
   return "";
 }
 function pfgRender(c,keep){
@@ -6709,6 +6723,7 @@ function pfgRender(c,keep){
       <button class="btn" type="button" data-plu="back"${L.step?"":" disabled"}>Back</button>
       <button class="btn pri" type="button" data-plu="${last?"ok":"next"}"${L.busy||L.err?" disabled":""}>${last?"Level up":"Next"}</button></div></div>`;
   const sh=o.querySelector(".sheet"); if(sh)sh.scrollTop=keep?prev:0;
+  const on=o.querySelector(".crprog .on"); if(on&&on.parentNode)on.parentNode.scrollLeft=Math.max(0,on.offsetLeft-on.parentNode.offsetLeft-40);
 }
 function pfgApply(c,L){
   const snap=JSON.stringify(Object.assign({},c,{lvlHist:undefined}));
@@ -6727,7 +6742,7 @@ function pfgClick(c,b){
   const L=ui.lvl, a=b.dataset.plu, v=b.dataset.v; if(!L||!L.pfg)return;
   L.msg="";
   if(a==="cancel"){$("#lvlOv").hidden=true;ui.lvl=null;return}
-  if(a==="manual"){c.lvlMode="manual";save();$("#lvlOv").hidden=true;ui.lvl=null;renderSheet();showUndo("Levelling set to manual. Switch back on the Sheet section.",null);return}
+  if(a==="manual"){c.lvlMode="manual";save();$("#lvlOv").hidden=true;ui.lvl=null;renderSheet();showNote("Manual levelling is on. Switch back next to the Level box on the Sheet section.");return}
   if(a==="ski"){L.ski=L.ski===v?"":v;pfgRender(c,1);return}
   if(a==="boost"){const i=L.boost.indexOf(v);if(i>=0)L.boost.splice(i,1);else if(L.boost.length<4)L.boost.push(v);pfgRender(c,1);return}
   if(a==="feat"){const k=v.slice(0,v.indexOf("|")),n=v.slice(v.indexOf("|")+1);L.fp[k]=L.fp[k]===n?"":n;pfgRender(c,1);return}
@@ -7387,7 +7402,7 @@ function crStepClass(s){
     if(subs.length&&sl<=1){
       det+=`<h4>Subclass</h4><div class="crgrid">${subs.map(x=>crCard("subcls",x.name,x.name,s.subcls===x.name)).join("")}</div>`;
     }else if(subs.length)det+=`<p class="hint">You choose your ${esc(c.n)} subclass at level ${sl} with Level up.</p>`;
-    crOptGroups(s).forEach(g=>{const pk=(s.opts||{})[g.key]||[];det+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${g.opts.map(f=>crCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),String(f.desc||"").replace(/\s+/g," ").slice(0,70))).join("")}</div>`});
+    crOptGroups(s).forEach(g=>{const pk=(s.opts||{})[g.key]||[];det+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${g.opts.map(f=>crCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),luSnip(f))).join("")}</div>`});
   }
   return `${crSrcNote(L)}<div class="crgrid">${L.map(x=>crCard("cls",x.n,x.n,s.cls===x.n,"d"+(x.meta.hd||x.data.hd||"?")+(x.meta.sc?" \u00b7 caster":""))).join("")}</div>${det}`;
 }
@@ -8214,6 +8229,11 @@ document.addEventListener("touchend",()=>setTimeout(qrSync,60),{passive:true});
 const UNDOACT=/^(del-(char|camp|pick|fac|res|feat|spell|item|atk)|p-rest|rest-short|rest-long|rest|hp-full|p-dmg|p-heal|pf-del.*|cls-del)$/;
 let undoSnap=null, undoTimer=0;
 function toastBuild(){let t=$("#toast");if(!t){t=document.createElement("div");t.id="toast";t.setAttribute("role","status");t.hidden=true;document.body.appendChild(t)}return t}
+function showNote(msg){
+  const t=toastBuild(); undoSnap=null;
+  t.innerHTML=`<span>${esc(msg)}</span>`; t.hidden=false;
+  clearTimeout(undoTimer); undoTimer=setTimeout(()=>{t.hidden=true},5000);
+}
 function showUndo(msg,snap){
   const t=toastBuild(); undoSnap=snap;
   t.innerHTML=`<span>${esc(msg)}</span><button class="btn sm" type="button" data-act="undo">Undo</button>`; t.hidden=false;
