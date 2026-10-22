@@ -1970,7 +1970,7 @@ const fullAt=n=>FULLT[Math.max(0,Math.min(20,n))]||[];
 /* library: your own classes, spells, items and text, kept private to you */
 const LIBLS="character-ledger-lib-v1";
 function normLib(p){
-  const o={classes:[],spells:[],items:[],sections:[],packs:{},updated:num(p&&p.updated)};
+  const o={classes:[],spells:[],items:[],sections:[],packs:{},updated:num(p&&p.updated),splSig:String(p&&p.splSig||"")};
   ["classes","spells","items","sections"].forEach(k=>{if(p&&Array.isArray(p[k]))o[k]=p[k].filter(x=>x&&x.name!=null).map(x=>Object.assign({},x,{id:x.id||uid()}))});
   if(p&&p.packs&&typeof p.packs==="object"&&!Array.isArray(p.packs))Object.keys(p.packs).forEach(k=>{o.packs[k]={creator:!!(p.packs[k]&&p.packs[k].creator)}});
   return o;
@@ -2752,12 +2752,11 @@ function parseSpellLists(text,spellNames){
   const classes=SRDCLS.concat(arguments[2]||[]);
   L.forEach(raw=>{
     const s=raw.replace(/^\s*#+\s*/,"").trim(); if(!s)return;
-    const hm=s.match(/^([A-Z][A-Za-z' \-]{2,30}?)\s+SPELLS$/);
-    if(hm&&s===s.toUpperCase()){cls=lc(hm[1]);return}
+    const hm=s.match(/^([A-Za-z' \-]{2,30}?)\s+spell(?:s|\s+list)$/i);
+    if(hm&&(s===s.toUpperCase()||classes.map(lc).includes(lc(hm[1])))){cls=lc(hm[1]);return}
     if(/^[A-Z][A-Z \-]{5,}$/.test(s)&&!/SPELLS$/.test(s)){cls=null;return}
     if(!cls)return;
-    const nm=normName(s.replace(/\*+$/,""));
-    if(names.has(nm)){(map[cls]=map[cls]||new Set()).add(nm)}
+    s.replace(/^[^:]*(cantrip|level)[^:]*:\s*/i,"").split(/,|;/).forEach(part=>{const nm=normName(part.trim().replace(/\*+$/,""));if(names.has(nm)){(map[cls]=map[cls]||new Set()).add(nm)}});
   });
   return map;
 }
@@ -3286,8 +3285,8 @@ function profileCard(c){
   return `<section class="panel pcard"><button class="pc-port" type="button" data-act="tab" data-tab="details" aria-label="Edit portrait and details">${portAv(c,ini,av,"")}</button>
     <div class="pc-info"><div class="pc-lvl">${hex}<span>LEVEL<br><b>${lv}</b></span></div>
       <div class="pc-xp"><span>XP</span><label class="xpin"><input type="number" inputmode="numeric" data-t="n" data-f="${pf?"pf.xp":"xp"}" value="${esc(xp)}" aria-label="Experience points"> <small>${nxt?"/ "+nxt:"max"}</small></label><span class="hpbar" aria-hidden="true"><i style="width:${pct}%"></i></span></div>
-      <div class="pc-chips"><span class="tag">${esc(c.campaign?campName(c.campaign):"No campaign")}</span><span class="tag">${pf?"PF2e":c.rules==="2024"?"5.5e":"5e"}</span>${pf?"":`<span class="tag">${lvGuided(c)?"Guided":"Manual"}</span>`}</div>
-      ${pf||lv>=20?"":`<div class="pc-lvbtns"><button class="btn sm pri" type="button" data-act="lvl-start">Level up</button>${lvGuided(c)&&Array.isArray(c.lvlHist)&&c.lvlHist.length?`<button class="btn sm" type="button" data-act="lvl-undo">Undo level up</button>`:""}</div>`}</div></section>`;
+      <div class="pc-chips"><span class="tag">${esc(c.campaign?campName(c.campaign):"No campaign")}</span><span class="tag">${pf?"PF2e":c.rules==="2024"?"5.5e":"5e"}</span><span class="tag">${lvGuided(c)?"Guided":"Manual"}</span></div>
+      ${lv>=20?"":`<div class="pc-lvbtns"><button class="btn sm pri" type="button" data-act="lvl-start">Level up</button>${lvGuided(c)&&Array.isArray(c.lvlHist)&&c.lvlHist.length?`<button class="btn sm" type="button" data-act="lvl-undo">Undo level up</button>`:""}</div>`}</div></section>`;
 }
 function barHTML(c){
   const _tabs=[["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["more","More"]], _cur=MORE.includes(ui.tab)?"more":ui.tab;
@@ -3962,9 +3961,13 @@ document.addEventListener("click",e=>{
     } break;
     case "lib-open": openLib(); break;
     case "lib-close": closeLib(); break;
-    case "lib-tab": ui.lib.tab=b.dataset.tab; ui.lib.view=null; renderLib(); break;
+    case "lib-tab": ui.lib.tab=b.dataset.tab; ui.lib.view=null; ui.lib.spl=null; renderLib(); break;
     case "lib-view": ui.lib.view={i:num(b.dataset.i)}; renderLib(); {const o=$("#libOv");if(o)o.scrollTop=0} break;
     case "lib-vback": ui.lib.view=null; renderLib(); break;
+    case "lib-spl": ui.lib.spl={cls:"",q:"",only:false}; renderLib(); Promise.all([loadSpells("2014"),loadSpells("2024")]).then(()=>{if(ui.lib&&ui.lib.spl)renderLib()}).catch(()=>{}); break;
+    case "lib-spl-back": ui.lib.spl=null; renderLib(); break;
+    case "lib-spl-only": ui.lib.spl.only=!ui.lib.spl.only; renderLib(); break;
+    case "lib-spl-tog": libSplToggle(b.dataset.n); break;
     case "lib-vedit": {const L=ui.lib,x=L.view&&LIB.classes[L.view.i];if(x){L.view=null;L.tab="classes";L.kind="classes";L.editId=x.id;L.draft=draftFrom("classes",x);L.msg="";renderLib()}break;}
     case "lib-new": {const L=ui.lib;L.kind=L.tab;L.editId=null;L.draft=draftFrom(L.kind,null);L.msg="";renderLib();break;}
     case "lib-edit": {const L=ui.lib,x=LIB[L.tab][num(b.dataset.i)];if(x){L.kind=L.tab;L.editId=x.id;L.draft=draftFrom(L.kind,x);L.msg="";renderLib()}break;}
@@ -4342,7 +4345,9 @@ function libClassViewHTML(x){
   const SV=Object.fromEntries(ABIL), saves=(x.saves||[]).map(k=>SV[k]||k).join(", ");
   const facts=x.addOn?`Extra subclasses for ${esc(x.name)}`:[ "Hit die d"+(x.hd||"?"),saves?"Saves: "+saves:"",x.caster&&x.caster!=="none"?"Spellcasting ("+(x.ability||"").toUpperCase()+")":"" ].filter(Boolean).map(esc).join(" \u00b7 ");
   const feats=(x.features||[]).slice().sort((a,b)=>num(a.lvl)-num(b.lvl));
-  let h=`<div class="bar" style="margin:0"><h3 style="margin:0">${esc(x.name)}</h3><span class="status">${esc(x.source||"")}</span></div><p class="hint" style="margin:.2em 0 .8em">${facts}</p><div class="items">`;
+  const nOpt=(x.features||[]).concat(...(x.subclasses||[]).map(q=>q.features||[])).filter(f=>/:/.test(f.name||"")).length;
+  let h=`<div class="bar" style="margin:0"><h3 style="margin:0">${esc(x.name)}</h3><span class="status">${esc(x.source||"")}</span></div><p class="hint" style="margin:.2em 0 .4em">${facts}</p>
+    ${x.addOn?"":`<p class="hint" style="margin:0 0 .8em">${nOpt?nOpt+" options (named Feature: Option) are offered as choices in Level up. ":""}To change what Level up offers, tap Edit: a feature named like <b>Fighting Style: Archery</b> becomes one choice under Fighting Style, as long as Fighting Style's text says to choose. ${(x.spellList||[]).length?"Spell list: "+x.spellList.length+" spells. ":""}${x.caster&&x.caster!=="none"?"Edit which spells it can learn under Spells, Class spell lists.":""}</p>`}<div class="items">`;
   if(x.tableText)h+=`<details class="item cdet"><summary><span class="sum-t">Class table</span></summary><div class="ibody">${richHTML(x.tableText,0)}</div></details>`;
   if(x.info)h+=`<details class="item"><summary><span class="sum-t">About this class</span></summary><div class="ibody">${viewText(x.info,"")}</div></details>`;
   h+=`</div>`;
@@ -4364,7 +4369,7 @@ function libListHTML(kind){
     :{classes:"Add a class from a third-party book once and it works like an SRD class: pick it on the Sheet tab, apply its features, and get spell slots automatically.",
     spells:"Spells here show up in the D&D spell picker next to the SRD list.",items:"Items here show up in the D&D gear picker next to the SRD lists.",
     sections:"Feats, species, rules and other text. Add any entry to a character as a feature."}[kind];
-  const head=`<p>${intro}</p><div class="btns"><button class="btn pri" type="button" data-act="lib-new">New ${LIBKIND[kind]}</button></div>`;
+  const head=`<p>${intro}</p><div class="btns"><button class="btn pri" type="button" data-act="lib-new">New ${LIBKIND[kind]}</button>${kind==="spells"&&!pf?`<button class="btn" type="button" data-act="lib-spl">Class spell lists</button>`:""}</div>`;
   const rows=[]; A.forEach((x,i)=>{if(sysOf(x)===L.sys)rows.push([x,i])});
   if(!rows.length)return head+`<div class="empty">Nothing here yet. Create one by hand${pf?"":" or use the Import tab"}.</div>`;
   return head+`<div class="items">`+rows.map(([x,i])=>`<div class="prow"><div class="pmain"><div class="plink"><b>${esc(x.name)}</b><span>${esc(libMeta(kind,x))}</span></div>
@@ -4446,6 +4451,8 @@ function renderLib(){
       <div class="btns"><button class="btn pri" type="button" data-act="lib-save">Save to library</button><button class="btn" type="button" data-act="lib-cancel">Cancel</button></div>`;
   }else if(!pf&&L.view&&LIB.classes[L.view.i]){
     body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-vback">Back to classes</button><button class="btn sm" type="button" data-act="lib-vedit">Edit</button></div>`+libClassViewHTML(LIB.classes[L.view.i]);
+  }else if(!pf&&L.spl){
+    body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-spl-back">Back to spells</button></div>`+libSplHTML();
   }else body=L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():L.tab==="sources"?libSourcesHTML():L.tab==="review"?libReviewHTML():libListHTML(L.tab);
   ov.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="libT">
     <div class="bar" style="margin:0"><h2 id="libT">Library</h2><span class="status" id="libStatus">${esc(libStatusText())}</span><button class="btn sm pri" type="button" data-act="lib-close">Done</button></div>
@@ -4454,6 +4461,41 @@ function renderLib(){
     ${edBar}
     ${L.draft||L.view?"":`<div class="tabs" role="tablist" style="flex-wrap:wrap;overflow:visible">${tabs.map(t=>`<button class="tab" role="tab" type="button" data-act="lib-tab" data-tab="${t[0]}" aria-selected="${L.tab===t[0]}">${t[1]}</button>`).join("")}</div>`}
     ${body}</div>`;
+}
+/* which spells are on a class's list: Library classes keep a list of names; Library spells name their classes */
+function splOn(cls,sp){
+  const x=libClass(cls), k=lc(sp.n);
+  if((sp.cl||[]).some(n=>lc(n)===lc(cls)))return true;
+  if(x&&((x.spellList||[]).some(n=>lc(n)===k)||(sp.cl||[]).some(n=>(x.spellFrom||[]).includes(lc(n)))))return true;
+  return false;
+}
+function libSplHTML(){
+  const L=ui.lib, S2=L.spl, cls=dndLib("classes").filter(x=>!x.addOn).map(x=>x.name).concat(SRDCLASSES).filter((n,i,a)=>a.findIndex(m=>lc(m)===lc(n))===i);
+  if(!S2.cls)S2.cls=(dndLib("classes").find(x=>!x.addOn)||{name:"Wizard"}).name;
+  const x=libClass(S2.cls), srd=!x;
+  const all=spellList("2024").concat(SPELLDATA["2014"]||[]).filter((a,i,arr)=>arr.findIndex(b=>lc(b.n)===lc(a.n))===i);
+  const q=lc(S2.q||"");
+  let rows=all.filter(sp=>(!q||lc(sp.n).includes(q))&&(!S2.only||splOn(S2.cls,sp))).sort((a,b)=>a.l-b.l||a.n.localeCompare(b.n));
+  const count=all.filter(sp=>splOn(S2.cls,sp)).length, more=rows.length>120; rows=rows.slice(0,120);
+  return `<h3>Class spell lists</h3>
+    <p>Choose which spells a class can learn. Level up and the character creator offer spells from these lists. ${srd?"For a built-in class you can add your Library spells; its SRD spells are already on the list.":"For an imported class you can add any spell, from your Library or the SRD."}</p>
+    <div class="igrid"><label class="fld"><span>Class</span><select data-splf="cls">${cls.map(n=>`<option${lc(n)===lc(S2.cls)?" selected":""}>${esc(n)}</option>`).join("")}</select></label>
+      <label class="fld"><span>Search spells</span><input type="search" data-splf="q" value="${esc(S2.q||"")}" placeholder="Spell name"></label></div>
+    <div class="btns"><button class="btn sm${S2.only?" pri":""}" type="button" data-act="lib-spl-only" aria-pressed="${!!S2.only}">Only spells on this list (${count})</button>${x&&x.spellFrom&&x.spellFrom.length?`<span class="hint" style="margin:0">Also uses the ${x.spellFrom.map(titleCase).join(" and ")} list.</span>`:""}</div>
+    ${SPELLDATA["2014"]&&SPELLDATA["2024"]?"":`<p class="hint">Loading SRD spells...</p>`}
+    <div class="items">${rows.map(sp=>{const on=splOn(S2.cls,sp),fixed=srd?!sp.lib:(!!(sp.cl||[]).some(n=>(x.spellFrom||[]).includes(lc(n)))&&!sp.lib);
+      return `<div class="prow"><div class="pmain"><div class="plink"><b>${esc(sp.n)}</b><span>${esc([sp.l===0?"Cantrip":"Level "+sp.l,sp.s,sp.lib?"Library":"SRD"].filter(Boolean).join(" \u00b7 "))}</span></div>
+        ${fixed?`<span class="tag">${on?"On the list":"Not on the list"}</span>`:`<button class="btn sm${on?" pri":""}" type="button" data-act="lib-spl-tog" data-n="${esc(sp.n)}" aria-pressed="${on}">${on?"On the list":"Add"}</button>`}</div></div>`}).join("")||`<div class="empty">No spells match.</div>`}</div>
+    ${more?`<p class="hint">Showing the first 120. Search to narrow the list.</p>`:""}`;
+}
+function libSplToggle(name){
+  const S2=ui.lib.spl, x=libClass(S2.cls), k=lc(name), sp=LIB.spells.find(q=>sysOf(q)==="dnd5e"&&lc(q.name)===k);
+  const on=splOn(S2.cls,spellList("2024").concat(SPELLDATA["2014"]||[]).find(q=>lc(q.n)===k)||{n:name,cl:sp?sp.classes:[]});
+  if(x){
+    x.spellList=(x.spellList||[]).filter(n=>lc(n)!==k); if(!on)x.spellList.push(name);
+  }
+  if(sp){sp.classes=(sp.classes||[]).filter(n=>lc(n)!==lc(S2.cls)); if(!on)sp.classes.push(x?x.name:S2.cls)}
+  saveLib(); renderLib();
 }
 function libDraftInput(t){
   const L=ui.lib; if(!L||!L.draft)return;
@@ -5308,7 +5350,7 @@ function playClick(c,b){
    offer exactly what the class (SRD or Library) gives at that level. Manual: levels and features are edited by hand.
    Both modes work the same way for built-in and imported content. */
 const ASI=[4,8,12,16,19];
-const lvGuided=c=>!!c&&!isPf(c)&&c.lvlMode!=="manual";
+const lvGuided=c=>!!c&&c.lvlMode!=="manual";
 const LUWORD={a:1,an:1,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8};
 const luWordNum=w=>LUWORD[lc(w)]||num(w,0);
 const luCount=(t,d)=>{const m=String(t||"").match(/\b(?:choose|select|learn|gain|pick)\s+(a|an|one|two|three|four|five|six|\d)\b/i);return m?luWordNum(m[1]):d};
@@ -5323,7 +5365,7 @@ function luTable(x){
 }
 const luRow=(T,l)=>{for(let k=Math.min(20,l);k>=1;k--)if(T.rows[k])return T.rows[k];return null};
 /* Work out creator / level-up data for an imported class the same way the SRD classes have it */
-function libMeta(x){
+function libClassMeta(x){
   x=x||{};
   const m={hd:num(x.hd,8),saves:(x.saves||[]).map(k=>lc(k).slice(0,3)),abil:lc(x.ability||"").slice(0,3)};
   const trait=(x.features||[]).filter(f=>num(f.lvl)<=1&&/class traits|hit points|proficienc|equipment/i.test(f.name+" "+String(f.desc||"").slice(0,200))).map(f=>f.desc||"").join("\n");
@@ -5374,7 +5416,7 @@ function libMeta(x){
 async function luMeta(c,name){
   try{await crLoad5()}catch(e){}
   const lib=libClass(name);
-  if(lib)return libMeta(lib);
+  if(lib)return libClassMeta(lib);
   const ed=luEd(c), T=CRD.c&&CRD.c[ed]||{}, k=Object.keys(T).find(n=>lc(n)===lc(name))||Object.keys((CRD.c&&CRD.c[ed==="2024"?"2014":"2024"])||{}).find(n=>lc(n)===lc(name));
   return k?Object.assign({},T[k]||CRD.c[ed==="2024"?"2014":"2024"][k]):{};
 }
@@ -5414,6 +5456,35 @@ function luGroupCount(g,parent,meta,L){
   return luCount(parent&&parent.desc,1);
 }
 const luOwns=(c,name)=>c.features.some(f=>lc(f.name)===lc(name));
+/* prerequisites: the SRD warlock invocations (the SRD data leaves them out) and "Prerequisite:" lines in any imported option or feat */
+const LUPRE={"agonizing blast":{sp:"eldritch blast"},"ascendant step":{l:9},"bewitching whispers":{l:7},"book of ancient secrets":{ft:"pact of the tome"},"chains of carceri":{l:15,ft:"pact of the chain"},"dreadful word":{l:7},"eldritch spear":{sp:"eldritch blast"},"lifedrinker":{l:12,ft:"pact of the blade"},"master of myriad forms":{l:15},"minions of chaos":{l:9},"mire the mind":{l:5},"one with shadows":{l:5},"otherworldly leap":{l:9},"repelling blast":{sp:"eldritch blast"},"sculptor of flesh":{l:7},"sign of ill omen":{l:5},"thirsting blade":{l:5,ft:"pact of the blade"},"visions of distant realms":{l:15},"voice of the chain master":{ft:"pact of the chain"},"whispers of the grave":{l:9},"witch sight":{l:15}};
+function luPreText(f){const m=String(f&&(f.desc||f.d)||"").match(/(?:^|\n)\s*\*{0,2}Prerequisites?\*{0,2}\s*[:.]\s*([^\n]+)/i);return m?m[1].trim().replace(/\.$/,""):""}
+function luPreCheck(c,f,lvl,extra){
+  const nm=lc(String(f.name||f.n||"").replace(/^[^:]+:\s*/,"")), ex=(extra||[]).map(x=>lc(x).replace(/^[^:]+:\s*/,""));
+  const have=n=>{n=lc(n).replace(/^(the|a|an)\s+/,"");return c.features.some(x=>lc(x.name).replace(/^[^:]+:\s*/,"")===n||lc(x.name)===n)||ex.includes(n)};
+  const spell=n=>{n=lc(n).replace(/^(the|a|an)\s+/,"");return c.spells.some(x=>lc(x.name)===n)||ex.includes(n)};
+  const casts=()=>c.spells.length>0||calcSlots(c).any;
+  const why=[], txt=luPreText(f), T=!txt&&LUPRE[nm];
+  if(T){
+    if(T.l&&lvl<T.l)why.push("level "+T.l); if(T.ft&&!have(T.ft))why.push(titleCase(T.ft)); if(T.sp&&!spell(T.sp))why.push("the "+T.sp+" cantrip");
+    return {ok:!why.length,why:why,text:[T.l?"level "+T.l:"",T.ft?titleCase(T.ft):"",T.sp?"the "+T.sp+" cantrip":""].filter(Boolean).join(", ")};
+  }
+  if(!txt)return {ok:true,why:why,text:""};
+  let check=false;
+  txt.split(/,|;|\band\b/i).map(x=>x.trim()).filter(Boolean).forEach(p=>{
+    let m;
+    if((m=p.match(/(\d+)(?:st|nd|rd|th)?[- ]level|level\s*(\d+)/i))){const n=num(m[1]||m[2]);if(lvl<n)why.push("level "+n);return}
+    if((m=p.match(/\b(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+(\d+)/i))){const k=m[1].slice(0,3).toLowerCase();if(num(c.abilities[k])<num(m[2]))why.push(m[1]+" "+m[2]);return}
+    if(/spellcast|ability to cast|cast at least one spell|pact magic/i.test(p)&&!/feature$/i.test(p)){if(!casts())why.push("spellcasting");return}
+    if((m=p.match(/^(?:the\s+)?(.+?)\s+(?:cantrip|spell)$/i))){if(!spell(m[1]))why.push(m[1]);return}
+    if((m=p.match(/^(?:the\s+)?(.+?)\s+feature$/i))){const alts=m[1].split(/\s+or\s+/i);if(!alts.some(a=>have(a)||(/spellcasting|pact magic/i.test(a)&&casts())))why.push(m[1]);return}
+    if(have(p)||lc(c.race).includes(lc(p))||lc(c.species||"").includes(lc(p))||(c.classes||[]).some(r=>lc(r.name)===lc(p)||lc(r.sub)===lc(p)))return;
+    check=true;
+  });
+  return {ok:!why.length,why:why,text:txt,check:check};
+}
+const luPreLine=pr=>pr.ok?(pr.text?"Prerequisite: "+pr.text+(pr.check?" (check this yourself)":""):""):"Needs "+pr.why.join(", ");
+const luSnip=f=>String(f.desc||f.d||"").replace(/(?:^|\n)\s*\*{0,2}Prerequisites?[^\n]*/i,"").replace(/\s+/g," ").trim().slice(0,70);
 const luOwnsIn=(c,g)=>c.features.filter(f=>g.names.has(lc(f.name))).length;
 /* everything a level brings: built from whatever class data exists (SRD, Library, add-on subclasses) */
 async function luPlan(c,sel){
@@ -5466,9 +5537,9 @@ function luSteps(c,L){
   if(L.P&&L.P.subDue)s.push("sub");
   s.push("feat");
   const D=L.D;
+  if(L.goal&&(L.goal.newC>0||L.goal.newS>0))s.push("spells");
   if(D&&(D.groups.length||D.exp||D.style))s.push("choice");
   if(D&&(D.asi||D.boon))s.push("asi");
-  if(L.goal&&(L.goal.newC>0||L.goal.newS>0))s.push("spells");
   s.push("rev");
   return s;
 }
@@ -5481,7 +5552,8 @@ async function luSpellsPrep(c,L){
   try{await loadSpells(luEd(c))}catch(e){}
   const have=new Set(c.spells.map(s=>lc(s.name)));
   const ed=luEd(c), all=spellList(ed).filter(x=>(!x.ed||x.ed===ed||x.lib)).filter((x,i,arr)=>arr.findIndex(y=>lc(y.n)===lc(x.n))===i);
-  let list=all.filter(x=>(x.cl||[]).some(n=>lc(n)===lc(P.cls)));
+  const lcx=libClass(P.cls), onList=new Set(((lcx&&lcx.spellList)||[]).map(lc)), from=((lcx&&lcx.spellFrom)||[]).map(lc);
+  let list=all.filter(x=>(x.cl||[]).some(n=>lc(n)===lc(P.cls)||from.includes(lc(n)))||onList.has(lc(x.n)));
   const sdn=L.sub||P.sub; if(sdn)all.filter(x=>(x.cl||[]).some(n=>lc(n)===lc(sdn))).forEach(x=>{if(!list.includes(x))list.push(x)});
   L.spellAll=!list.length; if(!list.length)list=all;
   L.goal={newC:newC,newS:newS,maxl:Math.max(1,b.maxl),book:b.book,ab:ab,
@@ -5490,6 +5562,7 @@ async function luSpellsPrep(c,L){
   if(!b.maxl)L.goal.newS=0;
 }
 async function luFeatList(c,L){
+  L.featHidden=0;
   try{await crLoad5()}catch(e){}
   try{libEnrich()}catch(e){}
   const ed=luEd(c), tot=totalDice(c)+1, owned=new Set(c.features.map(f=>lc(f.name)));
@@ -5497,7 +5570,8 @@ async function luFeatList(c,L){
     if(ed==="2024"&&lc(f.n)==="ability score improvement")return false;
     if(owned.has(lc(f.n))&&!/repeat/i.test(f.d||""))return false;
     if(num(f.lv)>tot)return false;
-    const pre=f.pre||{}; if(Object.keys(pre).some(k=>CRAB.includes(k)&&num(c.abilities[k])<num(pre[k])))return false;
+    const pre=f.pre||{}; if(Object.keys(pre).some(k=>CRAB.includes(k)&&num(c.abilities[k])<num(pre[k]))){L.featHidden=(L.featHidden||0)+1;return false}
+    if(!luPreCheck(c,{name:f.n,desc:f.d},tot).ok){L.featHidden=(L.featHidden||0)+1;return false}
     if(L.mode==="boon")return ed==="2024"?f.t==="epic-boon":true;
     if(ed==="2024")return f.t==="general"||f.t==="origin"||(f.t==="epic-boon"&&tot>=19);
     return f.t!=="fighting-style"&&f.t!=="epic-boon";
@@ -5585,7 +5659,9 @@ function luBody(c,L){
     let h="";
     D.groups.forEach(g=>{
       const pk=L.picks[g.key]||[];
-      h+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${g.opts.map(f=>luCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),String(f.desc||"").replace(/\s+/g," ").slice(0,70))).join("")}</div>`;
+      const ex=Object.values(L.picks).flat().filter(n=>!pk.includes(n)).concat(L.sp.c,L.sp.s);
+      const rows=g.opts.map(f=>({f:f,pr:luPreCheck(c,f,P.nl,ex)})), locked=rows.filter(r=>!r.pr.ok).length;
+      h+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${rows.map(({f,pr})=>luCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),luPreLine(pr)||luSnip(f),!pr.ok&&!pk.includes(f.name))).join("")}</div>${locked?`<p class="hint">${locked} greyed out because you do not meet their prerequisites yet.</p>`:""}`;
     });
     if(D.style){const S=luStyleFeats(c);h+=`<h4>Fighting Style feat</h4><div class="crgrid">${S.map(f=>luCard("style",f.n,f.n,L.style===f.n,String(f.d||"").replace(/\s+/g," ").slice(0,70))).join("")||'<p class="hint">No Fighting Style feats found. Turn on a source in Library, Sources, or add one later.</p>'}</div>`}
     if(D.exp){
@@ -5603,7 +5679,9 @@ function luBody(c,L){
       ${A.k==="feat"?`<label class="fld"><span>Feat</span>${luSel("f",A.f,F.map(f=>[f.n,f.n+(f.src&&f.src!=="SRD"?" ("+f.src+")":"")]),"Choose a feat")}</label>
         ${fdef?`<div class="crd"><p class="prose">${esc(String(fdef.d||"").slice(0,900))}</p></div>`:""}
         ${fab.length?`<label class="fld"><span>This feat also raises one ability by 1</span>${luSel("fa",A.fa,fab.filter(k=>num(tot[k])<20).map(k=>[k,crAbName(k)]),"Choose")}</label>`:""}
-        ${F.length?"":`<p class="hint">No feats found that you qualify for. Turn on more sources in Library, Sources.</p>`}`
+        ${F.length?"":`<p class="hint">No feats found that you qualify for. Turn on more sources in Library, Sources.</p>`}
+        ${L.featHidden?`<p class="hint">${L.featHidden} feat${L.featHidden===1?" is":"s are"} not listed because you do not meet ${L.featHidden===1?"its":"their"} prerequisites yet.</p>`:""}
+        ${fdef&&luPreText({d:fdef.d})?`<p class="hint">Prerequisite: ${esc(luPreText({d:fdef.d}))}</p>`:""}`
       :`<div class="igrid"><label class="fld"><span>${A.k==="asi2"?"Ability":"First ability"}</span>${luSel("a",A.a,CRAB.filter(k=>num(tot[k])<20).map(k=>[k,crAbName(k)+" ("+num(tot[k])+")"]),"Choose")}</label>
         ${A.k==="asi11"?`<label class="fld"><span>Second ability</span>${luSel("b",A.b,CRAB.filter(k=>k!==A.a&&num(tot[k])<20).map(k=>[k,crAbName(k)+" ("+num(tot[k])+")"]),"Choose")}</label>`:""}</div>`}
       <p class="hint">${CRAB.map(k=>k.toUpperCase()+" "+prev(k)).join(" · ")}. Scores cannot go above 20.</p>`;
@@ -5611,7 +5689,7 @@ function luBody(c,L){
   if(st==="spells"){
     const g=L.goal, chip=(x,key)=>luCard("sp"+key,x.n,x.n,L.sp[key].includes(x.n),(x.l?"L"+x.l+" · ":"")+(x.s||"")+(x.lib?" · Library":""));
     return `<p>${g.newC?"New cantrips: <b>"+L.sp.c.length+"</b> of "+g.newC+". ":""}${g.newS?(g.book?"Spells for your spellbook":"New spells")+": <b>"+L.sp.s.length+"</b> of "+g.newS+" (up to level "+g.maxl+").":""}</p>
-      ${L.spellAll?`<p class="hint">No spell list for ${esc(P.cls)} was found, so every spell is shown. Library spells list their classes under Library, Spells.</p>`:""}
+      ${L.spellAll?`<p class="hint">No spell list for ${esc(P.cls)} was found, so every spell is shown. To fix this, open Library, Spells, Class spell lists and add spells to ${esc(P.cls)}.</p>`:""}
       <div class="btns"><button class="btn sm" type="button" data-lu="spauto">Pick for me</button></div>
       ${g.newC?`<h4>Cantrips</h4><div class="crgrid">${g.can.map(x=>chip(x,"c")).join("")}</div>`:""}
       ${g.newS?`<h4>Spells</h4><div class="crgrid">${g.sp.map(x=>chip(x,"s")).join("")}</div>`:""}
@@ -5643,7 +5721,7 @@ function luValid(c,L){
   if(st==="cls")return !P?"Choose a class.":(!P.d&&P.err&&L.sel.i<0)?P.err:"";
   if(st==="sub")return L.sub?"":"Choose a subclass.";
   if(st==="choice"){
-    for(const g of D.groups){if((L.picks[g.key]||[]).length<g.n)return "Choose "+g.n+" for "+g.name+".";}
+    for(const g of D.groups){const okN=g.opts.filter(f=>luPreCheck(c,f,P.nl,Object.values(L.picks).flat()).ok).length;const need=Math.min(g.n,okN);if((L.picks[g.key]||[]).length<need)return "Choose "+need+" for "+g.name+".";}
     if(D.style&&luStyleFeats(c).length&&!L.style)return "Choose a Fighting Style feat.";
     if(D.exp&&SKILLS.some(s=>num(c.skills[s[0]])===1)&&L.exp.length<Math.min(D.exp,SKILLS.filter(s=>num(c.skills[s[0]])===1).length))return "Choose "+D.exp+" skills for Expertise.";
     return "";
@@ -5681,7 +5759,7 @@ function luAutoPick(c,L){
   if(P.subDue&&!L.sub&&P.subs.length){L.sub=crPick(P.subs).name;L.D=luDetail(c,P,L)}
   const d2=L.D;
   if(d2){
-    d2.groups.forEach(g=>{L.picks[g.key]=crShuffle(g.opts).slice(0,g.n).map(f=>f.name)});
+    d2.groups.forEach(g=>{L.picks[g.key]=crShuffle(g.opts.filter(f=>luPreCheck(c,f,P.nl,Object.values(L.picks).flat()).ok)).slice(0,g.n).map(f=>f.name)});
     if(d2.style){const S=luStyleFeats(c);if(S.length)L.style=crPick(S).n}
     if(d2.exp){L.exp=crShuffle(SKILLS.filter(s=>num(c.skills[s[0]])===1).map(s=>s[0])).slice(0,d2.exp)}
     if(d2.asi||d2.boon){const pri=(CRPRI[P.cls]||[]).concat(CRAB).filter(k=>num(c.abilities[k])<20);
@@ -5842,7 +5920,7 @@ document.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]"); if(!b)return;
   const c=cur(), a=b.dataset.act;
   if(a==="cls-lvl"&&c){openLevelUp(c,num(b.dataset.i));return}
-  if(a==="lvl-start"&&c){if(isPf(c)){openPfLevelUp(c);return}openLevelUp(c,null);return}
+  if(a==="lvl-start"&&c){if(isPf(c)){lvGuided(c)?openPfGuided(c):openPfLevelUp(c);return}openLevelUp(c,null);return}
   if(a==="lvl-undo"&&c){if(luUndo(c))showUndo("Last level up undone.",null);return}
   if(a==="lvl-reset"&&c){if(confirm("Take "+(c.name||"this character")+" back to level 1 in their first class? Class features above level 1, extra classes and level-up feats are removed and hit points are reset. Ability scores and spells stay as they are. You can undo this."))luReset(c);return}
   if(a==="lvl-modeset"&&c){c.lvlMode=b.dataset.v==="manual"?"manual":"guided";save();renderSheet();return}
@@ -5947,7 +6025,7 @@ function renderPfDetails(c){
       <label class="fld"><span>Background</span><input data-f="background" type="text" list="pfBgList" value="${esc(c.background)}"></label>
       <label class="fld"><span>Class</span><input data-f="cls" type="text" list="pfClsList" value="${esc(c.cls)}"></label>
       <label class="fld"><span>Subclass or path</span><input data-f="subclass" type="text" value="${esc(c.subclass)}"></label>
-      <label class="fld"><span>Level</span><input type="number" inputmode="numeric" min="1" max="20" data-t="n" data-f="level" value="${esc(c.level)}"></label>
+      <label class="fld"><span>Level${lvGuided(c)?" (use Level up)":""}</span><input type="number" inputmode="numeric" min="1" max="20" data-t="n" data-f="level" value="${esc(c.level)}"${lvGuided(c)?" readonly":""}></label>
       <label class="fld"><span>XP (level up at 1000)</span><input type="number" inputmode="numeric" data-t="n" data-f="pf.xp" value="${esc(p.xp)}"></label>
       <label class="fld"><span>Player name</span><input data-f="pf.player" type="text" value="${esc(p.player)}"></label>
       <label class="fld"><span>Deity or philosophy</span><input data-f="pf.deity" type="text" value="${esc(p.deity)}"></label>
@@ -5958,6 +6036,9 @@ function renderPfDetails(c){
     </div>
     <div class="btns" style="margin-top:12px"><button class="btn sm" type="button" data-act="pf-apply" data-w="class">Apply class</button><button class="btn sm" type="button" data-act="pf-apply" data-w="ancestry">Apply ancestry</button><button class="btn sm" type="button" data-act="pf-apply" data-w="background">Apply background</button>
       <button class="btn sm" type="button" data-act="pf-autohp">Recalculate max HP</button><button class="btn sm pri" type="button" data-act="pf-levelup">Level up</button></div>
+    <div class="lvmode" style="margin-top:12px"><span class="lvlbl">Levelling</span><div class="seg" role="group" aria-label="Levelling mode"><button class="btn sm${lvGuided(c)?" pri":""}" type="button" data-act="lvl-modeset" data-v="guided" aria-pressed="${lvGuided(c)}">Guided</button><button class="btn sm${lvGuided(c)?"":" pri"}" type="button" data-act="lvl-modeset" data-v="manual" aria-pressed="${!lvGuided(c)}">Manual</button></div>
+      <p class="hint">${lvGuided(c)?"Level up walks you through hit points, class features, skill increases, attribute boosts, feats and spells for the new level. The Level box is locked.":"Type the level yourself and add feats on the Feats section. Level up only adds hit points and class features."}</p>
+      ${lvGuided(c)&&Array.isArray(c.lvlHist)&&c.lvlHist.length?`<div class="btns"><button class="btn sm" type="button" data-act="lvl-undo">Undo last level up</button></div>`:""}</div>
     <div class="msg" id="pfMsg" role="status"></div>
     <p class="hint">Type a class, ancestry or background from the Pathfinder list and use Apply to fill in what it grants: key ability, hit points, proficiencies and features. Enter your ability modifiers yourself (your boosts and flaws already added up).</p></section>
 
@@ -6496,6 +6577,175 @@ function pfLevelDone(c){
   if(L.d)(L.d.f||[]).filter(f=>num(f.lvl)===L.nl).forEach(f=>pfAddFeat(c,{n:f.name,lvl:f.lvl,d:f.desc,src:L.d.n},"classfeature"));
   $("#lvlOv").hidden=true; ui.lvl=null; save(); renderSheet();
 }
+/* ----- Pathfinder 2e: guided level up (the same Guided/Manual switch as 5e) ----- */
+const PFSTEP={hp:"Hit points",feat:"Class features",ski:"Skill increase",boost:"Attribute boosts",feats:"Feats",spells:"Spells",rev:"Review"};
+const pfSlug=n=>lc(n).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const pfRankCap=l=>l>=15?4:l>=7?3:2;
+function pfPreCheck(c,f,extra){
+  const txt=String(f.pre||"").trim(); if(!txt)return {ok:true,why:[],text:""};
+  const owned=new Set(c.pf.feats.map(x=>lc(x.name)).concat((extra&&extra.feats)||[]).map(lc));
+  const rank=id=>Math.max(num(c.pf.skills[id]),extra&&extra.ski===id?num(c.pf.skills[id])+1:0);
+  const why=[]; let check=false;
+  txt.split(/;/).map(x=>x.trim()).filter(Boolean).forEach(p=>{
+    let m;
+    if((m=p.match(/^(trained|expert|master|legendary) in (.+)$/i))){
+      const need=["trained","expert","master","legendary"].indexOf(lc(m[1]))+1;
+      if(/at least one skill/i.test(m[2])){if(!PFSKILLS.some(s=>rank(s[0])>=need))why.push(p);return}
+      const alts=m[2].split(/,\s*(?:or\s+)?|\s+or\s+/i).map(x=>x.trim()).filter(Boolean);
+      const ok=alts.some(a=>{const sk=PFSKILLS.find(s=>lc(s[1])===lc(a));if(sk)return rank(sk[0])>=need;if(/lore$/i.test(a)){check=true;return (c.pf.lores||[]).some(l=>lc(l.name||l.n||"").includes(lc(a.replace(/\s*lore$/i,"")))&&num(l.rank)>=need)}check=true;return true});
+      if(!ok)why.push(p);return;
+    }
+    if((m=p.match(/^(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s*\+?(\d)/i))){const k=m[1].slice(0,3).toLowerCase();if(pfMod(c,k)<num(m[2]))why.push(p);return}
+    if(/spellcasting class feature|ability to cast spells/i.test(p)){if(!(c.pf.cast&&c.pf.cast.kind)&&!c.pf.spells.length)why.push(p);return}
+    const nm=lc(p.replace(/\s+(feat|class feature|feature)$/i,""));
+    if(owned.has(nm)||owned.has(lc(p)))return;
+    if(c.pf.feats.some(x=>lc(x.name).includes(nm)))return;
+    check=true;
+  });
+  return {ok:!why.length,why:why,text:txt,check:check};
+}
+async function openPfGuided(c,opt){
+  if(pfLvl(c)>=20){pfSay("Already at level 20.",true);return}
+  const L={pfg:1,step:0,busy:true,fp:{},q:{},ski:"",boost:[],sp:[],all:false,msg:""};
+  ui.lvl=L; $("#lvlOv").hidden=false; pfgRender(c);
+  try{
+    const [cls,feats,spells]=await Promise.all([pfLoad("classes"),pfLoad("feats"),pfLoad("spells")]);
+    L.d=cls.find(x=>lc(x.n)===lc(c.cls))||null; L.feats=feats; L.spells=spells;
+  }catch(e){L.err="The Pathfinder data could not be loaded here."}
+  const nl=pfLvl(c)+1; L.nl=nl;
+  L.gain=Math.max(1,num(c.pf.classHp)+pfMod(c,"con"));
+  L.cf=L.d?(L.d.f||[]).filter(f=>num(f.lvl)===nl):[];
+  L.slots=L.d?pfPlanSlots(L.d)(nl).map(([cat,label],i)=>({id:cat+":"+i,cat:cat,label:label})):[];
+  L.ski=""; L.hasSki=!!(L.d&&L.d.lvl&&(L.d.lvl.ski||[]).includes(nl));
+  L.hasBoost=[5,10,15,20].includes(nl);
+  const cast=c.pf.cast||{}, d=L.d;
+  L.spN=0;
+  if(d&&d.sc&&d.n!=="Champion"&&cast.kind){
+    const rk=l=>{const o={};for(let r=1;r<=9;r++){const n=l>=2*r?3:l===2*r-1?2:0;if(n)o[r]=n}if(l>=19)o[10]=1;return o};
+    const a=rk(nl-1), b=rk(nl); L.newSlots=b; L.maxRank=Math.max(0,...Object.keys(b).map(Number));
+    if(cast.kind==="spontaneous")L.spN=Object.keys(b).reduce((t,r)=>t+Math.max(0,b[r]-num(a[r])),0);
+    else if(/wizard|witch|magus/i.test(d.n))L.spN=2;
+  }
+  L.busy=false; pfgRender(c);
+}
+function pfgSteps(c,L){
+  const s=["hp"]; if(L.cf&&L.cf.length)s.push("feat"); if(L.hasSki)s.push("ski"); if(L.hasBoost)s.push("boost"); if(L.slots&&L.slots.length)s.push("feats"); if(L.spN)s.push("spells"); s.push("rev"); return s;
+}
+function pfgFeatOpts(c,L,sl){
+  const anc=pfSlug(c.race), cls=pfSlug(c.cls), owned=new Set(c.pf.feats.map(x=>lc(x.name)));
+  const picked=Object.keys(L.fp).filter(k=>k!==sl.id).map(k=>lc(L.fp[k]));
+  return L.feats.filter(f=>f.lv<=L.nl&&(L.all||/^Pathfinder (Player Core|GM Core)/.test(f.src||""))&&(
+    sl.cat==="ancestry"?f.cat==="ancestry"&&(f.t||[]).includes(anc):
+    sl.cat==="class"?f.cat==="class"&&(f.t||[]).includes(cls):
+    sl.cat==="skill"?f.cat==="skill":
+    f.cat==="general"||f.cat==="skill")&&(!owned.has(lc(f.n))||/more than once/i.test(f.d||""))&&!picked.includes(lc(f.n)))
+    .sort((a,b)=>b.lv-a.lv||a.n.localeCompare(b.n));
+}
+function pfgBody(c,L){
+  if(L.busy)return `<p>Loading Pathfinder data...</p>`;
+  if(L.err)return `<p class="msg err">${esc(L.err)}</p>`;
+  const st=pfgSteps(c,L)[L.step], d=L.d;
+  if(st==="hp")return `<p class="lubig">+${L.gain} HP</p><p>Class HP ${num(c.pf.classHp)} plus Constitution ${sgn(pfMod(c,"con"))}. Max HP goes from ${num(c.hpMax)} to ${num(c.hpMax)+L.gain}.</p>${d?"":`<p class="hint">Your class "${esc(c.cls)}" was not found in the Pathfinder data, so only hit points can be added. Check the class name on the Sheet.</p>`}`;
+  if(st==="feat")return `<p>These are added to your Feats section.</p><div class="items">${L.cf.map(f=>luFeatRow({name:f.name,desc:f.desc},d.n+" "+L.nl)).join("")}</div>`;
+  if(st==="ski"){
+    const cap=pfRankCap(L.nl);
+    return `<p>Raise one skill by one rank. At level ${L.nl} the highest rank is ${PFRANKS[cap]}.</p><div class="crgrid">${PFSKILLS.map(s=>{const r=num(c.pf.skills[s[0]]),ok=r<cap;return luCardP("ski",s[0],s[1],L.ski===s[0],PFRANKS[r]+(ok?" → "+PFRANKS[r+1]:" (highest rank for now)"),!ok)}).join("")}</div>`;
+  }
+  if(st==="boost")return `<p>Choose four different attributes. Each goes up by 1, or by half a step if it is already +4 or higher (two half steps make +1). ${L.boost.length} of 4 chosen.</p><div class="crgrid">${CRAB.map(k=>{const m=pfMod(c,k),part=c.pf.partial&&c.pf.partial[k];return luCardP("boost",k,crAbName(k),L.boost.includes(k),sgn(m)+(L.boost.includes(k)?" → "+(m>=4?(part?sgn(m+1):sgn(m)+" and a half"):sgn(m+1)):""))}).join("")}</div>`;
+  if(st==="feats"){
+    return `<label class="chk" style="margin-bottom:8px"><input type="checkbox" data-pluf="all"${L.all?" checked":""}>Show feats from every book (not only Player Core and GM Core)</label>`+L.slots.map(sl=>{
+      const all=pfgFeatOpts(c,L,sl), extra={feats:Object.values(L.fp),ski:L.ski}, q=lc(L.q[sl.id]||"");
+      const rows=all.map(f=>({f:f,pr:pfPreCheck(c,f,extra)})), ok=rows.filter(r=>r.pr.ok), hid=rows.length-ok.length;
+      const shown=ok.filter(r=>!q||lc(r.f.n).includes(q)||(r.f.t||[]).some(t=>lc(t).includes(q))).slice(0,40);
+      const pick=L.fp[sl.id], pf=pick&&L.feats.find(f=>f.n===pick);
+      return `<h4>${esc(sl.label)}${pick?": "+esc(pick):""}</h4>
+        <label class="fld"><span>Search ${esc(sl.label.toLowerCase())}s</span><input type="search" data-plusq="${esc(sl.id)}" value="${esc(L.q[sl.id]||"")}" placeholder="Name or trait"></label>
+        <div class="crgrid">${shown.map(({f,pr})=>luCardP("feat",sl.id+"|"+f.n,f.n,pick===f.n,"Level "+f.lv+(pr.text?" · needs "+pr.text+(pr.check?" (check)":""):""))).join("")||'<p class="hint">No feats match.</p>'}</div>
+        ${pf?`<div class="crd"><p class="prose">${esc(String(pf.d||"").slice(0,700))}</p></div>`:""}
+        <p class="hint">${ok.length>40&&!q?"Showing 40 of "+ok.length+". Search to find others. ":""}${hid?hid+" hidden because you do not meet their prerequisites.":""}</p>`;
+    }).join("");
+  }
+  if(st==="spells"){
+    const trad=lc((c.pf.cast||{}).trad||""), have=new Set(c.pf.spells.map(s=>lc(s.name)));
+    const list=L.spells.filter(x=>x.k!=="focus"&&x.k!=="cantrip"&&x.lv>=1&&x.lv<=L.maxRank&&(!trad||(x.tr||[]).includes(trad))&&!have.has(lc(x.n))&&(L.all||/^Pathfinder (Player Core|GM Core)/.test(x.src||"")));
+    const q=lc(L.q.sp||""), shown=list.filter(x=>!q||lc(x.n).includes(q)).sort((a,b)=>b.lv-a.lv||a.n.localeCompare(b.n)).slice(0,60);
+    return `<p>${(c.pf.cast||{}).kind==="spontaneous"?"Add spells to your repertoire for your new slots":"Add spells to your spellbook"}: <b>${L.sp.length}</b> of ${L.spN}, up to rank ${L.maxRank}${trad?" ("+trad+")":""}.</p>
+      <label class="fld"><span>Search spells</span><input type="search" data-plusq="sp" value="${esc(L.q.sp||"")}" placeholder="Spell name"></label>
+      <div class="crgrid">${shown.map(x=>luCardP("sp",x.n,x.n,L.sp.includes(x.n),"Rank "+x.lv)).join("")}</div>
+      <p class="hint">You can pick fewer and add the rest on the Spells section later.</p>`;
+  }
+  if(st==="rev"){
+    const out=["Hit points +"+L.gain];
+    if(L.cf.length)out.push("Class features: "+L.cf.map(f=>f.name).join(", "));
+    if(L.ski){const r=num(c.pf.skills[L.ski]);out.push("Skill increase: "+PFSKILLS.find(s=>s[0]===L.ski)[1]+" to "+PFRANKS[r+1])}
+    if(L.boost.length)out.push("Boosts: "+L.boost.map(crAbName).join(", "));
+    const fs=L.slots.map(sl=>L.fp[sl.id]?sl.label+": "+L.fp[sl.id]:"").filter(Boolean); if(fs.length)out.push(fs.join("; "));
+    if(L.sp.length)out.push("Spells: "+L.sp.join(", "));
+    if(L.newSlots)out.push("Spell slots: "+Object.keys(L.newSlots).map(r=>"rank "+r+" ×"+L.newSlots[r]).join(", "));
+    return `<div class="crd"><p><b>${esc(c.cls||"Character")} ${L.nl-1} → ${L.nl}</b></p>${out.map(t=>`<p>${esc(t)}</p>`).join("")}</div><p class="hint">Proficiency bonuses use your level, so they rise on their own. You can undo this level up from the Overview.</p>`;
+  }
+  return "";
+}
+const luCardP=(act,val,title,on,sub,dis)=>`<button class="crc${on?" on":""}" type="button" data-plu="${act}" data-v="${esc(val)}" aria-pressed="${!!on}"${dis?" disabled":""}><b>${esc(title)}</b>${sub?`<span>${esc(sub)}</span>`:""}</button>`;
+function pfgValid(c,L){
+  const st=pfgSteps(c,L)[L.step];
+  if(st==="ski"&&!L.ski)return "Choose a skill to raise.";
+  if(st==="boost"&&L.boost.length<4)return "Choose four attributes ("+L.boost.length+" so far).";
+  if(st==="feats"){const miss=L.slots.filter(sl=>!L.fp[sl.id]&&pfgFeatOpts(c,L,sl).some(f=>pfPreCheck(c,f,{feats:Object.values(L.fp),ski:L.ski}).ok));if(miss.length)return "Choose your "+miss.map(sl=>sl.label.toLowerCase()).join(" and ")+".";}
+  return "";
+}
+function pfgRender(c,keep){
+  const L=ui.lvl,o=$("#lvlOv"); if(!L||!L.pfg)return;
+  const steps=pfgSteps(c,L); L.step=Math.max(0,Math.min(steps.length-1,L.step));
+  const prev=keep&&o.querySelector(".sheet")?o.querySelector(".sheet").scrollTop:0;
+  let body; try{body=pfgBody(c,L)}catch(e){body=`<p class="msg err">Something went wrong on this step. ${esc(e.message||"")}</p>`}
+  const last=L.step===steps.length-1;
+  o.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="lvlT">
+    <div class="bar" style="margin:0"><h2 id="lvlT">Level up: ${esc(c.cls||"Character")} ${pfLvl(c)} → ${pfLvl(c)+1}</h2><button class="btn sm" type="button" data-plu="cancel">Close</button></div>
+    <div class="crprog" role="list" aria-label="Steps">${steps.map((t,i)=>`<span role="listitem" class="${i===L.step?"on":i<L.step?"done":""}"${i===L.step?' aria-current="step"':""}>${PFSTEP[t]}</span>`).join("")}</div>
+    <section class="crbody"><h3>${PFSTEP[steps[L.step]]}</h3>${body}</section>
+    <div class="msg${L.msg?" err":""}" role="status">${esc(L.msg||"")}</div>
+    <div class="crnav"><button class="btn" type="button" data-plu="manual" title="Edit the level by hand on this character instead">Manual</button><span class="sp"></span>
+      <button class="btn" type="button" data-plu="back"${L.step?"":" disabled"}>Back</button>
+      <button class="btn pri" type="button" data-plu="${last?"ok":"next"}"${L.busy||L.err?" disabled":""}>${last?"Level up":"Next"}</button></div></div>`;
+  const sh=o.querySelector(".sheet"); if(sh)sh.scrollTop=keep?prev:0;
+}
+function pfgApply(c,L){
+  const snap=JSON.stringify(Object.assign({},c,{lvlHist:undefined}));
+  c.lvlHist=(Array.isArray(c.lvlHist)?c.lvlHist:[]).concat([snap]).slice(-3);
+  c.level=L.nl; c.hpMax=num(c.hpMax)+L.gain; c.hp=num(c.hp)+L.gain;
+  L.cf.forEach(f=>pfAddFeat(c,{n:f.name,lvl:f.lvl,d:f.desc,src:L.d.n},"classfeature"));
+  if(L.ski)c.pf.skills[L.ski]=Math.min(pfRankCap(L.nl),num(c.pf.skills[L.ski])+1);
+  c.pf.partial=c.pf.partial||{};
+  L.boost.forEach(k=>{const m=pfMod(c,k);if(m<4)c.pf.mods[k]=m+1;else if(c.pf.partial[k]){c.pf.mods[k]=m+1;c.pf.partial[k]=false}else c.pf.partial[k]=true});
+  L.slots.forEach(sl=>{const nm=L.fp[sl.id];if(!nm)return;const f=L.feats.find(x=>x.n===nm);if(f&&pfAddFeat(c,f,sl.cat==="general"&&f.cat==="skill"?"general":sl.cat)){const x=c.pf.feats[c.pf.feats.length-1];x.at=L.nl}});
+  if(L.newSlots){const cs=c.pf.cast;cs.slots=cs.slots||{};Object.keys(L.newSlots).forEach(r=>{cs.slots[r]=Object.assign({max:0,used:0},cs.slots[r]||{});cs.slots[r].max=Math.max(num(cs.slots[r].max),L.newSlots[r])})}
+  L.sp.forEach(n=>{const x=L.spells.find(y=>y.n===n);if(x)pfAddSpell(c,x)});
+  c.updated=Date.now();
+}
+function pfgClick(c,b){
+  const L=ui.lvl, a=b.dataset.plu, v=b.dataset.v; if(!L||!L.pfg)return;
+  L.msg="";
+  if(a==="cancel"){$("#lvlOv").hidden=true;ui.lvl=null;return}
+  if(a==="manual"){c.lvlMode="manual";save();$("#lvlOv").hidden=true;ui.lvl=null;renderSheet();showUndo("Levelling set to manual. Switch back on the Sheet section.",null);return}
+  if(a==="ski"){L.ski=L.ski===v?"":v;pfgRender(c,1);return}
+  if(a==="boost"){const i=L.boost.indexOf(v);if(i>=0)L.boost.splice(i,1);else if(L.boost.length<4)L.boost.push(v);pfgRender(c,1);return}
+  if(a==="feat"){const k=v.slice(0,v.indexOf("|")),n=v.slice(v.indexOf("|")+1);L.fp[k]=L.fp[k]===n?"":n;pfgRender(c,1);return}
+  if(a==="sp"){const i=L.sp.indexOf(v);if(i>=0)L.sp.splice(i,1);else{if(L.sp.length>=L.spN)L.sp.shift();L.sp.push(v)}pfgRender(c,1);return}
+  if(a==="back"){L.step--;pfgRender(c);return}
+  if(a==="next"||a==="ok"){
+    const err=pfgValid(c,L); if(err){L.msg=err;pfgRender(c,1);return}
+    if(a==="ok"){pfgApply(c,L);$("#lvlOv").hidden=true;ui.lvl=null;save();renderSheet();try{window.__lvlFx&&window.__lvlFx()}catch(e){}return}
+    L.step++; pfgRender(c); return;
+  }
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-plu]");if(!b)return;const c=cur();if(c)pfgClick(c,b)});
+document.addEventListener("input",e=>{
+  const t=e.target, L=ui.lvl; if(!L||!L.pfg||!t.dataset)return; const c=cur(); if(!c)return;
+  if(t.dataset.plusq!=null){L.q[t.dataset.plusq]=t.value;pfgRender(c,1);const q=document.querySelector(`[data-plusq="${t.dataset.plusq}"]`);if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}return}
+});
+document.addEventListener("change",e=>{const t=e.target,L=ui.lvl;if(!L||!L.pfg||!t.dataset||t.dataset.pluf!=="all")return;L.all=t.checked;const c=cur();if(c)pfgRender(c,1)});
+
 /* ---------- Pathfinder 2e: library (only Pathfinder content) ---------- */
 const PFLIBTABS=[["pf-spells","Spells"],["pf-feats","Feats"],["pf-items","Items"],["pf-classes","Classes"],["pf-origins","Ancestries and backgrounds"],["pf-rules","Rules"]];
 const PFKIND={"pf-spells":"spells","pf-feats":"feats","pf-items":"items","pf-classes":"classes","pf-origins":"origins","pf-rules":"rules"};
@@ -6637,7 +6887,7 @@ document.addEventListener("click",e=>{
   switch(a){
     case "pf-apply": pfApply(c,b.dataset.w); break;
     case "pf-autohp": pfHp(c); save(); renderSheet(); pfSay("Max HP set to "+c.hpMax+": ancestry "+num(p.ancHp)+" plus (class "+num(p.classHp)+" "+sgn(pfMod(c,"con"))+" Con) x level "+pfLvl(c)+"."); break;
-    case "pf-levelup": openPfLevelUp(c); break;
+    case "pf-levelup": lvGuided(c)?openPfGuided(c):openPfLevelUp(c); break;
     case "pf-add-lore": p.lores.push({id:uid(),name:"",abl:"int",rank:1,misc:0}); save(); renderSheet(); break;
     case "pf-del-lore": p.lores.splice(i,1); save(); renderSheet(); break;
     case "pf-add-strike": {const s={id:uid(),name:"New strike",abl:"str",cat:"simple",dmg:"1d6",type:"",pot:0,str:0,misc:0,dbonus:0,extra:"",traits:"",dm:true};p.strikes.push(s);ui.edit.add("st"+s.id);save();$("#pfStrikeBox").innerHTML=pfStrikesHTML(c);pfRecompute(c);break;}
@@ -6659,6 +6909,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("input",e=>{
   const t=e.target, c=cur();
   if(t.dataset&&t.dataset.lined!=null&&ui.lib){ui.lib.ed=t.value;return}
+  if(t.dataset&&t.dataset.splf&&ui.lib&&ui.lib.spl){ui.lib.spl[t.dataset.splf]=t.value;renderLib();if(t.dataset.splf==="q"){const q=$("[data-splf=q]");if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}}return}
   if(t.dataset&&t.dataset.pfq!=null&&ui.lib){const P=pfLibS();P.q=t.value;P.limit=60;renderLib();const q=$("[data-pfq]");if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}return}
   if(t.dataset&&t.dataset.pff&&ui.lib){const P=pfLibS();P[t.dataset.pff]=t.value;P.limit=60;P.open=new Set();renderLib();return}
   if(!c||!isPf(c)||ui.view!=="sheet")return;
@@ -6982,6 +7233,7 @@ new MutationObserver(decorateRows).observe(document.getElementById("app"),{child
   };
   const _ld=levelDone;
   levelDone=function(c){_ld(c);burst(44,1.3);sfx("level")};
+  window.__lvlFx=()=>{burst(44,1.3);sfx("level")};
   if(typeof pfLevelDone==="function"){const _pl=pfLevelDone;pfLevelDone=function(c){_pl(c);burst(44,1.3);sfx("level")}}
 })();
 
@@ -7048,7 +7300,7 @@ function crFeats(ed){
 async function crClasses(ed){
   const D=await loadClasses(ed), out=[];
   SRDCLASSES.forEach(n=>{const d=D.find(x=>x.name===n);if(d)out.push({n:n,data:d,meta:CRD.c[ed][n]||{},src:"SRD"})});
-  LIB.classes.filter(x=>!x.addOn&&sysOf(x)==="dnd5e"&&(!x.ed||x.ed===ed)&&crPackOn(x.source)).forEach(x=>out.push({n:x.name,data:withAddOns(x,x.name)||x,meta:libMeta(x),src:x.source||"Library",lib:1}));
+  LIB.classes.filter(x=>!x.addOn&&sysOf(x)==="dnd5e"&&(!x.ed||x.ed===ed)&&crPackOn(x.source)).forEach(x=>out.push({n:x.name,data:withAddOns(x,x.name)||x,meta:libClassMeta(x),src:x.source||"Library",lib:1}));
   out.forEach(o=>{if(!o.lib)o.data=withAddOns(o.data,o.n)||o.data});
   return out;
 }
@@ -7814,8 +8066,69 @@ function libExtract(x){
   }
   return d;
 }
+/* imported class features that say "choose one of the following" become separate options (Feature: Option),
+   so Level up can offer them as choices the same way the SRD classes do */
+const LUSPLIT=/\b(?:choose|select|pick|gain|learn|adopt)\s+(?:one|two|three|four|a|an|\d)\b[^.]{0,90}?\bfollowing\b/i;
+function optHead(b){
+  const ls=String(b||"").split("\n"), h=ls[0].trim().replace(/^[\u2022*\-\u2013]\s*/,"");
+  const run=h.match(/^([A-Z][A-Za-z'\u2019 \-()]{1,40}?)\.\s+(\S.*)$/);
+  if(run&&run[1].split(/\s+/).length<=6&&!/^(prerequisite|at|when|you|if|the|this|as)\b/i.test(run[1]))return {name:run[1].trim(),rest:[run[2]].concat(ls.slice(1)).join("\n").trim()};
+  if(ls.length>1&&h.length<=48&&/^[A-Z]/.test(h)&&!/[.,;:!?]$/.test(h)&&h.split(/\s+/).length<=6)return {name:h,rest:ls.slice(1).join("\n").trim()};
+  return null;
+}
+function splitOptFeats(list){
+  const out=[];
+  (list||[]).forEach(f=>{
+    out.push(f);
+    if(/class traits|^spellcasting|pact magic|ability score/i.test(f.name||"")||/:/.test(f.name||""))return;
+    const blocks=String(f.desc||"").split(/\n\s*\n/), first=blocks.findIndex((b,i)=>i>0&&optHead(b));
+    if(first<1)return;
+    const intro=blocks.slice(0,first).join("\n\n"); if(!LUSPLIT.test(intro))return;
+    const opts=[]; let cur=null, tail=[];
+    blocks.slice(first).forEach(b=>{const h=optHead(b);if(h){cur={lvl:f.lvl,name:f.name+": "+titleCase(h.name),desc:h.rest};opts.push(cur)}else if(cur)cur.desc+=(cur.desc?"\n\n":"")+b;else tail.push(b)});
+    if(opts.length<2)return;
+    f.desc=intro+(tail.length?"\n\n"+tail.join("\n\n"):"");
+    opts.forEach(o=>out.push(o));
+  });
+  return out;
+}
+/* spell lists for imported classes: "Binder Spells" sections, "uses the wizard spell list", and spells that name the class */
+const SPCLS=["artificer","bard","cleric","druid","paladin","ranger","sorcerer","warlock","wizard"];
+function spellListsIn(text,names){
+  const out={}; let cur=null;
+  String(text||"").replace(/\r/g,"").split("\n").forEach(raw=>{
+    const t=raw.replace(/^\s*#+\s*/,"").replace(/\*+/g,"").trim(); if(!t){return}
+    const hm=t.match(/^(?:the\s+)?([A-Za-z' \-]{3,40}?)\s+spell(?:s| list)\s*$/i);
+    if(hm){const k=lc(hm[1]);cur=names.includes(k)?k:null;return}
+    if(!cur)return;
+    if(/^(cantrips?|\d+(?:st|nd|rd|th)?[- ]level|level \d)/i.test(t)){const rest=t.replace(/^[^:]*:\s*/,"");if(rest===t)return;t2(rest);return}
+    if(t.length>60&&!t.includes(",")){cur=null;return}
+    t2(t);
+    function t2(x){x.split(/,|;|\u2022/).map(y=>y.trim().replace(/[.*]+$/,"").replace(/\s*\(.*?\)\s*$/,"")).filter(y=>y&&y.length<=40&&y.split(/\s+/).length<=6&&/^[A-Za-z]/.test(y)).forEach(y=>{(out[cur]=out[cur]||new Set()).add(titleCase(y))})}
+  });
+  return out;
+}
+function libLinkSpells(){
+  const cls=LIB.classes.filter(x=>sysOf(x)==="dnd5e"&&!x.addOn), names=cls.map(x=>lc(x.name)); if(!cls.length)return false;
+  const sig=cls.length+":"+LIB.spells.length+":"+LIB.sections.length+":"+cls.map(x=>(x.features||[]).length).join(",");
+  if(LIB.splSig===sig)return false;
+  cls.forEach(x=>{
+    const texts=[x.info||""].concat((x.features||[]).map(f=>(f.name||"")+"\n"+(f.desc||"")),(x.subclasses||[]).flatMap(sc=>(sc.features||[]).map(f=>(f.name||"")+"\n"+(f.desc||""))));
+    LIB.sections.filter(q=>sysOf(q)==="dnd5e"&&(!x.source||!q.source||lc(q.source)===lc(x.source))&&/spell/i.test(q.name||"")).forEach(q=>texts.push((q.name||"")+"\n"+(q.text||"")));
+    const found=new Set(x.spellList||[]);
+    texts.forEach(t=>{const m=spellListsIn(t,names);if(m[lc(x.name)])m[lc(x.name)].forEach(n=>found.add(n))});
+    if(found.size)x.spellList=[...found];
+    const from=new Set(x.spellFrom||[]); let r; const rx=/(?:from|on|use|uses|using|choose from)\s+the\s+([a-z]+)\s+spell\s+list/ig;
+    texts.forEach(t=>{rx.lastIndex=0;while((r=rx.exec(t))){if(SPCLS.includes(lc(r[1]))&&lc(r[1])!==lc(x.name))from.add(lc(r[1]))}});
+    if(from.size)x.spellFrom=[...from];
+  });
+  LIB.spells.forEach(sp=>{if(sysOf(sp)!=="dnd5e")return;const k=lc(sp.name);cls.forEach(x=>{if((x.spellList||[]).some(n=>lc(n)===k)&&!(sp.classes||[]).some(n=>lc(n)===lc(x.name)))sp.classes=(sp.classes||[]).concat([x.name])})});
+  LIB.splSig=sig; return true;
+}
 function libEnrich(){
   let ch=false;
+  LIB.classes.forEach(x=>{if(sysOf(x)!=="dnd5e"||x.optv)return;x.features=splitOptFeats(x.features);(x.subclasses||[]).forEach(sc=>{sc.features=splitOptFeats(sc.features)});x.optv=1;ch=true});
+  if(libLinkSpells())ch=true;
   LIB.sections.forEach(x=>{
     if(sysOf(x)!=="dnd5e")return;
     if(x.cat===undefined){const g=libGuess(x);x.cat=g.cat;x.catq=g.conf==="low"?"review":"ok";ch=true}

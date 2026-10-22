@@ -1,5 +1,5 @@
 /* Character Ledger offline helper. Bump VERSION when the app files change. */
-const VERSION="ledger-v35";
+const VERSION="ledger-v36";
 /* Third-party files in vendor/ never change for a given version, so they get their own cache that survives app updates. */
 const VENDOR="ledger-vendor-pdfjs-6.4.299";
 const SHELL=["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "classes-2014.json", "classes-2024.json", "items-2014.json", "items-2024.json", "magic-2014.json", "magic-2024.json", "spells-2014.json", "spells-2024.json", "origins-5e.json", "creator-5e.json"];

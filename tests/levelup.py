@@ -16,19 +16,19 @@ LIB={"updated":9999999999999,"packs":{"Valda Test":{"creator":True}},
    "features":[{"lvl":1,"name":"Class Traits","desc":"Hit Dice: 1d8 per binder level\nArmor: Light armor\nWeapons: Simple weapons\nSkills: Choose two from Arcana, Deception, History, Insight, and Religion\nEquipment\nYou start with the following equipment:\n(a) a dagger or (b) a quarterstaff\nLeather armor and a component pouch"},
      {"lvl":1,"name":"Spellcasting","desc":"Charisma is your spellcasting ability."},
      {"lvl":1,"name":"Soul Binding","desc":"You bind spirits."},
-     {"lvl":2,"name":"Seal Rite","desc":"Choose one of the following rites."},
-     {"lvl":2,"name":"Seal Rite: Bonded Flame","desc":"Fire seal."},{"lvl":2,"name":"Seal Rite: Bonded Frost","desc":"Cold seal."},{"lvl":2,"name":"Seal Rite: Bonded Storm","desc":"Storm seal."},
+     {"lvl":2,"name":"Seal Rite","desc":"You learn a binding rite. Choose one of the following rites.\n\nBonded Flame\nFire seal.\n\nBonded Frost\nPrerequisite: 5th level\nCold seal.\n\nBonded Storm\nStorm seal."},
      {"lvl":3,"name":"Binder Pact","desc":"Choose a pact subclass."},
      {"lvl":4,"name":"Ability Score Improvement","desc":"Increase scores."},
      {"lvl":5,"name":"Greater Binding","desc":"More binding."}],
    "subclasses":[{"name":"Pact of Ash","features":[{"lvl":3,"name":"Ash Form","desc":"Ashy."},{"lvl":5,"name":"Ash Storm","desc":"Ash storm."}]},
                  {"name":"Pact of Tide","features":[{"lvl":3,"name":"Tide Form","desc":"Wet."}]}]}],
  "spells":[{"id":"vs1","name":"Spirit Bolt","level":0,"school":"Evocation","classes":["Binder"],"desc":"Bolt.","source":"Valda Test"},
-           {"id":"vs2","name":"Ghost Chain","level":1,"school":"Conjuration","classes":["Binder"],"desc":"Chain.","source":"Valda Test"},
+           {"id":"vs2","name":"Ghost Chain","level":1,"school":"Conjuration","classes":[],"desc":"Chain.","source":"Valda Test"},
            {"id":"vs3","name":"Wraith Ward","level":1,"school":"Abjuration","classes":["Binder"],"desc":"Ward.","source":"Valda Test"},
            {"id":"vs4","name":"Soul Lance","level":2,"school":"Necromancy","classes":["Binder"],"desc":"Lance.","source":"Valda Test"}],
  "items":[],
  "sections":[{"id":"vf1","name":"Spirit Touched","source":"Valda Test","kind":"feat","text":"Feat\nPrerequisite: none\nIncrease your Wisdom or Charisma score by 1, to a maximum of 20. You can see spirits."},
+   {"id":"vsl1","name":"Binder Spells","source":"Valda Test","kind":"text","text":"Binder Spells\nCantrips (0 Level): Spirit Bolt, Fire Bolt\n1st Level: Ghost Chain, Shield, Wraith Ward"},
    {"id":"vsp1","name":"Veilkin","source":"Valda Test","kind":"species","text":"Veilkin Traits\nAbility Score Increase. Your Charisma score increases by 2.\nAge. They live long.\nSize. Veilkin are Medium.\nSpeed. Your base walking speed is 30 feet.\nDarkvision. You can see in dim light within 60 feet of you as if it were bright light.\nVeil Step. Once per long rest you can teleport 10 feet.\nLanguages. You can speak, read, and write Common and Sylvan.\nSubraces\nDusk Veilkin\nAbility Score Increase. Your Wisdom score increases by 1.\nDusk Sight. Your darkvision extends to 120 feet.\nDawn Veilkin\nAbility Score Increase. Your Strength score increases by 1.\nDawn Blade. You are proficient with longswords."}]}
 def run(pg,js,a=None): return pg.evaluate(js,a)
 def step_through(pg,maxsteps=12,pick=0):
@@ -42,9 +42,9 @@ def step_through(pg,maxsteps=12,pick=0):
         if st=="Subclass":
             run(pg,f"document.querySelectorAll('#lvlOv [data-lu=sub]')[{pick}].click()")
         if st=="Choices":
-            run(pg,"""(()=>{document.querySelectorAll('#lvlOv .crbody h4').forEach(h=>{const m=h.textContent.match(/choose (\\d+)/i);const n=m?+m[1]:1;const g=h.nextElementSibling;if(!g)return;const cs=[...g.querySelectorAll('.crc')];cs.filter(x=>!x.classList.contains('on')).slice(0,n-cs.filter(x=>x.classList.contains('on')).length).forEach(x=>x.click())})})()""")
+            run(pg,"""(()=>{document.querySelectorAll('#lvlOv .crbody h4').forEach(h=>{const m=h.textContent.match(/choose (\\d+)/i);const n=m?+m[1]:1;const g=h.nextElementSibling;if(!g)return;const cs=[...g.querySelectorAll('.crc:not([disabled]),.crc.on')];cs.filter(x=>!x.classList.contains('on')).slice(0,n-cs.filter(x=>x.classList.contains('on')).length).forEach(x=>x.click())})})()""")
             pg.wait_for_timeout(150)
-            run(pg,"""(()=>{document.querySelectorAll('#lvlOv .crbody h4').forEach(h=>{const m=h.textContent.match(/choose (\\d+) \\((\\d+)/i);if(!m)return;let need=+m[1]-+m[2];const g=h.nextElementSibling;[...g.querySelectorAll('.crc:not(.on)')].forEach(x=>{if(need-->0)x.click()})})})()""")
+            run(pg,"""(()=>{document.querySelectorAll('#lvlOv .crbody h4').forEach(h=>{const m=h.textContent.match(/choose (\\d+) \\((\\d+)/i);if(!m)return;let need=+m[1]-+m[2];const g=h.nextElementSibling;[...g.querySelectorAll('.crc:not(.on):not([disabled])')].forEach(x=>{if(need-->0)x.click()})})})()""")
         if st=="Improvement":
             sel=run(pg,"(()=>{const s=document.querySelector('#lvlOv select[data-luf=a]');if(s&&!s.value){s.value=s.options[1].value;s.dispatchEvent(new Event('change',{bubbles:true}))}return !!s})()")
         if st=="Spells":
@@ -95,6 +95,15 @@ try:
     run(pg,"document.querySelector('[data-act=lvl-start]').click()");pg.wait_for_timeout(700)
     # record step names
     seen.append(run(pg,"[...document.querySelectorAll('#lvlOv .crprog span')].map(s=>s.textContent).join(',')"))
+    if lv==2:
+        for _ in range(6):
+            st=run(pg,"document.querySelector('#lvlOv .crbody h3').textContent")
+            if st=="Choices":break
+            if st=="Spells": run(pg,"document.querySelector('#lvlOv [data-lu=spauto]').click()")
+            run(pg,"(()=>{const b=document.querySelector('#lvlOv [data-lu=next]');b&&b.click()})()");pg.wait_for_timeout(250)
+        cards=run(pg,"[...document.querySelectorAll('#lvlOv [data-lu=opt]')].map(b=>b.textContent+(b.disabled?' [locked]':''))")
+        print("seal cards",cards)
+        ok(len(cards)==3 and any('locked' in x and 'Frost' in x for x in cards),"split options with locked prerequisite")
     if lv==4:
         # go to Improvement and choose the library feat
         for _ in range(6):
@@ -113,7 +122,10 @@ try:
   c=chars(pg)[0]
   print("binder",c["classes"],c["abilities"]["cha"],[ (f["name"],f["source"],f.get("type")) for f in c["features"]],[s["name"] for s in c["spells"]])
   ok(c["classes"][0]["level"]==5 and c["classes"][0]["sub"],"binder level/sub")
-  ok(any(f["name"].startswith("Seal Rite:") for f in c["features"]) and sum(f["name"].startswith("Seal Rite:") for f in c["features"])==1,"binder one seal rite")
+  ok(sum(f["name"].startswith("Seal Rite:") for f in c["features"])==1,"binder one seal rite")
+  ok(not any(f["name"]=="Seal Rite: Bonded Frost" for f in c["features"]),"prerequisite respected")
+  ok(any(s["name"] in ("Fire Bolt","Shield","Ghost Chain") for s in c["spells"]),"spell list section linked (SRD and unlinked spells)")
+  ok(not any(s["name"]=="Magic Missile" for s in c["spells"]),"only listed spells offered")
   ok(c["abilities"]["cha"]==17,"feat raised cha")
   ok(any(s["name"]=="Soul Lance" or s["name"]=="Ghost Chain" for s in c["spells"]),"library spells picked")
   icons=run(pg,"[...document.querySelectorAll('#featBox details.item>summary')].map(s=>s.querySelector('.sum-t').textContent+'='+s.title)")
@@ -151,6 +163,43 @@ try:
   c=chars(pg)[-1]; print("random",c["race"],c["classes"],c["level"],c["hpMax"],[f["name"]+"|"+f["source"] for f in c["features"]])
   print(run(pg,"[...document.querySelectorAll('#featBox details.item>summary')].map(s=>s.querySelector('.sum-t').textContent+'='+s.title)"))
   ok(c["level"]==5,"random auto-levelled to 5 (got %s)"%c["level"])
+
+  # 5) Pathfinder: random level 1 character, then guided level ups to 5
+  for want in ("Sorcerer","Fighter"):
+    pg=load(pg,None)
+    run(pg,"document.querySelector('[data-act=new-char]').click()");pg.wait_for_timeout(200)
+    run(pg,"document.querySelector('[data-act=new-game][data-v=pf2e]').click()");pg.wait_for_timeout(200)
+    run(pg,"document.querySelector('[data-act=creator]').click()");pg.wait_for_timeout(3000)
+    # pick class directly in the creator state via the random button, then force the class
+    run(pg,"document.querySelector('[data-cr=rand]').click()");pg.wait_for_timeout(1500)
+    run(pg,"document.querySelector('[data-cr=finish]').click()");pg.wait_for_timeout(2500)
+    S=json.loads(run(pg,"localStorage.getItem('character-ledger-v1')"));c=S["characters"][-1]
+    c["cls"]=want;c["pf"]["classHp"]=6 if want=="Sorcerer" else 10
+    if want=="Sorcerer": c["pf"]["cast"]=dict(c["pf"].get("cast",{}),kind="spontaneous",trad="arcane",abl="cha")
+    pg=load(pg,c)
+    for lv in range(2,6):
+      run(pg,"document.querySelector('[data-act=lvl-start]').click()");pg.wait_for_timeout(1500)
+      for _ in range(10):
+        st=run(pg,"(document.querySelector('#lvlOv .crbody h3')||{}).textContent||''")
+        if not st:break
+        if st=="Skill increase": run(pg,"document.querySelector('#lvlOv [data-plu=ski]:not([disabled])').click()")
+        if st=="Attribute boosts":
+          for i in range(4): run(pg,"document.querySelector('#lvlOv [data-plu=boost]:not(.on)').click()");pg.wait_for_timeout(120)
+        if st=="Feats":
+          for i in range(3):
+            run(pg,"(()=>{const hs=[...document.querySelectorAll('#lvlOv .crbody h4')];for(const h of hs){if(!h.textContent.includes(':')){let g=h.nextElementSibling;while(g&&!g.classList.contains('crgrid'))g=g.nextElementSibling;const b=g&&g.querySelector('.crc');if(b){b.click();return}}}})()");pg.wait_for_timeout(250)
+        if st=="Spells":
+          for i in range(3): run(pg,"(()=>{const b=document.querySelector('#lvlOv [data-plu=sp]:not(.on)');b&&b.click()})()");pg.wait_for_timeout(120)
+        pg.wait_for_timeout(250)
+        t=run(pg,"(()=>{const b=document.querySelector('#lvlOv [data-plu=ok]')||document.querySelector('#lvlOv [data-plu=next]');b.click();return b.dataset.plu})()");pg.wait_for_timeout(400)
+        m=run(pg,"(document.querySelector('#lvlOv .msg.err')||{}).textContent||''")
+        if m: print("pf msg",st,m);break
+        if t=="ok":break
+    c=chars(pg)[0]
+    print("pf",want,c["level"],c["hpMax"],c["pf"]["mods"],[ (f["name"],f["cat"],f.get("at")) for f in c["pf"]["feats"] if f["cat"]!="classfeature"],len(c["pf"]["spells"]),c["pf"].get("cast",{}).get("slots",{}).get("2"))
+    ok(c["level"]==5,f"pf {want} reached 5")
+    ok(sum(1 for f in c["pf"]["feats"] if f["cat"] in ("class","skill","general","ancestry") and (f.get("at") or 0)>=2)>=5,f"pf {want} feats chosen")
+    ok(len(c.get("lvlHist",[]))>=1,"pf undo history")
   print("errors",errs)
   ok(not errs,"page errors")
 finally:
