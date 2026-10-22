@@ -3353,18 +3353,29 @@ function featsHTML(c){
   return fxSummary(c)+c.features.map((f,i)=>{
     if((fq&&!lc(f.name+" "+f.source+" "+f.desc).includes(fq))||(ui.favF&&!f.fav))return "";
     const ed=ui.edit.has(f.id);
-    const body=ed?`<div class="igrid">${fld(c,"Name","features."+i+".name")}${fld(c,"Source","features."+i+".source",{ph:"Where it comes from (class, feat, species)"})}</div>
+    const body=ed?`<div class="igrid">${fld(c,"Name","features."+i+".name")}${fld(c,"Source","features."+i+".source",{ph:"Where it comes from (class, feat, species)"})}<label class="fld"><span>Type</span><select data-f="features.${i}.type">${FKINDS.map(k=>`<option value="${k[0]}"${(f.type||"")===k[0]?" selected":""}>${k[1]}</option>`).join("")}</select></label></div>
       <label class="fld"><span>Details</span><textarea data-f="features.${i}.desc" placeholder="What it does, how it works, and any numbers to remember">${esc(f.desc)}</textarea></label>
       ${fxEditor(f,"features",i)}
       <div class="btns">${editBtn(f.id,"feat","Done","pri")}<button class="btn sm danger" type="button" data-act="del-feat" data-i="${i}">Delete feature</button></div>`
     :`${kv("Source",f.source)}${viewText(f.desc,"No details yet. Tap Edit to add them.")}${fxRows(f,"features",i)}<div class="btns">${editBtn(f.id,"feat","Edit")}<button class="btn sm${f.fav?" pri":""}" type="button" data-act="fav" data-kind="features" data-i="${i}" aria-pressed="${!!f.fav}">${f.fav?"Favourite":"Favourite it"}</button></div>`;
-    return `<details class="item" data-id="${esc(f.id)}"${ui.open.has(f.id)?" open":""}>
+    return `<details class="item" data-fk="${featKind(c,f)}" data-id="${esc(f.id)}"${ui.open.has(f.id)?" open":""}>
       <summary><span class="sum-t" data-live="features.${i}.name">${esc(f.name||"Untitled feature")}</span>
         <span class="sum-m">${f.fav?"&#9733; ":""}<span data-live="features.${i}.source">${esc(f.source)}</span></span></summary>
       <div class="ibody">${body}</div></details>`;
   }).join("");
 }
 
+const FKINDS=[["","Auto-detect"],["feat","Feat"],["transformation","Transformation"],["class","Class"],["race","Species / Race"],["background","Background"],["general","General / Other"]];
+function featKind(c,f){
+  if(f.type&&FKINDS.some(k=>k[0]===f.type))return f.type;
+  const src=lc(f.source||""), nm=lc(f.name||""), all=src+" "+nm;
+  if(/transformation|transform|grim hollow|lycan|werewolf|vampir|dhampir|beast form|curse of|hybrid form/.test(all))return "transformation";
+  if(/\bfeat\b|origin feat|general feat|ancestry feat|skill feat/.test(src))return "feat";
+  if(c.background&&src&&src===lc(c.background)||/background/.test(src))return "background";
+  if(c.race&&src&&(src===lc(c.race)||src.indexOf(lc(c.race))>=0)||/species|race|ancestry|heritage|racial/.test(src))return "race";
+  if((c.classes||[]).some(r=>r.name&&src.indexOf(lc(r.name))>=0)||(c.cls&&src.indexOf(lc(c.cls))>=0)||/class|subclass|archetype|\blevel \d/.test(src))return "class";
+  return "general";
+}
 function spellItem(c,s,i){
   const p="spells."+i+".";
   const ed=ui.edit.has(s.id);
@@ -6302,10 +6313,21 @@ Object.assign(ICON,{
   iSword:'<path d="M5 19l10-10M15 9l4-4V4h-1l-4 4M5 19l-1-1M8 16l-2 2"/>',
   iTool:'<path d="M14 6a4 4 0 0 0 4 4l-9 9a2 2 0 0 1-3-3l9-9a4 4 0 0 0-1-1z"/>',
   iFlask:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3M8 15h8"/>',
-  iBow:'<path d="M6 4c8 2 12 8 12 16M6 4v16M6 12h12"/>'
+  iBow:'<path d="M6 4c8 2 12 8 12 16M6 4v16M6 12h12"/>',
+  fFeat:'<circle cx="12" cy="9" r="5"/><path d="M9 13.5L7 21l5-3 5 3-2-7.5"/>',
+  fTrans:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/><path d="M16 4v3M14.5 5.5h3"/>',
+  fClass:'<path d="M12 3l8 3v6c0 5-3.500 8-8 9-4.500-1-8-4-8-9V6z"/><path d="M12 8v8M9 11h6"/>',
+  fRace:'<circle cx="12" cy="7" r="3.200"/><path d="M5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/>',
+  fBack:'<path d="M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 0 2 2H8a2 2 0 0 1-2-2z"/><path d="M6 4a2 2 0 0 0-2 2v2h2M10 9h6M10 13h6"/>'
 });
 const SCHOOLICO=[[/abjuration/i,"sAbj","#6aa9ff"],[/conjuration/i,"sCon","#38d9bd"],[/divination/i,"sDiv","#b79cff"],[/enchantment/i,"sEnc","#ff8fc7"],[/evocation/i,"sEvo","#ff9a4d"],[/illusion/i,"sIll","#c58bff"],[/necromancy/i,"sNec","#7ee08a"],[/transmutation/i,"sTra","#ffd26a"]];
 const ITEMICO=[[/potion|elixir|oil|consumable|scroll|ration|antitoxin/i,"iFlask","#ff8fc7"],[/armor|shield|mail|plate|leather|hide/i,"hShield","#8fb8d9"],[/bow|crossbow|arrow|dart|sling/i,"iBow","#d9b46a"],[/weapon|sword|dagger|axe|mace|spear|rapier|staff|club|hammer/i,"iSword","#e0b070"],[/tool|kit|supplies|instrument|thieves|artisan/i,"iTool","#b6c0c8"]];
+document.addEventListener("change",e=>{
+  const t=e.target; if(!t||!t.matches||!t.matches('select[data-f$=".type"]'))return;
+  setTimeout(()=>{const c=cur(); if(!c)return; const d=t.closest("details.item"); if(!d)return;
+    const f=(c.features||[]).find(x=>x.id===d.getAttribute("data-id")); if(!f)return;
+    d.setAttribute("data-fk",featKind(c,f)); const sm=d.querySelector("summary"); const o=sm.querySelector(".sico"); if(o)o.remove(); sm.removeAttribute("data-si"); decorateRows();},0);
+});
 function decorateRows(){
   document.querySelectorAll("#app details.item>summary:not([data-si])").forEach(sm=>{
     sm.setAttribute("data-si","1");
@@ -6313,7 +6335,11 @@ function decorateRows(){
     let m=null;
     if(/spell|cantrip|level|rank/i.test(kind)||SCHOOLICO.some(x=>x[0].test(txt)))m=SCHOOLICO.find(x=>x[0].test(txt))||[0,"sCon","#38d9bd"];
     else if(/inventory|strikes|armor/i.test(kind))m=ITEMICO.find(x=>x[0].test(txt))||[0,"hBag","#9fb3b0"];
-    else if(/feat|feature|trait/i.test(kind))m=[0,"hStar","#ffd26a"];
+    else if(/feat|feature|trait/i.test(kind)){
+      const fk=sm.parentNode.getAttribute("data-fk")||"general";
+      m=({feat:[0,"fFeat","#7fd6a0"],transformation:[0,"fTrans","#c58bff"],class:[0,"fClass","#6aa9ff"],race:[0,"fRace","#ff9a4d"],background:[0,"fBack","#d9b46a"],general:[0,"hStar","#ffd26a"]})[fk]||[0,"hStar","#ffd26a"];
+      sm.title=({feat:"Feat",transformation:"Transformation",class:"Class feature",race:"Species / race trait",background:"Background",general:"General feature"})[fk]||"";
+    }
     if(!m)return;
     const s=document.createElement("span"); s.className="sico"; s.style.setProperty("--ic",m[2]); s.innerHTML=ico(m[1]); sm.insertBefore(s,sm.firstChild);
   });
