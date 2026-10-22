@@ -3373,7 +3373,7 @@ function featKind(c,f){
   if(/\bfeat\b|origin feat|general feat|ancestry feat|skill feat/.test(src))return "feat";
   if(c.background&&src&&src===lc(c.background)||/background/.test(src))return "background";
   if(c.race&&src&&(src===lc(c.race)||src.indexOf(lc(c.race))>=0)||/species|race|ancestry|heritage|racial/.test(src))return "race";
-  if((c.classes||[]).some(r=>r.name&&src.indexOf(lc(r.name))>=0)||(c.cls&&src.indexOf(lc(c.cls))>=0)||/class|subclass|archetype|\blevel \d/.test(src))return "class";
+  if((c.classes||[]).some(r=>(r.name&&src.indexOf(lc(r.name))>=0)||(r.sub&&src.indexOf(lc(r.sub))>=0))||(c.cls&&src.indexOf(lc(c.cls))>=0)||(c.subclass&&String(c.subclass).split(" / ").some(x=>x&&(src.indexOf(lc(x))>=0||nm.indexOf(lc(x))>=0)))||/class|subclass|archetype|\bpath of\b|\bcircle of\b|\bcollege of\b|\boath of\b|\bdomain\b|\bway of\b|\bschool of\b|\bpatron\b|\bcollege\b|\bconclave\b|\bbloodline\b|\bmystery\b|\blevel \d/.test(src))return "class";
   return "general";
 }
 function spellItem(c,s,i){
