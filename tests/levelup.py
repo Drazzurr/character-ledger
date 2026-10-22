@@ -18,6 +18,8 @@ LIB={"updated":9999999999999,"packs":{"Valda Test":{"creator":True}},
      {"lvl":1,"name":"Soul Binding","desc":"You bind spirits."},
      {"lvl":2,"name":"Seal Rite","desc":"You learn a binding rite. Choose one of the following rites.\n\nBonded Flame\nFire seal.\n\nBonded Frost\nPrerequisite: 5th level\nCold seal.\n\nBonded Storm\nStorm seal."},
      {"lvl":3,"name":"Binder Pact","desc":"Choose a pact subclass."},
+     {"lvl":3,"name":"Fighting Style","desc":"At 3rd level, you adopt a style of fighting as your specialty. Choose one of the following options. You can't take a Fighting Style option more than once."},
+     {"lvl":3,"name":"Spirit Lore","desc":"You gain proficiency in one skill of your choice from Arcana, History, or Religion."},
      {"lvl":4,"name":"Ability Score Improvement","desc":"Increase scores."},
      {"lvl":5,"name":"Greater Binding","desc":"More binding."}],
    "subclasses":[{"name":"Pact of Ash","features":[{"lvl":3,"name":"Ash Form","desc":"Ashy."},{"lvl":5,"name":"Ash Storm","desc":"Ash storm."}]},
@@ -45,6 +47,16 @@ def step_through(pg,maxsteps=12,pick=0):
             run(pg,"""(()=>{document.querySelectorAll('#lvlOv .crbody h4').forEach(h=>{const m=h.textContent.match(/choose (\\d+)/i);const n=m?+m[1]:1;const g=h.nextElementSibling;if(!g)return;const cs=[...g.querySelectorAll('.crc:not([disabled]),.crc.on')];cs.filter(x=>!x.classList.contains('on')).slice(0,n-cs.filter(x=>x.classList.contains('on')).length).forEach(x=>x.click())})})()""")
             pg.wait_for_timeout(150)
             run(pg,"""(()=>{document.querySelectorAll('#lvlOv .crbody h4').forEach(h=>{const m=h.textContent.match(/choose (\\d+) \\((\\d+)/i);if(!m)return;let need=+m[1]-+m[2];const g=h.nextElementSibling;[...g.querySelectorAll('.crc:not(.on):not([disabled])')].forEach(x=>{if(need-->0)x.click()})})})()""")
+        if st in ("Choices","Improvement"):
+            for i in range(8):
+                pg.wait_for_timeout(250)
+                n=run(pg,"""(()=>{for(const p of document.querySelectorAll('#lvlOv .chlbl')){const m=p.textContent.match(/\\((\\d+) of (\\d+)\\)/);if(m&&+m[1]<+m[2]){let g=p.nextElementSibling;const b=g&&g.querySelector('[data-ch]:not(.on)');if(b){b.click();return 1}}}return 0})()""")
+                if not n:break
+        if st in ("Choices","Improvement"):
+            for i in range(8):
+                pg.wait_for_timeout(250)
+                n=run(pg,"""(()=>{for(const p of document.querySelectorAll('#lvlOv .chlbl')){const m=p.textContent.match(/\\((\\d+) of (\\d+)\\)/);if(m&&+m[1]<+m[2]){let g=p.nextElementSibling;const b=g&&g.querySelector('[data-ch]:not(.on)');if(b){b.click();return 1}}}return 0})()""")
+                if not n:break
         if st=="Improvement":
             sel=run(pg,"(()=>{const s=document.querySelector('#lvlOv select[data-luf=a]');if(s&&!s.value){s.value=s.options[1].value;s.dispatchEvent(new Event('change',{bubbles:true}))}return !!s})()")
         if st=="Spells":
@@ -56,6 +68,15 @@ def step_through(pg,maxsteps=12,pick=0):
         if msg: return "msg:"+st+":"+msg
         if btn=="ok": return "done"
     return "stuck"
+def cr_to(pg,name,species=None):
+    for _ in range(10):
+        t=pg.evaluate("document.querySelector('#crOv .crbody h3').textContent")
+        if t==name:return True
+        if t=="Species":
+            pg.evaluate("(v)=>{const b=[...document.querySelectorAll('[data-cr=species]')].find(b=>!v||b.dataset.v===v);b.click()}",species);pg.wait_for_timeout(200)
+            for k in range(2): pg.evaluate("(()=>{const b=document.querySelector('[data-cr=abo]:not(.on)');b&&b.click()})()");pg.wait_for_timeout(150)
+        pg.evaluate("document.querySelector('[data-cr=next]').click()");pg.wait_for_timeout(250)
+    return False
 def chars(pg): return json.loads(run(pg,"localStorage.getItem('character-ledger-v1')"))["characters"]
 def load(pg,c,lib=None):
     pg=newpage()
@@ -114,9 +135,9 @@ try:
         opts=run(pg,"[...document.querySelectorAll('#lvlOv select[data-luf=f] option')].map(o=>o.value)")
         ok("Spirit Touched" in opts,f"library feat offered {opts[:5]}")
         run(pg,"(()=>{const s=document.querySelector('#lvlOv select[data-luf=f]');s.value='Spirit Touched';s.dispatchEvent(new Event('change',{bubbles:true}))})()");pg.wait_for_timeout(200)
-        fa=run(pg,"[...document.querySelectorAll('#lvlOv select[data-luf=fa] option')].map(o=>o.value)")
-        ok(fa==["","wis","cha"],f"feat ability choice {fa}")
-        run(pg,"(()=>{const s=document.querySelector('#lvlOv select[data-luf=fa]');s.value='cha';s.dispatchEvent(new Event('change',{bubbles:true}))})()");pg.wait_for_timeout(200)
+        fa=run(pg,"[...document.querySelectorAll('#lvlOv [data-ch]')].map(b=>b.dataset.v)")
+        ok(fa==["wis","cha"],f"feat ability choice {fa}")
+        run(pg,"[...document.querySelectorAll('#lvlOv [data-ch]')].find(b=>b.dataset.v==='cha').click()");pg.wait_for_timeout(200)
     r=step_through(pg); ok(r=="done",f"Binder ->{lv}: {r}")
   print("binder steps",seen)
   c=chars(pg)[0]
@@ -126,6 +147,9 @@ try:
   ok(not any(f["name"]=="Seal Rite: Bonded Frost" for f in c["features"]),"prerequisite respected")
   ok(any(s["name"] in ("Fire Bolt","Shield","Ghost Chain") for s in c["spells"]),"spell list section linked (SRD and unlinked spells)")
   ok(not any(s["name"]=="Magic Missile" for s in c["spells"]),"only listed spells offered")
+  ok(any(f["name"].startswith("Fighting Style: ") for f in c["features"]),"fighting style with no options listed got a pick")
+  ok(any(c["skills"].get(k)==1 for k in ("arcana","history","religion")),"skill choice applied")
+  ok(any("Your choice" in f["desc"] for f in c["features"] if f["name"]=="Spirit Lore"),"choice written on the feature")
   ok(c["abilities"]["cha"]==17,"feat raised cha")
   ok(any(s["name"]=="Soul Lance" or s["name"]=="Ghost Chain" for s in c["spells"]),"library spells picked")
   icons=run(pg,"[...document.querySelectorAll('#featBox details.item>summary')].map(s=>s.querySelector('.sum-t').textContent+'='+s.title)")
@@ -200,6 +224,42 @@ try:
     ok(c["level"]==5,f"pf {want} reached 5")
     ok(sum(1 for f in c["pf"]["feats"] if f["cat"] in ("class","skill","general","ancestry") and (f.get("at") or 0)>=2)>=5,f"pf {want} feats chosen")
     ok(len(c.get("lvlHist",[]))>=1,"pf undo history")
+
+  # 6) books per campaign and choices on the sheet
+  camp={"id":"k1","name":"Strahd","srcs":{}}
+  pg=newpage();pg.goto('http://localhost:8792/index.html')
+  run(pg,"([s,l])=>{localStorage.clear();localStorage.setItem('character-ledger-v1',JSON.stringify(s));localStorage.setItem('character-ledger-lib-v1',JSON.stringify(l))}",[{"campaigns":[camp],"characters":[],"updated":1},LIB])
+  run(pg,"()=>new Promise(r=>{const q=indexedDB.deleteDatabase('ledger-library');q.onsuccess=q.onerror=q.onblocked=()=>r()})");pg.reload();pg.wait_for_timeout(700)
+  run(pg,"document.querySelector('[data-act=filter][data-camp=k1]').click()");pg.wait_for_timeout(200)
+  run(pg,"document.querySelector('[data-act=new-char]').click()");pg.wait_for_timeout(200)
+  run(pg,"document.querySelector('[data-act=new-game][data-v=\"2014\"]').click()");run(pg,"document.querySelector('[data-act=creator]').click()");pg.wait_for_timeout(1500)
+  cr_to(pg,"Class")
+  cls=run(pg,"[...document.querySelectorAll('[data-cr=cls]')].map(b=>b.dataset.v)")
+  ok(len(cls)>5 and "Binder" not in cls,"campaign with the book off hides its class")
+  run(pg,"document.querySelector('[data-cr=cancel]').click()");pg.wait_for_timeout(200)
+  run(pg,"document.querySelector('[data-act=camp-src]').click()");pg.wait_for_timeout(200)
+  run(pg,"(()=>{const i=document.querySelector('[data-act=lib-pack][data-camp=k1]');i.checked=true;i.dispatchEvent(new Event('change',{bubbles:true}))})()");pg.wait_for_timeout(200)
+  run(pg,"document.querySelector('[data-act=new-char]').click()");pg.wait_for_timeout(200)
+  run(pg,"document.querySelector('[data-act=new-game][data-v=\"2014\"]').click()");run(pg,"document.querySelector('[data-act=creator]').click()");pg.wait_for_timeout(1500)
+  cr_to(pg,"Class","Half-Elf")
+  cls=run(pg,"[...document.querySelectorAll('[data-cr=cls]')].map(b=>b.dataset.v)")
+  ok("Binder" in cls,"campaign with the book on shows its class "+str(cls)+" "+str(json.loads(run(pg,"localStorage.getItem('character-ledger-v1')"))["campaigns"]))
+  steps=run(pg,"[...document.querySelectorAll('#crOv .crprog span')].map(s=>s.textContent)")
+  ok("Choices" in steps,f"creator has a Choices step for Half-Elf {steps}")
+  S2=json.loads(run(pg,"localStorage.getItem('character-ledger-v1')"))
+  ok(S2["campaigns"][0].get("srcs",{}).get("Valda Test")==True,"campaign keeps its books")
+  ch=base(features=[{"id":"x1","name":"Wanderer's Gift","source":"Valda Test","desc":"You learn one language of your choice and gain proficiency in two skills of your choice."}])
+  pg=load(pg,ch,LIB)
+  tag=run(pg,"!!document.querySelector('#featBox .chtag')")
+  ok(tag,"sheet shows Choose on a feature with an open choice")
+  run(pg,"document.querySelector('#featBox details.item summary').click()");pg.wait_for_timeout(150)
+  run(pg,"document.querySelector('[data-act=ch-open]').click()");pg.wait_for_timeout(800)
+  for i in range(4):
+    run(pg,"(()=>{for(const p of document.querySelectorAll('#lvlOv .chlbl')){const m=p.textContent.match(/\\((\\d+) of (\\d+)\\)/);if(m&&+m[1]<+m[2]){const b=p.nextElementSibling.querySelector('[data-ch]:not(.on)');if(b){b.click();return}}}})()");pg.wait_for_timeout(150)
+  run(pg,"document.querySelector('[data-chx=ok]').click()");pg.wait_for_timeout(300)
+  cc=chars(pg)[0]; f=[x for x in cc["features"] if x["name"]=="Wanderer's Gift"][0]
+  ok(f.get("chDone") and "Your choice" in f["desc"],"sheet choice saved: "+f["desc"][-80:])
+  ok(sum(1 for v in cc["skills"].values() if v)>=4,"sheet choice added skills")
   print("errors",errs)
   ok(not errs,"page errors")
 finally:

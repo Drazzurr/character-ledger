@@ -1825,6 +1825,10 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 .cg-l{display:flex;flex-direction:column;align-items:center;gap:2px}.cg-l span{font:600 11px/1 var(--body);letter-spacing:.14em;color:var(--muted)}.cg-l b{font-size:22px}
 .pc-lvbtns{display:flex;gap:8px;flex-wrap:wrap}
 .lubig{font-size:28px;font-weight:700;margin:6px 0}
+.campsrc{margin:-4px 0 14px;padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--panel)}
+.chgrp{margin:0 0 14px;padding:0 0 10px;border-bottom:1px solid var(--line)}.chgrp:last-child{border-bottom:0}
+.chlbl{margin:10px 0 6px;font-weight:600}.chlbl span{color:var(--muted);font-weight:400}
+.tag.chtag{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .crc:disabled{opacity:.5;cursor:not-allowed;background:transparent;border-style:dashed}
 .prow div.plink{text-align:left;align-items:flex-start}
 .crc:disabled span{color:var(--danger,var(--muted))}
@@ -2889,7 +2893,7 @@ function normChar(c){
 }
 function norm(s){
   const o={campaigns:[],characters:[],updated:num(s&&s.updated)};
-  if(s&&Array.isArray(s.campaigns))o.campaigns=s.campaigns.filter(k=>k&&k.id).map(k=>({id:String(k.id),name:String(k.name||"Untitled campaign")}));
+  if(s&&Array.isArray(s.campaigns))o.campaigns=s.campaigns.filter(k=>k&&k.id).map(k=>Object.assign({id:String(k.id),name:String(k.name||"Untitled campaign")},k.srcs&&typeof k.srcs==="object"?{srcs:Object.assign({},k.srcs)}:{}));
   if(s&&Array.isArray(s.characters))o.characters=s.characters.filter(c=>c&&c.id).map(normChar);
   return o;
 }
@@ -3219,9 +3223,12 @@ function renderHome(){
     strip=`<div class="strip"><label class="fld"><span>New campaign name</span><input id="newCampName" type="text" maxlength="60" placeholder="Curse of Strahd"></label>
       <button class="btn pri" type="button" data-act="add-camp">Add</button><button class="btn" type="button" data-act="cancel-camp">Cancel</button></div>`;
   }else{
-    const k=S.campaigns.find(k=>k.id===ui.camp);
+    const k=S.campaigns.find(k=>k.id===ui.camp), hasBooks=dndLib("classes").length+dndLib("spells").length+dndLib("items").length+dndLib("sections").length>0;
+    const srcBox=id=>ui.campSrc?`<div class="campsrc"><p class="hint" style="margin:0 0 8px">${id?"Characters in this campaign can use the books ticked here in the creator, Level up and choices. Built-in SRD content is always available.":"Characters without a campaign can use the books ticked here. Each campaign has its own list."}</p>${libSourcesHTML(id)}</div>`:"";
     if(k)strip=`<div class="strip"><label class="fld"><span>Campaign name</span><input type="text" maxlength="60" data-cname="${esc(k.id)}" value="${esc(k.name)}"></label>
-      <button class="btn danger" type="button" data-act="del-camp" data-id="${esc(k.id)}">Delete campaign</button></div>`;
+      ${hasBooks?`<button class="btn${ui.campSrc?" pri":""}" type="button" data-act="camp-src" aria-pressed="${!!ui.campSrc}">Books for this campaign</button>`:""}
+      <button class="btn danger" type="button" data-act="del-camp" data-id="${esc(k.id)}">Delete campaign</button></div>${srcBox(k.id)}`;
+    else if(hasBooks)strip=`<div class="strip"><button class="btn${ui.campSrc?" pri":""}" type="button" data-act="camp-src" aria-pressed="${!!ui.campSrc}">Books for characters without a campaign</button></div>${srcBox("")}`;
   }
 
   const list=S.characters.filter(c=>ui.camp==="all"||(ui.camp==="none"?!c.campaign:c.campaign===ui.camp))
@@ -3361,15 +3368,15 @@ function featsHTML(c){
   if(!shown)return `<div class="empty">${ui.favF?"No favourite features yet. Open a feature and tap Favourite.":"No features match that search."}</div>`;
   return fxSummary(c)+c.features.map((f,i)=>{
     if((fq&&!lc(f.name+" "+f.source+" "+f.desc).includes(fq))||(ui.favF&&!f.fav))return "";
-    const ed=ui.edit.has(f.id);
+    const ed=ui.edit.has(f.id), pend=chPending(c,f);
     const body=ed?`<div class="igrid">${fld(c,"Name","features."+i+".name")}${fld(c,"Source","features."+i+".source",{ph:"Where it comes from (class, feat, species)"})}<label class="fld"><span>Type</span><select data-f="features.${i}.type">${FKINDS.map(k=>`<option value="${k[0]}"${(f.type||"")===k[0]?" selected":""}>${k[1]}</option>`).join("")}</select></label></div>
       <label class="fld"><span>Details</span><textarea data-f="features.${i}.desc" placeholder="What it does, how it works, and any numbers to remember">${esc(f.desc)}</textarea></label>
       ${fxEditor(f,"features",i)}
       <div class="btns">${editBtn(f.id,"feat","Done","pri")}<button class="btn sm danger" type="button" data-act="del-feat" data-i="${i}">Delete feature</button></div>`
-    :`${kv("Source",f.source)}${viewText(f.desc,"No details yet. Tap Edit to add them.")}${fxRows(f,"features",i)}<div class="btns">${editBtn(f.id,"feat","Edit")}<button class="btn sm${f.fav?" pri":""}" type="button" data-act="fav" data-kind="features" data-i="${i}" aria-pressed="${!!f.fav}">${f.fav?"Favourite":"Favourite it"}</button></div>`;
+    :`${kv("Source",f.source)}${viewText(f.desc,"No details yet. Tap Edit to add them.")}${fxRows(f,"features",i)}<div class="btns">${pend?`<button class="btn sm pri" type="button" data-act="ch-open" data-id="${esc(f.id)}">Make your choice</button>`:""}${editBtn(f.id,"feat","Edit")}<button class="btn sm${f.fav?" pri":""}" type="button" data-act="fav" data-kind="features" data-i="${i}" aria-pressed="${!!f.fav}">${f.fav?"Favourite":"Favourite it"}</button></div>`;
     return `<details class="item" data-fk="${featKind(c,f)}" data-id="${esc(f.id)}"${ui.open.has(f.id)?" open":""}>
       <summary><span class="sum-t" data-live="features.${i}.name">${esc(f.name||"Untitled feature")}</span>
-        <span class="sum-m">${f.fav?"&#9733; ":""}<span data-live="features.${i}.source">${esc(f.source)}</span></span></summary>
+        <span class="sum-m">${f.fav?"&#9733; ":""}${pend?'<span class="tag chtag">Choose</span> ':""}<span data-live="features.${i}.source">${esc(f.source)}</span></span></summary>
       <div class="ibody">${body}</div></details>`;
   }).join("");
 }
@@ -3511,7 +3518,7 @@ function renderBastion(c){
 /* ---------- SRD spell picker ---------- */
 const SPELLDATA={};
 const dndLib=k=>LIB[k].filter(x=>sysOf(x)==='dnd5e');
-const libSpellRec=x=>({ed:x.ed||"",n:x.name,l:num(x.level),s:x.school||"",t:x.time||"",r:x.range||"",c:x.components||"",d:x.duration||"",k:!!x.conc,ri:!!x.ritual,cl:x.classes||[],desc:x.desc||"",hi:x.higher||"",lib:1});
+const libSpellRec=x=>({src:x.source||"",ed:x.ed||"",n:x.name,l:num(x.level),s:x.school||"",t:x.time||"",r:x.range||"",c:x.components||"",d:x.duration||"",k:!!x.conc,ri:!!x.ritual,cl:x.classes||[],desc:x.desc||"",hi:x.higher||"",lib:1});
 const spellList=r=>(SPELLDATA[r]||[]).concat(SPELLDATA[r==="2024"?"2014":"2024"]||[],dndLib("spells").map(libSpellRec));
 async function loadSpells(rules){
   if(SPELLDATA[rules])return SPELLDATA[rules];
@@ -3804,7 +3811,7 @@ function confirmTwice(btn,label){
 function addCamp(){
   const i=$("#newCampName"); const n=(i&&i.value||"").trim();
   if(!n){if(i)i.focus();return}
-  const k={id:uid(),name:n}; S.campaigns.push(k); ui.camp=k.id; ui.addCamp=false; save(); renderHome();
+  const k={id:uid(),name:n,srcs:{}}; Object.keys(LIB.packs||{}).forEach(x=>{if(packDefault(x))k.srcs[x]=true}); S.campaigns.push(k); ui.camp=k.id; ui.addCamp=false; save(); renderHome();
 }
 function rerender(kind){
   const c=cur(); if(!c)return;
@@ -4003,6 +4010,7 @@ document.addEventListener("click",e=>{
     case "new-char": ui.newChar=true; ui.addCamp=false; renderHome(); break;
     case "cancel-new": ui.newChar=false; renderHome(); break;
     case "new-game": ui.newGame=b.dataset.v; renderHome(); break;
+    case "camp-src": ui.campSrc=!ui.campSrc; renderHome(); break;
     case "create-char": {
       const camp0=S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"", ch=b.dataset.sys==="pf2e"?pfBlank(camp0):blankChar(camp0,b.dataset.rules);
       ui.newChar=false; S.characters.push(ch); ui.sel=ch.id; ui.tab="details"; ui.q=""; save(); renderSheet(); window.scrollTo(0,0);
@@ -4444,7 +4452,7 @@ function renderLib(){
   const L=ui.lib, ov=$("#libOv"); libEnrich();
   const pf=L.sys==="pf2e", cnt=k=>LIB[k].filter(x=>sysOf(x)===L.sys).length;
   const tabs=pf?PFLIBTABS.concat([["spells","My spells ("+cnt("spells")+")"],["items","My items ("+cnt("items")+")"],["sections","My text ("+cnt("sections")+")"]])
-    :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["sources","Sources"],["review","Needs review"+(libReviewList().length?" ("+libReviewList().length+")":"")],["book","Import a book"],["import","Import text"]];
+    :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["review","Needs review"+(libReviewList().length?" ("+libReviewList().length+")":"")],["book","Import a book"],["import","Import text"]];
   const sysBar=L.locked?`<div class="tags"><span class="tag ex">${pf?"Pathfinder 2e only":"D&amp;D 5e and 5.5e only"}</span></div>`
     :`<div class="seg" role="group" aria-label="Game system">${[["dnd5e","D&amp;D 5e and 5.5e"],["pf2e","Pathfinder 2e"]].map(([v,t])=>`<button class="btn sm${L.sys===v?" pri":""}" type="button" data-act="lib-sys" data-s="${v}" aria-pressed="${L.sys===v}">${t}</button>`).join("")}</div>`;
   const edBar=!pf&&!L.draft&&!L.view?`<label class="fld" style="max-width:260px"><span>Edition for new entries</span><select data-lined>${[["","5e and 5.5e (both)"],["2014","5e (2014)"],["2024","5.5e (2024)"]].map(([v,t])=>`<option value="${v}"${String(L.ed||"")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:"";
@@ -4456,7 +4464,7 @@ function renderLib(){
     body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-vback">Back to classes</button><button class="btn sm" type="button" data-act="lib-vedit">Edit</button></div>`+libClassViewHTML(LIB.classes[L.view.i]);
   }else if(!pf&&L.spl){
     body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-spl-back">Back to spells</button></div>`+libSplHTML();
-  }else body=L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():L.tab==="sources"?libSourcesHTML():L.tab==="review"?libReviewHTML():libListHTML(L.tab);
+  }else body=L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():L.tab==="sources"?`<p>Books are now turned on per campaign. On the Characters screen, tap a campaign, then Books for this campaign.</p>`:L.tab==="review"?libReviewHTML():libListHTML(L.tab);
   ov.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="libT">
     <div class="bar" style="margin:0"><h2 id="libT">Library</h2><span class="status" id="libStatus">${esc(libStatusText())}</span><button class="btn sm pri" type="button" data-act="lib-close">Done</button></div>
     ${sysBar}
@@ -5348,6 +5356,210 @@ function playClick(c,b){
   if(a==="pactpip"){const s=c.spellcasting.pact,m=num(s.max),left=Math.max(0,m-num(s.used)),n=num(b.dataset.n);s.used=m-(left===n?n-1:n);save();renderPlay(c);return true}
   return false;
 }
+
+/* ----- choices inside features, feats, traits and backgrounds -----
+   Reads a feature's text and finds the choices it gives (skills, tools, languages, ability scores, cantrips and spells,
+   damage types, short lists, fighting styles). Each one becomes a picker in Level up, the creator and on the sheet.
+   When the text clearly asks for a choice but lists nothing the app can read, a box lets you write the choice down. */
+const CHTOOLS={artisan:["Alchemist's supplies","Brewer's supplies","Calligrapher's supplies","Carpenter's tools","Cartographer's tools","Cobbler's tools","Cook's utensils","Glassblower's tools","Jeweler's tools","Leatherworker's tools","Mason's tools","Painter's supplies","Potter's tools","Smith's tools","Tinker's tools","Weaver's tools","Woodcarver's tools"],
+  music:["Bagpipes","Drum","Dulcimer","Flute","Horn","Lute","Lyre","Pan flute","Shawm","Viol"],
+  game:["Dice set","Dragonchess set","Playing card set","Three-Dragon Ante set"],
+  other:["Disguise kit","Forgery kit","Herbalism kit","Navigator's tools","Poisoner's kit","Thieves' tools","Vehicles (land)","Vehicles (water)"]};
+const CHLANG=["Common","Common Sign Language","Dwarvish","Elvish","Giant","Gnomish","Goblin","Halfling","Orc","Abyssal","Celestial","Deep Speech","Draconic","Infernal","Primordial","Sylvan","Undercommon"];
+const CHDMG=["acid","cold","fire","force","lightning","necrotic","poison","psychic","radiant","thunder"];
+const CHABN={str:"Strength",dex:"Dexterity",con:"Constitution",int:"Intelligence",wis:"Wisdom",cha:"Charisma"};
+const CHN="(a|an|one|two|three|four|five|\\d)";
+const chSkip=n=>/^(class traits|spellcasting|pact magic|ability score improvement|epic boon|expertise|hit points|proficiencies|equipment)\b/i.test(String(n||""));
+function chSentences(t){return String(t||"").replace(/\r/g,"").split(/(?<=[.!?])\s+|\n+/).map(s=>s.trim()).filter(Boolean)}
+const chInPlay=s=>/^(when|whenever|each time|if|once|until|while|as (a|an|your)\b|on (each of )?your turn|after|before|at the (start|end))/i.test(s)||/\byou can choose to\b/i.test(s);
+function chList(t){return String(t||"").replace(/\.$/,"").split(/,\s*(?:and\s+|or\s+)?|\s+or\s+|\s+and\s+/).map(x=>x.trim().replace(/^(the|a|an)\s+/i,"")).filter(Boolean)}
+function chSpecs(f,ctx){
+  ctx=ctx||{};
+  const name=String(f&&(f.name||f.n)||""), text=String(f&&(f.desc||f.d||f.text)||"");
+  if(!name||chSkip(name)||ctx.handled&&ctx.handled.has(lc(name)))return [];
+  const out=[], add=(o)=>{o.key=o.kind+":"+out.length;out.push(o)};
+  /* a feature called Fighting Style (not one of its options) is always a fighting style pick */
+  if(/^(additional )?fighting style$/i.test(name.trim())){add({kind:"style",n:1,label:"Choose a Fighting Style"});return out}
+  /* "choose one of the following" followed by named options written as run-ins ("Protector. You ...") */
+  {
+    const lines=text.replace(/\r/g,"").split(/\n+/), ci=lines.findIndex(l=>chSentences(l).some(x=>!chInPlay(x)&&!/\b(you can (add|use|choose)|can do only|when you|whenever|each time|on a hit|the target)\b/i.test(x)&&/\b(choose|select|pick)\b[^.]{0,60}\bfollowing\b|\b(one|two|three)\s+of the following\b|\bfollowing\b[^.]{0,40}\bof your choice\b|\bof your choice\b[^.]{0,40}\bfollowing\b/i.test(x)));
+    if(ci>=0){
+      const heads=[];
+      for(let j=ci+1;j<lines.length;j++){const m=lines[j].trim().match(/^\**([A-Z][A-Za-z'\u2019 \-]{1,34}?)(?:\s*\([^)]{1,30}\))?\.\**\s+\S/);if(m&&m[1].split(/\s+/).length<=5&&!/^(prerequisite|at|when|you|if|the|this|as|once)$/i.test(m[1]))heads.push(m[1].trim())}
+      if(heads.length>=2){const nm=lines[ci].match(new RegExp("\\b"+CHN+"\\b","i"));add({kind:"list",n:nm?luWordNum(nm[1])||1:1,opts:heads.map(h=>[h,h]),label:"Choose "+(nm?luWordNum(nm[1])||1:1)+" option"});return out}
+    }
+  }
+  const S=chSentences(text);
+  S.forEach(s=>{
+    if(chInPlay(s))return;
+    let m, hit=false;
+    /* skills (and "skill or tool") */
+    if((m=s.match(new RegExp("proficiency (?:in|with) "+CHN+" (?:additional |other |more |extra )?skills?( or tools?)?(?: of your choice)?(?:[^.:]*?(?:from|:|among) ([^.]+))?","i")))||(m=s.match(new RegExp(CHN+" (?:additional |other )?skills?( or tools?)? of your choice(?:[^.:]*?(?:from|:|among) ([^.]+))?","i")))){
+      const n=luWordNum(m[1])||1, from=m[3]?chList(m[3]).map(x=>FXSK.find(q=>lc(q[1])===lc(x))).filter(Boolean):[];
+      const opts=(from.length?from:FXSK).map(q=>[q[0],q[1]]);
+      if(m[2])CHTOOLS.artisan.concat(CHTOOLS.music,CHTOOLS.game,CHTOOLS.other).forEach(t=>opts.push(["tool:"+t,t]));
+      add({kind:"skill",n:n,opts:opts,label:"Choose "+n+" skill"+(n>1?"s":"")+(m[2]?" or tools":"")});hit=true;
+    }
+    if((m=s.match(new RegExp("(?:proficiency with|tool proficienc(?:y|ies)\\s*[:.]\\s*)"+CHN+" (?:type of |kind of )?(artisan'?s tools?|musical instruments?|gaming sets?|tools?)(?: of your choice)?","i")))){
+      const n=luWordNum(m[1])||1, k=/artisan/i.test(m[2])?CHTOOLS.artisan:/music/i.test(m[2])?CHTOOLS.music:/gaming/i.test(m[2])?CHTOOLS.game:CHTOOLS.artisan.concat(CHTOOLS.music,CHTOOLS.game,CHTOOLS.other);
+      add({kind:"tool",n:n,opts:k.map(t=>[t,t]),label:"Choose "+n+" "+(/artisan/i.test(m[2])?"artisan's tool":/music/i.test(m[2])?"musical instrument":/gaming/i.test(m[2])?"gaming set":"tool")+(n>1?"s":"")});hit=true;
+    }
+    if((m=s.match(/^languages?\s*[:.]\s*(a|an|one|two|three|\d)\b[^.]*?of your choice/i))||((m=s.match(new RegExp(CHN+" (?:additional |extra |other |more |standard |exotic )?languages?(?: of your choice)?","i")))&&/of your choice|\blearn\b/i.test(s))){
+      const n=luWordNum(m[1])||1; add({kind:"lang",n:n,opts:CHLANG.map(l=>[l,l]),label:"Choose "+n+" language"+(n>1?"s":"")});hit=true;
+    }
+    /* ability scores */
+    if((m=s.match(/increase (?:one|an|1) ability score of your choice by (\d)/i))||(m=s.match(/increase one of your ability scores by (\d)/i))){
+      add({kind:"abil",n:1,v:num(m[1],1),opts:CRAB.map(k=>[k,CHABN[k]]),label:"Choose an ability to raise by "+num(m[1],1)});hit=true;
+    }
+    if((m=s.match(/increase your ((?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)(?:,\s*(?:or\s+)?(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)|\s+or\s+(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma))+) score by (\d)/i))){
+      const ks=CRAB.filter(k=>new RegExp(CHABN[k],"i").test(m[1])); if(ks.length>1){add({kind:"abil",n:1,v:num(m[2],1),opts:ks.map(k=>[k,CHABN[k]]),label:"Choose an ability to raise by "+num(m[2],1)});hit=true}
+    }
+    /* spells of your choice from any class (Magical Secrets and the like) */
+    if((m=s.match(new RegExp("(?:learn|choose|gain)\\s+"+CHN+"\\s+(?:additional\\s+)?spells?(?:\\s+of your choice)?(?:\\s+from (?:any class|any spell list|the (\\w+),? (?:(\\w+),? )?(?:or|and) (\\w+) spell lists?))?","i")))&&/of your choice|any class/i.test(s)){
+      const cls=[m[2],m[3],m[4]].filter(Boolean).map(lc).filter(x=>SPCLS.includes(x));
+      add({kind:"spell",n:luWordNum(m[1])||1,lv:-1,cls:cls.length===1?cls[0]:"",clsAny:cls,label:"Choose "+(luWordNum(m[1])||1)+" spell"+((luWordNum(m[1])||1)>1?"s":"")+(cls.length?" from the "+cls.map(titleCase).join(", ")+" lists":" from any class")});hit=true;
+    }
+    /* expertise picked from a named list of skills */
+    if(/expertise/i.test(text)&&(m=s.match(new RegExp("choose\\s+"+CHN+"\\s+of the following skills[^:]*:\\s*([^.]+)","i")))){
+      const it=chList(m[2]).map(x=>FXSK.find(q=>lc(q[1])===lc(x))).filter(Boolean);
+      if(it.length>=2){add({kind:"exp",n:luWordNum(m[1])||1,opts:it.map(q=>[q[0],q[1]]),label:"Choose "+(luWordNum(m[1])||1)+" skill for Expertise"});hit=true}
+    }
+    /* cantrips and spells */
+    if((m=s.match(new RegExp("(?:learn|know|choose|gain)\\s+"+CHN+"\\s+(?:additional\\s+)?(?:(\\w+)\\s+)?cantrips?(?:[^.]*?from the (\\w+) spell list)?","i")))&&!/\bwhen you\b/i.test(s)){
+      const cls=SPCLS.includes(lc(m[3]||""))?lc(m[3]):SPCLS.includes(lc(m[2]||""))?lc(m[2]):"";
+      add({kind:"spell",n:luWordNum(m[1])||1,lv:0,cls:cls,label:"Choose "+(luWordNum(m[1])||1)+" cantrip"+((luWordNum(m[1])||1)>1?"s":"")+(cls?" from the "+titleCase(cls)+" list":"")});hit=true;
+    }
+    if((m=s.match(new RegExp(CHN+"\\s+(?:(?:1st|first)[- ]level|level[- ]1)\\s+(?:(\\w+)\\s+)?spells?(?:[^.]*?from the (\\w+) spell list)?","i")))&&/choice|learn|choose|spell list/i.test(s)){
+      const cls=SPCLS.includes(lc(m[3]||""))?lc(m[3]):SPCLS.includes(lc(m[2]||""))?lc(m[2]):"";
+      add({kind:"spell",n:luWordNum(m[1])||1,lv:1,cls:cls,label:"Choose "+(luWordNum(m[1])||1)+" level 1 spell"+((luWordNum(m[1])||1)>1?"s":"")+(cls?" from the "+titleCase(cls)+" list":"")});hit=true;
+    }
+    if(hit)return;
+    /* damage types */
+    const dm=CHDMG.filter(d=>new RegExp("\\b"+d+"\\b","i").test(s));
+    if(dm.length>=2&&/choose|of your choice|choice|select/i.test(s)&&!/\(your choice\)|choose (when|each time|which)|\bwhen you\b/i.test(s)){add({kind:"dmg",n:1,opts:dm.map(d=>[d,titleCase(d)]),label:"Choose a damage type"});return}
+    /* short inline lists: "choose one of the following: A, B, or C" */
+    if((m=s.match(new RegExp("(?:choose|select|pick)\\s+"+CHN+"[^.:]{0,40}?(?:following|from)\\s*:?\\s*([^.]+)","i")))){
+      const it=chList(m[2]); if(it.length>=2&&it.length<=10&&it.every(x=>x.split(/\s+/).length<=5)){add({kind:"list",n:luWordNum(m[1])||1,opts:it.map(x=>[x,titleCase(x)]),label:"Choose "+(luWordNum(m[1])||1)});return}
+    }
+  });
+  /* fighting styles with no options listed */
+  if(!out.length&&!/:/.test(name)&&/fighting style/i.test(name)&&/\b(choose|adopt|gain|select)\b/i.test(text))add({kind:"style",n:1,label:"Choose a Fighting Style"});
+  /* anything else that clearly asks for a choice */
+  if(!out.length&&!(ctx.noFree)){
+    const ask=S.find(s=>!chInPlay(s)&&new RegExp("\\b(choose|select|pick|gain|learn|adopt)\\b[^.]{0,60}\\b"+CHN+"\\b[^.]{0,80}\\b(of the following|of your choice|options?)\\b","i").test(s)&&!/\b(subclass|archetype|tradition|domain|college|circle|oath|patron|origin|conclave|path|bloodline|mystery)\b/i.test(s));
+    if(ask)add({kind:"free",n:1,label:ask.length>120?ask.slice(0,117)+"...":ask});
+  }
+  return out.filter((o,i)=>out.findIndex(q=>q.kind===o.kind&&q.n===o.n&&q.label===o.label)===i);
+}
+/* options for specs that need data: spells and fighting styles */
+async function chPrepare(c,specs){
+  const ed=c.rules==="2024"?"2024":"2014";
+  for(const sp of specs){
+    if(sp.kind==="spell"&&!sp.opts){
+      try{await loadSpells(ed)}catch(e){}
+      const have=new Set((c.spells||[]).map(x=>lc(x.name)));
+      const all=spellList(ed).filter(x=>(!x.ed||x.ed===ed||x.lib)&&(!x.lib||crPackOn(x.src)));
+      const maxl=sp.lv>=0?sp.lv:Math.max(1,(calcSlots(c).slots||[]).reduce((a,v,i)=>v?i+1:a,0)||(c.spellcasting&&c.spellcasting.pact&&num(c.spellcasting.pact.level))||1);
+      let L=all.filter(x=>(sp.lv>=0?x.l===sp.lv:x.l<=maxl)&&(!sp.cls||(x.cl||[]).some(n=>lc(n)===sp.cls))&&(!(sp.clsAny&&sp.clsAny.length>1)||(x.cl||[]).some(n=>sp.clsAny.includes(lc(n))))&&!have.has(lc(x.n)));
+      L=L.filter((x,i,a)=>a.findIndex(y=>lc(y.n)===lc(x.n))===i).sort((a,b)=>a.n.localeCompare(b.n));
+      sp.opts=L.map(x=>[x.n,x.n,x]);
+    }
+    if(sp.kind==="style"&&!sp.opts){
+      const opts=[];
+      try{const D=await loadClasses("2014");const fi=D.find(x=>x.name==="Fighter");(fi.features||[]).filter(f=>/^fighting style:/i.test(f.name)).forEach(f=>opts.push([f.name.replace(/^fighting style:\s*/i,""),f.name.replace(/^fighting style:\s*/i,""),{name:f.name,desc:f.desc,type:"class"}]))}catch(e){}
+      try{await crLoad5();libEnrich();crFeats(ed).filter(f=>f.t==="fighting-style").forEach(f=>{if(!opts.some(o=>lc(o[0])===lc(f.n)))opts.push([f.n,f.n+(f.src&&f.src!=="SRD"?" ("+f.src+")":""),{name:f.n,desc:f.d,type:"feat"}])})}catch(e){}
+      const have=new Set((c.features||[]).map(x=>lc(x.name).replace(/^fighting style:\s*/,"")));
+      sp.opts=opts.filter(o=>!have.has(lc(o[0])));
+    }
+  }
+  return specs;
+}
+/* rendering: st is {fkey:{specKey:[values] | "text"}} */
+function chHTML(groups,st){
+  return groups.map(g=>{
+    const fs=st[g.key]=st[g.key]||{};
+    return `<div class="chgrp"><h4>${esc(g.title)}</h4>${g.specs.map(sp=>{
+      const k=g.key+"|"+sp.key;
+      if(sp.kind==="free")return `<p class="hint" style="margin:4px 0">${esc(sp.label)}</p><label class="fld"><span>Your choice (written down on the feature)</span><input type="text" data-chf="${esc(k)}" value="${esc(fs[sp.key]||"")}" placeholder="What you chose"></label>`;
+      const pk=Array.isArray(fs[sp.key])?fs[sp.key]:[];
+      const opts=sp.opts||[];
+      return `<p class="chlbl">${esc(sp.label)} <span>(${pk.length} of ${sp.n})</span></p>${opts.length?`<div class="crgrid">${opts.map(o=>`<button class="crc${pk.includes(o[0])?" on":""}" type="button" data-ch="${esc(k)}" data-v="${esc(o[0])}" aria-pressed="${pk.includes(o[0])}"><b>${esc(o[1])}</b>${o[2]&&o[2].s?`<span>${esc(o[2].s)}</span>`:""}</button>`).join("")}</div>`:`<p class="hint">Nothing to choose from here. Add more sources to this campaign or write the choice in the feature.</p>`}`;
+    }).join("")}</div>`;
+  }).join("");
+}
+function chMissing(groups,st){
+  for(const g of groups)for(const sp of g.specs){
+    if(sp.kind==="free")continue;
+    const pk=(st[g.key]||{})[sp.key]; const need=Math.min(sp.n,(sp.opts||[]).length);
+    if((Array.isArray(pk)?pk.length:0)<need)return g.title+": "+sp.label.toLowerCase()+".";
+  }
+  return "";
+}
+function chAuto(groups,st){
+  groups.forEach(g=>{const fs=st[g.key]=st[g.key]||{};g.specs.forEach(sp=>{if(sp.kind!=="free"&&!(Array.isArray(fs[sp.key])&&fs[sp.key].length))fs[sp.key]=crShuffle(sp.opts||[]).slice(0,sp.n).map(o=>o[0])})});
+}
+let CHCTX=null;
+window.__chSpecs=chSpecs; /* used by tests */
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-ch]"); if(!b||!CHCTX)return;
+  const [gk,sk]=[b.dataset.ch.slice(0,b.dataset.ch.indexOf("|")),b.dataset.ch.slice(b.dataset.ch.indexOf("|")+1)];
+  const g=CHCTX.groups().find(x=>x.key===gk), sp=g&&g.specs.find(x=>x.key===sk); if(!sp)return;
+  const fs=CHCTX.st[gk]=CHCTX.st[gk]||{}, a=Array.isArray(fs[sk])?fs[sk]:(fs[sk]=[]), v=b.dataset.v, i=a.indexOf(v);
+  if(i>=0)a.splice(i,1);else{if(a.length>=sp.n)a.shift();a.push(v)}
+  CHCTX.render();
+});
+document.addEventListener("input",e=>{
+  const t=e.target; if(!t.dataset||t.dataset.chf==null||!CHCTX)return;
+  const k=t.dataset.chf, gk=k.slice(0,k.indexOf("|")), sk=k.slice(k.indexOf("|")+1);
+  (CHCTX.st[gk]=CHCTX.st[gk]||{})[sk]=t.value;
+});
+/* apply picks to the character and write them on the feature */
+function chApply(c,f,specs,fs){
+  if(!f||!fs)return;
+  const notes=[];
+  specs.forEach(sp=>{
+    const v=fs[sp.key]; if(v==null||(Array.isArray(v)&&!v.length)||v==="")return;
+    const vals=Array.isArray(v)?v:[v];
+    const label=x=>{const o=(sp.opts||[]).find(q=>q[0]===x);return o?o[1].replace(/ \(.+\)$/,""):x};
+    if(sp.kind==="skill")vals.forEach(x=>{if(/^tool:/.test(x))return;c.skills[x]=Math.max(1,num(c.skills[x]))});
+    if(sp.kind==="exp")vals.forEach(x=>{c.skills[x]=2});
+    if(sp.kind==="abil")vals.forEach(k=>{if(CRAB.includes(k))c.abilities[k]=Math.min(20,num(c.abilities[k])+num(sp.v,1))});
+    if(sp.kind==="spell")vals.forEach(n=>{const o=(sp.opts||[]).find(q=>q[0]===n),x=o&&o[2];if(x&&!c.spells.some(s=>lc(s.name)===lc(n)))c.spells.push(Object.assign(mkSpell(x.n),{level:x.l,school:x.s,time:x.t,range:x.r,components:x.c,duration:x.d,conc:x.k,ritual:x.ri,desc:x.desc,higher:x.hi,prepared:true}))});
+    if(sp.kind==="style")vals.forEach(n=>{const o=(sp.opts||[]).find(q=>q[0]===n),d=o&&o[2];if(d&&!c.features.some(x=>lc(x.name)===lc(d.name))){const x=mkFeat(d.name);x.source=f.source||"Fighting Style";x.desc=d.desc||"";x.type=d.type;fxAttach(x);c.features.push(x)}});
+    notes.push((sp.kind==="free"?"":sp.label.replace(/^Choose (an? |\d+ )?/i,"").replace(/^./,ch=>ch.toUpperCase())+": ")+vals.map(label).join(", "));
+  });
+  if(notes.length){f.desc=(f.desc?f.desc+"\n\n":"")+"Your choice: "+notes.join("; ")+".";f.chDone=true;fxAttach(f)}
+}
+const chPending=(c,f)=>!f.chDone&&chSpecs(f,{handled:chHandled(c)}).length>0;
+function chHandled(c){
+  /* features whose choices are already made another way: option groups and their parents */
+  const s=new Set(); (c.features||[]).forEach(f=>{const m=String(f.name||"").match(/^([^:]{3,60}):/);if(m)s.add(lc(m[1]));if(/^pact of the /i.test(f.name||""))s.add("pact boon")});
+  return s;
+}
+/* make a choice for one feature already on the sheet */
+async function chOpenFeature(c,fid){
+  PACKCAMP=c.campaign||null;
+  const f=c.features.find(x=>x.id===fid); if(!f)return;
+  const specs=await chPrepare(c,chSpecs(f,{handled:chHandled(c)}));
+  const st={}, groups=()=>[{key:"f",title:f.name,specs:specs}];
+  const o=$("#lvlOv");
+  const render=()=>{
+    CHCTX={st:st,groups:groups,render:render};
+    o.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="chT"><div class="bar" style="margin:0"><h2 id="chT">${esc(f.name)}</h2><button class="btn sm" type="button" data-chx="cancel">Close</button></div>
+      <section class="crbody">${chHTML(groups(),st)}</section><div class="msg" id="chMsg" role="status"></div>
+      <div class="crnav"><span class="sp"></span><button class="btn" type="button" data-chx="cancel">Cancel</button><button class="btn pri" type="button" data-chx="ok">Save choice</button></div></div>`;
+  };
+  ui.lvl=null; render(); o.hidden=false;
+  o.__ch={c:c,f:f,specs:specs,st:st,groups:groups};
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-chx]"); if(!b)return; const o=$("#lvlOv"), d=o.__ch; if(!d)return;
+  if(b.dataset.chx==="cancel"){o.hidden=true;o.__ch=null;CHCTX=null;return}
+  const miss=chMissing(d.groups(),d.st); if(miss){const m=$("#chMsg");if(m){m.textContent="Choose: "+miss;m.className="msg err"}return}
+  chApply(d.c,d.f,d.specs,d.st.f); o.hidden=true; o.__ch=null; CHCTX=null; save(); renderSheet();
+});
+document.addEventListener("click",e=>{const b=e.target.closest('[data-act="ch-open"]');if(!b)return;const c=cur();if(c)chOpenFeature(c,b.dataset.id)});
+
 /* ----- level up -----
    Each character has a levelling mode. Guided (the default): levels only change through the Level up steps, which
    offer exactly what the class (SRD or Library) gives at that level. Manual: levels and features are edited by hand.
@@ -5536,13 +5748,36 @@ function luDetail(c,P,L){
   return {feats:feats,groups:groups,asi:asi,boon:boon,style:style,exp:exp,sd:sd};
 }
 const LU_STEPS={cls:"Class",hp:"Hit points",sub:"Subclass",feat:"Features",choice:"Choices",asi:"Improvement",spells:"Spells",rev:"Review"};
+/* choices inside the new features (and inside options picked this level) */
+function luChSpecs(L,f,handled){
+  L.chCache=L.chCache||{}; const k=lc(f.name)+"|"+lc(f.desc||"").length;
+  if(!L.chCache[k])L.chCache[k]=chSpecs(f,{handled:handled});
+  return L.chCache[k];
+}
+function luChGroups(c,L){
+  const D=L.D; if(!D)return [];
+  const handled=chHandled(c); D.groups.forEach(g=>handled.add(lc(g.name))); if(D.style)handled.add("fighting style");
+  const list=D.feats.map(x=>({f:x.f,src:x.src}));
+  D.groups.forEach(g=>(L.picks[g.key]||[]).forEach(n=>{const f=g.opts.find(o=>o.name===n);if(f)list.push({f:f,src:g.src+" "+L.P.nl})}));
+  return list.map((x,i)=>({key:"g"+lc(x.f.name).replace(/[^a-z0-9]+/g,"-"),title:x.f.name,f:x.f,src:x.src,specs:luChSpecs(L,x.f,handled)})).filter(g=>g.specs.length);
+}
+function luFeatGroups(c,L){
+  const A=L.asi; if(A.k!=="feat"||!A.f)return [];
+  const fd=(L.feats||[]).find(f=>f.n===A.f); if(!fd)return [];
+  const sp=luChSpecs(L,{name:fd.n,desc:fd.d},new Set()); return sp.length?[{key:"feat",title:fd.n,f:{name:fd.n,desc:fd.d},specs:sp}]:[];
+}
+async function luChReady(c,L,groups){
+  const need=groups.flatMap(g=>g.specs).filter(sp=>(sp.kind==="spell"||sp.kind==="style")&&!sp.opts);
+  if(!need.length)return true;
+  await chPrepare(c,need); return false;
+}
 function luSteps(c,L){
   const s=["cls","hp"];
   if(L.P&&L.P.subDue)s.push("sub");
   s.push("feat");
   const D=L.D;
   if(L.goal&&(L.goal.newC>0||L.goal.newS>0))s.push("spells");
-  if(D&&(D.groups.length||D.exp||D.style))s.push("choice");
+  if(D&&(D.groups.length||D.exp||D.style||luChGroups(c,L).length))s.push("choice");
   if(D&&(D.asi||D.boon))s.push("asi");
   s.push("rev");
   return s;
@@ -5594,7 +5829,7 @@ function featAbils(f){
   return CRAB.filter(k=>new RegExp(FXABN[k]||k,"i").test(m[1]||m[0]));
 }
 async function openLevelUp(c,i,opt){
-  opt=opt||{};
+  opt=opt||{}; PACKCAMP=c.campaign||null;
   if(isPf(c))return;
   if(totalDice(c)>=20){luSay("Already at level 20.",true);return}
   if(!lvGuided(c)){openQuickLevel(c,i==null?0:i);return}
@@ -5611,7 +5846,7 @@ async function openLevelUp(c,i,opt){
 }
 async function luLoad(c,L){
   L.P=await luPlan(c,L.sel);
-  L.sub=""; L.picks={}; L.exp=[]; L.style=""; L.sp={c:[],s:[]};
+  L.sub=""; L.picks={}; L.exp=[]; L.style=""; L.sp={c:[],s:[]}; L.chs={}; L.chCache={};
   L.asi={k:"asi2",a:"",b:"",f:"",fa:""};
   if(L.P.err&&!L.P.d){L.D=null;L.goal=null;return}
   L.gain=L.P.avg; L.hpMode="avg";
@@ -5671,7 +5906,9 @@ function luBody(c,L){
       const rows=g.opts.map(f=>({f:f,pr:luPreCheck(c,f,P.nl,ex)})).sort((a,b)=>(b.pr.ok?1:0)-(a.pr.ok?1:0)), locked=rows.filter(r=>!r.pr.ok).length;
       h+=`<h4>${esc(g.name)}: choose ${g.n} (${pk.length} chosen)</h4><div class="crgrid">${rows.map(({f,pr})=>luCard("opt",g.key+"|"+f.name,f.name.replace(/^[^:]+:\s*/,""),pk.includes(f.name),(luPreLine(pr)?luPreLine(pr)+" · ":"")+luSnip(f),!pr.ok&&!pk.includes(f.name))).join("")}</div>${locked?`<p class="hint">${locked} greyed out at the end because you do not meet their prerequisites yet.</p>`:""}`;
     });
-    if(D.style){const S=luStyleFeats(c);h+=`<h4>Fighting Style feat</h4><div class="crgrid">${S.map(f=>luCard("style",f.n,f.n,L.style===f.n,luSnip(f))).join("")||'<p class="hint">No Fighting Style feats found. Turn on a source in Library, Sources, or add one later.</p>'}</div>`}
+    if(D.style){const S=luStyleFeats(c);h+=`<h4>Fighting Style feat</h4><div class="crgrid">${S.map(f=>luCard("style",f.n,f.n,L.style===f.n,luSnip(f))).join("")||'<p class="hint">No Fighting Style feats found. Turn on more books for this campaign (Characters screen, tap the campaign, Books for this campaign).</p>'}</div>`}
+    const CG=luChGroups(c,L);
+    if(CG.length){h+=chHTML(CG,L.chs);CHCTX={st:L.chs,groups:()=>luChGroups(c,L),render:()=>luRender(c,1)};luChReady(c,L,CG).then(r=>{if(!r&&ui.lvl===L)luRender(c,1)})}
     if(D.exp){
       const prof=SKILLS.filter(s=>num(c.skills[s[0]])===1);
       h+=`<h4>Expertise: choose ${D.exp} (${L.exp.length} chosen)</h4>${prof.length?`<div class="crgrid">${prof.map(s=>luCard("exp",s[0],s[1],L.exp.includes(s[0]))).join("")}${num(c.skills.thieves)===0&&/rogue/i.test(P.cls)?"":""}</div>`:'<p class="hint">You have no skill proficiencies to double yet. Mark them on the Overview and come back, or set expertise there later.</p>'}`;
@@ -5680,14 +5917,17 @@ function luBody(c,L){
   }
   if(st==="asi"){
     const A=L.asi, F=L.feats||[], tot=c.abilities;
-    const prev=k=>{const add=(A.k==="asi2"&&A.a===k?2:0)+(A.k==="asi11"&&(A.a===k||A.b===k)?1:0)+(A.k==="feat"&&A.fa===k?1:0);return Math.min(20,num(tot[k])+add)};
-    const fdef=F.find(f=>f.n===A.f), fab=featAbils(fdef);
+    const FG=luFeatGroups(c,L), fab=[];
+    const fup=k=>FG.flatMap(g=>g.specs.filter(sp=>sp.kind==="abil").map(sp=>(((L.chs[g.key]||{})[sp.key]||[]).includes(k)?num(sp.v,1):0))).reduce((a,b)=>a+b,0);
+    const prev=k=>{const add=(A.k==="asi2"&&A.a===k?2:0)+(A.k==="asi11"&&(A.a===k||A.b===k)?1:0)+(A.k==="feat"?fup(k):0);return Math.min(20,num(tot[k])+add)};
+    const fdef=F.find(f=>f.n===A.f);
+    if(FG.length){CHCTX={st:L.chs,groups:()=>luFeatGroups(c,L),render:()=>luRender(c,1)};luChReady(c,L,FG).then(r=>{if(!r&&ui.lvl===L)luRender(c,1)})}
     const choices=L.mode==="boon"?[["feat","Take an Epic Boon or feat"],["asi2","+2 to one ability"],["asi11","+1 to two abilities"]]:[["asi2","+2 to one ability"],["asi11","+1 to two abilities"],["feat","Take a feat"]];
     return `<div class="seg">${choices.map(([v,t])=>`<button class="btn sm${A.k===v?" pri":""}" type="button" data-lu="asik" data-v="${v}" aria-pressed="${A.k===v}">${t}</button>`).join("")}</div>
       ${A.k==="feat"?`<label class="fld"><span>Feat</span>${luSel("f",A.f,F.map(f=>[f.n,f.n+(f.src&&f.src!=="SRD"?" ("+f.src+")":"")]),"Choose a feat")}</label>
         ${fdef?`<div class="crd"><p class="prose">${esc(String(fdef.d||"").slice(0,900))}</p></div>`:""}
-        ${fab.length?`<label class="fld"><span>This feat also raises one ability by 1</span>${luSel("fa",A.fa,fab.filter(k=>num(tot[k])<20).map(k=>[k,crAbName(k)]),"Choose")}</label>`:""}
-        ${F.length?"":`<p class="hint">No feats found that you qualify for. Turn on more sources in Library, Sources.</p>`}
+        ${FG.length?chHTML(FG,L.chs):""}
+        ${F.length?"":`<p class="hint">No feats found that you qualify for. Turn on more books for this campaign on the Characters screen.</p>`}
         ${L.featHidden?`<p class="hint">${L.featHidden} feat${L.featHidden===1?" is":"s are"} not listed because you do not meet ${L.featHidden===1?"its":"their"} prerequisites yet.</p>`:""}
         ${fdef&&luPreText({d:fdef.d})?`<p class="hint">Prerequisite: ${esc(luPreText({d:fdef.d}))}</p>`:""}`
       :`<div class="igrid"><label class="fld"><span>${A.k==="asi2"?"Ability":"First ability"}</span>${luSel("a",A.a,CRAB.filter(k=>num(tot[k])<20).map(k=>[k,crAbName(k)+" ("+num(tot[k])+")"]),"Choose")}</label>
@@ -5718,7 +5958,8 @@ function luSummary(c,L){
     if(L.style)fs.push(L.style);
     if(fs.length)out.push("Features: "+fs.join(", "));
     if(L.exp.length)out.push("Expertise: "+L.exp.map(crSkName).join(", "));
-    if(D.asi||D.boon){const A=L.asi;out.push(A.k==="feat"?(A.f?"Feat: "+A.f+(A.fa?" (+1 "+crAbName(A.fa)+")":""):"No feat chosen"):A.k==="asi2"?(A.a?"+2 "+crAbName(A.a):"No ability chosen"):((A.a?"+1 "+crAbName(A.a):"")+(A.b?", +1 "+crAbName(A.b):"")||"No abilities chosen"))}
+    luChGroups(c,L).concat(luFeatGroups(c,L)).forEach(g=>{const fs=L.chs[g.key]||{};const parts=g.specs.map(sp=>{const v=fs[sp.key];if(!v||(Array.isArray(v)&&!v.length))return "";const vals=Array.isArray(v)?v:[v];return vals.map(x=>{const o=(sp.opts||[]).find(q=>q[0]===x);return o?o[1]:x}).join(", ")}).filter(Boolean);if(parts.length)out.push(g.title+": "+parts.join("; "))});
+    if(D.asi||D.boon){const A=L.asi;out.push(A.k==="feat"?(A.f?"Feat: "+A.f:"No feat chosen"):A.k==="asi2"?(A.a?"+2 "+crAbName(A.a):"No ability chosen"):((A.a?"+1 "+crAbName(A.a):"")+(A.b?", +1 "+crAbName(A.b):"")||"No abilities chosen"))}
   }
   if(L.sp.c.length||L.sp.s.length)out.push("Spells: "+L.sp.c.concat(L.sp.s).join(", "));
   if(L.slotTxt)out.push("Spell slots: "+L.slotTxt);
@@ -5733,9 +5974,10 @@ function luValid(c,L){
     for(const g of D.groups){const okN=g.opts.filter(f=>luPreCheck(c,f,P.nl,Object.values(L.picks).flat()).ok).length;const need=Math.min(g.n,okN);if((L.picks[g.key]||[]).length<need)return "Choose "+need+" for "+g.name+".";}
     if(D.style&&luStyleFeats(c).length&&!L.style)return "Choose a Fighting Style feat.";
     if(D.exp&&SKILLS.some(s=>num(c.skills[s[0]])===1)&&L.exp.length<Math.min(D.exp,SKILLS.filter(s=>num(c.skills[s[0]])===1).length))return "Choose "+D.exp+" skills for Expertise.";
+    const cm=chMissing(luChGroups(c,L),L.chs); if(cm)return "Choose "+cm;
     return "";
   }
-  if(st==="asi"){const A=L.asi;if(A.k==="feat"&&!A.f)return "Choose a feat.";if(A.k==="feat"&&featAbils((L.feats||[]).find(f=>f.n===A.f)).length&&!A.fa)return "Choose which ability the feat raises.";if(A.k==="asi2"&&!A.a)return "Choose an ability.";if(A.k==="asi11"&&(!A.a||!A.b))return "Choose two abilities.";return ""}
+  if(st==="asi"){const A=L.asi;if(A.k==="feat"&&!A.f)return "Choose a feat.";if(A.k==="feat"){const cm=chMissing(luFeatGroups(c,L),L.chs);if(cm)return "Choose "+cm}if(A.k==="asi2"&&!A.a)return "Choose an ability.";if(A.k==="asi11"&&(!A.a||!A.b))return "Choose two abilities.";return ""}
   return "";
 }
 function luRender(c,keep){
@@ -5773,7 +6015,7 @@ function luAutoPick(c,L){
     if(d2.style){const S=luStyleFeats(c);if(S.length)L.style=crPick(S).n}
     if(d2.exp){L.exp=crShuffle(SKILLS.filter(s=>num(c.skills[s[0]])===1).map(s=>s[0])).slice(0,d2.exp)}
     if(d2.asi||d2.boon){const pri=(CRPRI[P.cls]||[]).concat(CRAB).filter(k=>num(c.abilities[k])<20);
-      if(d2.boon&&!d2.asi&&(L.feats||[]).length){L.asi={k:"feat",f:crPick(L.feats).n,a:"",b:"",fa:""};const fa=featAbils((L.feats||[]).find(f=>f.n===L.asi.f));if(fa.length)L.asi.fa=fa.find(k=>num(c.abilities[k])<20)||""}
+      if(d2.boon&&!d2.asi&&(L.feats||[]).length){L.asi={k:"feat",f:crPick(L.feats).n,a:"",b:"",fa:""}}
       else if(pri.length&&num(c.abilities[pri[0]])<=18)L.asi={k:"asi2",a:pri[0],b:"",f:"",fa:""};
       else L.asi={k:"asi11",a:pri[0]||"con",b:pri.find(k=>k!==pri[0])||"dex",f:"",fa:""};}
   }
@@ -5790,6 +6032,7 @@ function luSpellAuto(L){
 async function luAuto(c,L){
   if(!L.P||!L.P.d){ui.lvl=null;return}
   L.gain=L.P.avg; luAutoPick(c,L); await luSpellsPrep(c,L); luSpellAuto(L);
+  const G=luChGroups(c,L).concat(luFeatGroups(c,L)); await luChReady(c,L,G); chAuto(G,L.chs);
   levelDone(c);
 }
 /* apply a finished guided level up */
@@ -5809,7 +6052,7 @@ function luApply(c,L){
   else{c.hpMax=num(c.hpMax)+g; c.hp=num(c.hp)+g;}
   const add=(f,src,type)=>{if(c.features.some(o=>lc(o.name)===lc(f.name)&&lc(o.source)===lc(src)))return;const x=mkFeat(f.name);x.source=src;x.desc=f.desc||f.d||"";x.type=type;fxAttach(x);c.features.push(x)};
   if(P.d){
-    const D=luDetail(c,P,L);
+    const D=luDetail(c,P,L), CG=luChGroups(c,L), FG=luFeatGroups(c,L);
     D.feats.forEach(x=>add(x.f,x.src,"class"));
     D.groups.forEach(gr=>(L.picks[gr.key]||[]).forEach(n=>{const f=gr.opts.find(o=>o.name===n);if(f)add(f,gr.src+" "+P.nl,"class")}));
     if(L.style){const f=crFeats(luEd(c)).find(x=>x.n===L.style);if(f)add({name:f.n,desc:f.d},"Fighting Style ("+P.cls+" "+P.nl+")","feat")}
@@ -5818,11 +6061,13 @@ function luApply(c,L){
       const A=L.asi, up=(k,v)=>{if(k&&CRAB.includes(k))c.abilities[k]=Math.min(20,num(c.abilities[k])+v)};
       if(A.k==="asi2")up(A.a,2);
       else if(A.k==="asi11"){up(A.a,1);up(A.b,1)}
-      else if(A.k==="feat"&&A.f){const f=(L.feats||[]).find(x=>x.n===A.f);add({name:A.f,desc:f?f.d:""},"Level "+(totalDice(c))+" feat","feat");up(A.fa,1)}
-      const ch=A.k==="feat"?(A.f?"took the "+A.f+" feat"+(A.fa?" (+1 "+crAbName(A.fa)+")":""):""):A.k==="asi2"?"+2 "+crAbName(A.a):"+1 "+crAbName(A.a)+", +1 "+crAbName(A.b);
+      else if(A.k==="feat"&&A.f){const f=(L.feats||[]).find(x=>x.n===A.f);add({name:A.f,desc:f?f.d:""},"Level "+(totalDice(c))+" feat","feat")}
+      const ch=A.k==="feat"?(A.f?"took the "+A.f+" feat":""):A.k==="asi2"?"+2 "+crAbName(A.a):"+1 "+crAbName(A.a)+", +1 "+crAbName(A.b);
       const af=c.features.slice().reverse().find(f=>/^(ability score improvement|epic boon)/i.test(f.name)&&/\s(\d+)$/.test(f.source||"")&&num((f.source.match(/(\d+)$/)||[])[1])===P.nl);
       if(af&&ch)af.desc=(af.desc?af.desc+"\n\n":"")+"Your choice at level "+totalDice(c)+": "+ch+".";
     }
+    CG.forEach(g=>{const f=c.features.slice().reverse().find(x=>lc(x.name)===lc(g.f.name)&&lc(x.source)===lc(g.src));if(f)chApply(c,f,g.specs,L.chs[g.key])});
+    FG.forEach(g=>{const f=c.features.slice().reverse().find(x=>lc(x.name)===lc(g.f.name));if(f)chApply(c,f,g.specs,L.chs[g.key])});
     if(c.rules==="2024"&&P.d.mastery){let best=-1,v=0;Object.keys(P.d.mastery).forEach(k=>{if(num(k)<=P.nl&&num(k)>best){best=num(k);v=num(P.d.mastery[k])}});if(best>=0&&idx===0)c.mastery.slots=v}
   }
   if(L.goal){
@@ -5955,7 +6200,7 @@ document.addEventListener("change",e=>{
   const t=e.target, L=ui.lvl; if(!t.dataset||!t.dataset.luf||!L||!L.g)return;
   const f=t.dataset.luf, c=cur(); if(!c)return;
   if(f==="gain"){L.gain=num(t.value);return}
-  L.asi[f]=t.value; if(f==="a"&&L.asi.b===t.value)L.asi.b=""; if(f==="f")L.asi.fa="";
+  L.asi[f]=t.value; if(f==="a"&&L.asi.b===t.value)L.asi.b=""; if(f==="f"){L.asi.fa="";if(L.chs)delete L.chs.feat}
   L.msg=""; luRender(c,1);
 });
 document.addEventListener("keydown",e=>{
@@ -7260,7 +7505,10 @@ const CRARRAY=[15,14,13,12,10,8], CRPB={8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
 const crSkId=n=>(FXSK.find(x=>lc(x[1])===lc(n))||[0,""])[0];
 const crSkName=id=>(FXSK.find(x=>x[0]===id)||[0,id])[1];
 const crAbName=k=>FXABN[k]||k;
-const crPackOn=src=>{const p=LIB.packs&&LIB.packs[String(src||"").trim()||"No source name"];return !!(p&&p.creator)};
+/* which imported books a character can use: set per campaign; characters without a campaign use the defaults */
+let PACKCAMP=null;
+const packDefault=n=>{const p=LIB.packs&&LIB.packs[n];return !!(p&&p.creator)};
+const crPackOn=src=>{const n=String(src||"").trim()||"No source name", k=PACKCAMP&&S.campaigns.find(x=>x.id===PACKCAMP);return k&&k.srcs?!!k.srcs[n]:packDefault(n)};
 const crQ=s=>String(s||"").replace(/[\u2018\u2019]/g,"'").trim().toLowerCase();
 async function crLoad5(){
   if(CRD.o)return;
@@ -7354,13 +7602,14 @@ function crSteps(s){
   const a=["Basics","Species","Class","Background","Abilities","Skills","Gear"];
   if(s.casterMeta&&s.casterMeta.sc)a.push("Spells");
   if(s.level>=4)a.push("Improvements");
+  if(crChGroups(s).length)a.push("Choices");
   a.push("Review"); return a;
 }
 
 /* ---- 5e steps ---- */
 const crCard=(act,val,title,on,sub)=>`<button class="crc${on?" on":""}" type="button" data-cr="${act}" data-v="${esc(val)}" aria-pressed="${!!on}"><b>${esc(title)}</b>${sub?`<span>${esc(sub)}</span>`:""}</button>`;
 const crSel=(f,val,opts,ph)=>`<select data-crf="${f}">${ph!=null?`<option value="">${esc(ph)}</option>`:""}${opts.map(o=>{const v=Array.isArray(o)?o[0]:o,t=Array.isArray(o)?o[1]:o;return `<option value="${esc(v)}"${String(val)===String(v)?" selected":""}>${esc(t)}</option>`}).join("")}</select>`;
-function crSrcNote(list){const n=new Set(list.filter(x=>x.src&&x.src!=="SRD").map(x=>x.src));return n.size?`<p class="hint">Includes content from: ${[...n].map(esc).join(", ")}.</p>`:`<p class="hint">Showing the free SRD options. Turn on your imported content under Library, Sources to see it here.</p>`}
+function crSrcNote(list){const n=new Set(list.filter(x=>x.src&&x.src!=="SRD").map(x=>x.src));return n.size?`<p class="hint">Includes content from: ${[...n].map(esc).join(", ")}.</p>`:`<p class="hint">Showing the free SRD options. To use your imported books, turn them on for this campaign: on the Characters screen tap the campaign, then Books for this campaign.</p>`}
 function crStepBasics(s){
   return `<div class="igrid"><label class="fld"><span>Character name</span><input data-crf="name" value="${esc(s.name)}" placeholder="Name"></label>
     <label class="fld lv"><span>${s.sys==="pf2e"?"Level":"Starting level"}</span><input type="number" inputmode="numeric" min="1" max="20" data-crf="level" value="${s.sys==="pf2e"?s.level:(s.target||1)}"></label></div>
@@ -7390,6 +7639,40 @@ function crOptGroups(s){
   return out;
 }
 function crExpN(s){const cl=s.L&&s.L.classes.find(x=>x.n===s.cls);return cl?(cl.data.features||[]).filter(f=>num(f.lvl)<=1&&/^expertise\b/i.test(f.name)).reduce((a,f)=>a+luCount(String(f.desc||"").replace(/choose\s+(one|two|three|four)\s+of your skill/i,"choose $1"),2),0):0}
+/* the creator's Choices step: choices inside species traits, background, origin feat and level 1 class features */
+function crChGroups(s){
+  if(s.sys==="pf2e"||!s.L)return [];
+  const out=[], sp=s.speciesObj, bg=s.bgObj, cl=s.L.classes.find(x=>x.n===s.cls);
+  const keyOf=(t,n)=>t+"-"+lc(n).replace(/[^a-z0-9]+/g,"-");
+  s.chCache=s.chCache||{};
+  const specs=(f,h)=>{const k=lc(f.name)+"|"+String(f.desc||"").length;return s.chCache[k]||(s.chCache[k]=chSpecs(f,{handled:h||new Set()}))};
+  const push=(t,f,src,type)=>{const sp2=specs(f);if(sp2.length)out.push({key:keyOf(t,f.name),title:f.name,f:f,src:src,type:type,specs:sp2})};
+  if(sp){
+    const subPre=new Set((sp.sub||[]).map(x=>lc(String(x.n).split(":")[0])));
+    sp.tr.filter(t=>!subPre.has(lc(t.n))).forEach(t=>push("sp",{name:t.n,desc:t.d},s.species,"race"));
+    const sb=(sp.sub||[]).find(x=>x.n===s.sub); if(sb)(sb.tr||[]).forEach(t=>push("sb",{name:t.n,desc:t.d},s.sub,"race"));
+    if(num(sp.lgn)>0){const k="sp-languages";s.chCache[k]=s.chCache[k]||[{kind:"lang",n:num(sp.lgn),key:"lang:0",opts:CHLANG.filter(l=>!(sp.lg||[]).includes(l)).map(l=>[l,l]),label:"Choose "+num(sp.lgn)+" extra language"+(num(sp.lgn)>1?"s":"")}];out.push({key:k,title:sp.n+" languages",f:null,specs:s.chCache[k]})}
+  }
+  if(bg){
+    const txt=s.ed==="2014"?bg.d:(bg.lib?bg.d:"");
+    if(txt)push("bg",{name:bg.n+" background",desc:txt},bg.n,"background");
+    if(bg.feat){const f=s.L.feats.find(x=>lc(x.n)===lc(bg.feat));if(f)push("of",{name:bg.feat+(bg.fnote?" ("+bg.fnote+")":""),desc:f.d},"Origin feat","feat")}
+  }
+  if(cl){
+    const d=cl.data||{}, SN=luSubNames(d), sd=s.subcls?subDef(d,s.subcls):null;
+    const h=new Set(crOptGroups(s).map(g=>g.key));
+    (d.features||[]).filter(f=>num(f.lvl)<=1&&!SN.has(lc(f.name))&&!/:/.test(f.name)).forEach(f=>{const x=specs(f,h);if(x.length)out.push({key:keyOf("cl",f.name),title:f.name,f:f,src:cl.n+" 1",type:"class",specs:x})});
+    if(sd)(sd.features||[]).filter(f=>num(f.lvl)<=1&&!/:/.test(f.name)).forEach(f=>{const x=specs(f,h);if(x.length)out.push({key:keyOf("sc",f.name),title:f.name,f:f,src:sd.name+" 1",type:"class",specs:x})});
+  }
+  return out;
+}
+function crStepChoices(s){
+  const G=crChGroups(s); s.chs=s.chs||{};
+  CHCTX={st:s.chs,groups:()=>crChGroups(s),render:()=>crRender(true)};
+  const need=G.flatMap(g=>g.specs).filter(sp=>(sp.kind==="spell"||sp.kind==="style")&&!sp.opts);
+  if(need.length){const c={rules:s.ed,spells:[],features:[]};chPrepare(c,need).then(()=>{if(CR===s)crRender(true)});return `<p>Loading choices...</p>`}
+  return `<p>Some of your traits, background and features let you choose. Pick them here.</p>${chHTML(G,s.chs)}<div class="btns"><button class="btn sm" type="button" data-cr="chauto">Pick for me</button></div>`;
+}
 function crStepClass(s){
   const L=s.L.classes, c=L.find(x=>x.n===s.cls);
   let det="";
@@ -7526,6 +7809,7 @@ function crValid(s){
   if(s.sys==="pf2e")return crValidPf(s,st);
   if(st==="Basics")return "";
   if(st==="Species"){if(!s.species)return "Choose a species.";const sp=s.speciesObj;if(sp&&s.ed==="2014"&&sp.abo&&s.aboPicks.length!==sp.abo.n)return "Choose "+sp.abo.n+" abilities for the bonus.";return ""}
+  if(st==="Choices"){const m=chMissing(crChGroups(s),s.chs||{});return m?"Choose "+m:""}
   if(st==="Class"){if(!s.cls)return "Choose a class.";const cl=s.L.classes.find(x=>x.n===s.cls);if(cl&&(cl.data.subclasses||[]).length&&crSubLv(cl.data)<=1&&!s.subcls)return "Choose a subclass.";for(const g of crOptGroups(s)){if(((s.opts||{})[g.key]||[]).length<g.n)return "Choose "+g.n+" for "+g.name+"."}return ""}
   if(st==="Background"){if(!s.bg)return "Choose a background.";const b=s.bgObj;if(s.ed==="2024"&&b&&b.ab&&b.ab.length===3&&s.bgMode==="21"&&(!s.bgA||!s.bgB))return "Choose where the +2 and +1 go.";return ""}
   if(st==="Abilities"){
@@ -7580,7 +7864,8 @@ async function crBuild5(s){
   const addF=(name,src,desc,type)=>{const x=mkFeat(name);x.source=src;x.desc=desc||"";if(type)x.type=type;fxAttach(x);c.features.push(x)};
   if(sp){
     sp.tr.forEach(t=>addF(t.n,s.species,t.d,"race"));
-    if(s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb)(sb.tr||[]).forEach(t=>addF(t.n,s.sub,t.d,"race"))}
+    if(s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb)(sb.tr||[]).forEach(t=>addF(t.n,s.sub,t.d,"race"));
+      const pre=lc(String(s.sub).split(":")[0]);c.features.forEach(f=>{if(lc(f.name)===pre){f.chDone=true;f.desc=(f.desc?f.desc+"\n\n":"")+"Your choice: "+String(s.sub).replace(/^[^:]+:\s*/,"")+"."}})}
   }
   if(bg&&bg.feat){const f=s.L.feats.find(x=>lc(x.n)===lc(bg.feat));addF(bg.feat+(bg.fnote?" ("+bg.fnote+")":""),"Origin feat",f?f.d:(bg.d||""),"feat");c.originFeat=bg.feat}
   if(ed==="2014"&&bg&&bg.d)addF(bg.n+" background",bg.n,bg.d,"background");
@@ -7645,6 +7930,9 @@ async function crFinish(s){
   /* level 1 choices made in the creator */
   crOptGroups(s).forEach(g=>((s.opts||{})[g.key]||[]).forEach(n=>{const f=g.opts.find(o=>o.name===n);if(f&&!c.features.some(x=>lc(x.name)===lc(n))){const x=mkFeat(f.name);x.source=g.src+" 1";x.desc=f.desc||"";x.type="class";fxAttach(x);c.features.push(x)}}));
   (s.exp||[]).forEach(k=>{if(num(c.skills[k]))c.skills[k]=2});
+  crChGroups(s).forEach(g=>{const fs=(s.chs||{})[g.key];if(!fs)return;let f=g.f?c.features.find(x=>lc(x.name)===lc(g.f.name)):null;
+    if(!f){f=mkFeat(g.title);f.source=s.species||"";f.type="race";c.features.push(f)}
+    chApply(c,f,g.specs,fs)});
   syncClassFields(c); syncSlots(c);
   c.updated=Date.now(); save(); closeCreator(); renderSheet(); window.scrollTo(0,0);
   const t=num(s.target);
@@ -7671,6 +7959,7 @@ async function crRandom5(s){
   s.eq={}; (m.eq||[]).forEach((g,i)=>{const kits=g.opts.map((o,j)=>j).filter(j=>g.opts[j].items.length);s.eq[i]=kits.length?crPick(kits):0}); s.bgEq="A";
   s.asi={}; crAsiLevels(s).forEach(l=>{const p=CRPRI[s.cls]||CRAB; s.asi[l]={k:"asi2",a:p[0],b:p[1],f:""}});
   crSync(s); crAutoSpells(s);
+  s.chs={}; s.chCache={}; {const G=crChGroups(s);const need=G.flatMap(g=>g.specs).filter(sp=>(sp.kind==="spell"||sp.kind==="style")&&!sp.opts);if(need.length)await chPrepare({rules:s.ed,spells:[],features:[]},need);chAuto(G,s.chs)}
   s.story=crStory(s);
   s.step=crSteps(s).length-1;
 }
@@ -7900,7 +8189,7 @@ const crOv=()=>$("#crOv");
 function crStepBody(s){
   const st=crSteps(s)[s.step];
   if(s.sys==="pf2e")return {Basics:crStepBasics,Ancestry:crStepPfAnc,Background:crStepPfBg,Class:crStepPfCls,Abilities:crStepPfAbil,Skills:crStepPfSkills,Feats:crStepPfFeats,Spells:crStepPfSpells,Review:crStepPfReview}[st](s);
-  return {Basics:crStepBasics,Species:crStepSpecies,Class:crStepClass,Background:crStepBg,Abilities:crStepAbil,Skills:crStepSkills,Gear:crStepGear,Spells:crStepSpells,Improvements:crStepImprove,Review:crStepReview5}[st](s);
+  return {Basics:crStepBasics,Species:crStepSpecies,Class:crStepClass,Background:crStepBg,Abilities:crStepAbil,Skills:crStepSkills,Gear:crStepGear,Spells:crStepSpells,Improvements:crStepImprove,Choices:crStepChoices,Review:crStepReview5}[st](s);
 }
 function crRender(keep){
   const s=CR, o=crOv(); if(!s||!o)return;
@@ -7923,6 +8212,7 @@ function crRender(keep){
   const sh=o.querySelector(".sheet"); if(sh&&keep)sh.scrollTop=prev; o.scrollTop=keep?ovTop:0;
 }
 async function openCreator(sys,ed,rand){
+  PACKCAMP=ui.camp&&S.campaigns.some(k=>k.id===ui.camp)?ui.camp:null;
   CR=crNewState(sys); CR.ed=ed; CR.loading=true; CR.rand=!!rand; CR.name=""; ui.newChar=false;
   const o=crOv(); o.hidden=false; crRender();
   try{
@@ -7931,7 +8221,7 @@ async function openCreator(sys,ed,rand){
   }catch(e){ CR.loading=false; CR.msg="The game data could not be loaded here. "+(e.message||""); }
   crRender();
 }
-function closeCreator(){const o=crOv();if(o){o.hidden=true;o.innerHTML=""}CR=null}
+function closeCreator(){const o=crOv();if(o){o.hidden=true;o.innerHTML=""}CR=null;CHCTX=null;if(ui.view==="home")renderHome()}
 function crSetPath(s,f,v){
   const p=f.split("."), pf=s.pf;
   if(p[0]==="name"){s.name=v;return false}
@@ -7980,7 +8270,7 @@ async function crAct(a,b){
       catch(e){ s.busy=false; s.msg="Could not create the character: "+(e.message||e) }
       break;}
     /* 5e */
-    case "species": s.species=v; s.sub=""; s.aboPicks=[]; break;
+    case "species": s.species=v; s.sub=""; s.aboPicks=[]; s.chs={}; break;
     case "sub": s.sub=s.sub===v?"":v; break;
     case "abo": {const sp=s.speciesObj; crToggle(s.aboPicks,v,sp&&sp.abo?sp.abo.n:2); break;}
     case "cls": s.cls=v; s.subcls=""; s.skills=[]; s.eq={}; s.spells={c:[],s:[]}; s.base={}; s.opts={}; s.exp=[]; break;
@@ -7999,6 +8289,7 @@ async function crAct(a,b){
     case "spc": crToggle(s.spells.c,v,s.goal?s.goal.cantrips:0); break;
     case "sps": crToggle(s.spells.s,v,s.goal?s.goal.spells:0); break;
     case "spauto": crSync(s); crAutoSpells(s); break;
+    case "chauto": s.chs=s.chs||{}; chAuto(crChGroups(s),s.chs); break;
     /* pf2e */
     case "panc": pf.anc=v; pf.her=""; pf.ancB=[]; break;
     case "pher": pf.her=v; break;
@@ -8157,16 +8448,16 @@ function libEnrich(){
   if(ch)saveLib();
 }
 function libReviewList(){return LIB.sections.map((x,i)=>[x,i]).filter(([x])=>sysOf(x)==="dnd5e"&&x.catq==="review")}
-function libSourcesHTML(){
+function libSourcesHTML(campId){
   const m={}; const add=(k,x)=>{const n=libSrcName(x);(m[n]=m[n]||{classes:0,spells:0,items:0,feat:0,species:0,background:0,rule:0})[k]++};
   LIB.classes.forEach(x=>{if(sysOf(x)==="dnd5e"&&!x.addOn)add("classes",x)});LIB.spells.forEach(x=>{if(sysOf(x)==="dnd5e")add("spells",x)});LIB.items.forEach(x=>{if(sysOf(x)==="dnd5e")add("items",x)});
   LIB.sections.forEach(x=>{if(sysOf(x)==="dnd5e")add(x.cat||"rule",x)});
   const names=Object.keys(m).sort();
   if(!names.length)return `<p>Nothing imported yet. Import a book or paste text and your sources will be listed here.</p>`;
-  return `<p>Turn a source on to offer its classes, species, backgrounds, feats and spells in the guided creator and the random character button. Off by default; your imports stay on this device.</p>
-    <div class="items">${names.map(n=>{const c=m[n],on=!!(LIB.packs[n]&&LIB.packs[n].creator);
-      const parts=[["classes","classes"],["species","species"],["background","backgrounds"],["feat","feats"],["spells","spells"],["items","items"],["rule","other"]].filter(p=>c[p[0]]).map(p=>c[p[0]]+" "+p[1]).join(", ");
-      return `<label class="chk crpack"><input type="checkbox" data-act="lib-pack" data-src="${esc(n)}"${on?" checked":""}><span><b>${esc(n)}</b><br><small>${esc(parts)}</small></span></label>`}).join("")}</div>`;
+  const k=campId&&S.campaigns.find(x=>x.id===campId);
+  return `<div class="items">${names.map(n=>{const c=m[n],on=k?(k.srcs?!!k.srcs[n]:packDefault(n)):packDefault(n);
+      const parts=[["classes","classes","class"],["species","species","species"],["background","backgrounds","background"],["feat","feats","feat"],["spells","spells","spell"],["items","items","item"],["rule","other","other"]].filter(p=>c[p[0]]).map(p=>c[p[0]]+" "+(c[p[0]]===1?p[2]:p[1])).join(", ");
+      return `<label class="chk crpack"><input type="checkbox" data-act="lib-pack" data-camp="${esc(k?k.id:"")}" data-src="${esc(n)}"${on?" checked":""}><span><b>${esc(n)}</b><br><small>${esc(parts)}</small></span></label>`}).join("")}</div>`;
 }
 function libReviewHTML(){
   const L=libReviewList();
@@ -8176,7 +8467,9 @@ function libReviewHTML(){
 }
 document.addEventListener("change",e=>{
   const t=e.target; if(!t.dataset||t.dataset.act!=="lib-pack")return;
-  const k=t.dataset.src; LIB.packs[k]=LIB.packs[k]||{}; LIB.packs[k].creator=t.checked; saveLib();
+  const n=t.dataset.src, camp=t.dataset.camp&&S.campaigns.find(x=>x.id===t.dataset.camp);
+  if(camp){if(!camp.srcs){camp.srcs={};Object.keys(LIB.packs||{}).forEach(x=>{if(packDefault(x))camp.srcs[x]=true})}camp.srcs[n]=t.checked;save()}
+  else{LIB.packs[n]=LIB.packs[n]||{}; LIB.packs[n].creator=t.checked; saveLib()}
 });
 document.addEventListener("click",e=>{
   const b=e.target.closest('[data-act="lib-cat"]'); if(!b)return;
