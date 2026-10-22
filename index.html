@@ -3266,7 +3266,7 @@ const SCHOOLS=["Abjuration","Conjuration","Divination","Enchantment","Evocation"
 const MORE=["feats","details","mastery","bastion"];
 function tabsFor(c){
   if(isPf(c))return [["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["feats","Feats ("+c.pf.feats.length+")"],["details","Details"]];
-  const t=[["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["feats","Features"],["details","Details"]];
+  const t=[["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["details","Details"]];
   if(c.rules==="2024")t.push(["mastery","Mastery"],["bastion","Bastion"]);
   return t;
 }
@@ -3284,7 +3284,7 @@ function profileCard(c){
 }
 function barHTML(c){
   const _tabs=[["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["more","More"]], _cur=MORE.includes(ui.tab)?"more":ui.tab;
-  const ttabs=`<div class="ttabs" role="group" aria-label="Sections">${_tabs.map(([id,l])=>`<button type="button" class="tt" data-act="tab" data-tab="${id==="more"?(ui.lastMore||"feats"):id}"${id===_cur?' aria-current="page"':""}>${l}</button>`).join("")}</div>`;
+  const ttabs=`<div class="ttabs" role="group" aria-label="Sections">${_tabs.map(([id,l])=>`<button type="button" class="tt" data-act="tab" data-tab="${id==="more"?(isPf(c)?(ui.lastMore||"feats"):(MORE.includes(ui.lastMore)&&ui.lastMore!=="feats"?ui.lastMore:"details")):id}"${id===_cur?' aria-current="page"':""}>${l}</button>`).join("")}</div>`;
   const top=`<div class="top-row">
       <button class="ibtn" type="button" data-act="back" aria-label="Back to characters">${ico("back")}</button>
       ${PORT[c.id]?`<button class="avatar sm has-img" type="button" data-act="tab" data-tab="details" style="--img:url('${PORT[c.id]}')" aria-label="Edit character details and portrait"></button>`:""}
@@ -3571,7 +3571,6 @@ function renderSheet(){
   if(ui.tab==="play"){renderPlay(c);return}
   if(ui.tab==="mastery"){renderMastery(c);return}
   if(ui.tab==="bastion"){renderBastion(c);return}
-  if(ui.tab==="feats"){renderFeats(c);return}
   if(ui.tab==="details"){renderDetails(c);return}
   const is24=c.rules==="2024";
   const abs=ABIL.map(([k,n])=>`<div class="ab"><span class="ab-n">${k.toUpperCase()}</span><b class="ab-m" data-mod="${k}">+0</b>
@@ -3622,12 +3621,12 @@ function renderSheet(){
 
     <section class="panel pprof${ui.profEdit&&ui.profEdit.skill?" editing":""}" data-pk="skill"><h3>Skills<small>Passive Perception <b data-pp>10</b></small><button class="btn sm pedit-btn" type="button" data-act="prof-edit" data-pk="skill" aria-pressed="${!!(ui.profEdit&&ui.profEdit.skill)}">${ui.profEdit&&ui.profEdit.skill?"Done":"Edit"}</button></h3><div class="rows">${skills}</div>
       <p class="hint"><span class="h-off">Tap Edit to change skill proficiency.</span><span class="h-on">Tap a skill once for proficient, twice for expertise, three times to clear. Tap Done when finished.</span></p></section>
+    ${featPanels(c)}
   </div>`;
   recompute();
 }
-function renderFeats(c){
-  app.innerHTML=barHTML(c)+`<div class="grid">
-    <section class="panel span2"><h3>Attacks</h3><div id="atkBox">${attacksHTML(c)}</div></section>
+function featPanels(c){
+  return `    <section class="panel span2"><h3>Attacks</h3><div id="atkBox">${attacksHTML(c)}</div></section>
     <section class="panel span2"><h3>Resources</h3>
       <div class="listbar"><button class="btn pri" type="button" data-act="add-res">Add resource</button>
         <button class="btn" type="button" data-act="rest-short">Short rest</button><button class="btn" type="button" data-act="rest-long">Long rest</button></div>
@@ -3637,9 +3636,7 @@ function renderFeats(c){
       <div class="listbar"><button class="btn pri" type="button" data-act="add-feat">Add feature</button>
         <label class="fld"><span>Search features</span><input id="featQ" type="search" value="${esc(ui.fq||"")}" placeholder="Name, source or text"></label>
         <button class="btn${ui.favF?" pri":""}" type="button" data-act="fav-filter" data-kind="favF" aria-pressed="${!!ui.favF}">&#9733; Favourites</button></div>
-      <div class="items" id="featBox">${featsHTML(c)}</div></section>
-  </div>`;
-  recompute();
+      <div class="items" id="featBox">${featsHTML(c)}</div></section>`;
 }
 function renderDetails(c){
   const is24=c.rules==="2024";
@@ -3948,7 +3945,7 @@ document.addEventListener("click",e=>{
     case "lib-del": if(confirmTwice(b,"Tap again to delete")){LIB[ui.lib.tab].splice(num(b.dataset.i),1);saveLib();renderLib()} break;
     case "lib-save": commitDraft(); break;
     case "lib-cancel": ui.lib.draft=null; ui.lib.msg=""; renderLib(); break;
-    case "lib-addfeat": if(c){const x=LIB.sections[num(b.dataset.i)];if(x&&sysOf(x)!==sysOf(c)){}else if(x&&isPf(c)){pfAddFeat(c,{n:x.name,lvl:"",d:x.text,src:x.source||"Library"},"bonus");save();b.textContent="Added";b.disabled=true}else if(x){const f=mkFeat(x.name);f.source=x.source||"Library";f.desc=x.text||"";if(x.fx)f.fx=JSON.parse(JSON.stringify(x.fx));else fxAttach(f);c.features.push(f);save();if(ui.view==="sheet"&&ui.tab==="feats")rerender("feat");b.textContent="Added";b.disabled=true}} break;
+    case "lib-addfeat": if(c){const x=LIB.sections[num(b.dataset.i)];if(x&&sysOf(x)!==sysOf(c)){}else if(x&&isPf(c)){pfAddFeat(c,{n:x.name,lvl:"",d:x.text,src:x.source||"Library"},"bonus");save();b.textContent="Added";b.disabled=true}else if(x){const f=mkFeat(x.name);f.source=x.source||"Library";f.desc=x.text||"";if(x.fx)f.fx=JSON.parse(JSON.stringify(x.fx));else fxAttach(f);c.features.push(f);save();if(ui.view==="sheet"&&(ui.tab==="feats"||ui.tab==="sheet"))rerender("feat");b.textContent="Added";b.disabled=true}} break;
     case "bk-run": bookRun(); break;
     case "bk-add": bookAdd(); break;
     case "bk-sel": {const e=bookState().entries&&bookState().entries[num(b.dataset.i)];if(e){e.sel=b.checked;const bt=document.querySelector('[data-act="bk-add"]');if(bt)bt.textContent="Add "+bookState().entries.filter(x=>x.sel).length+" selected to library"}break;}
