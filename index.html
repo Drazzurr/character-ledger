@@ -1852,6 +1852,8 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 .pip{position:relative}.pip::after{content:"";position:absolute;inset:-8px}
 .rctl .btn.sm,.srow .btn.sm{min-width:44px;min-height:44px}
 .nb{color:color-mix(in srgb,var(--muted) 72%,var(--ink))}
+html,body{overscroll-behavior-y:none}
+:root[data-view="home"]:not(:has(.ov:not([hidden]))),:root[data-view="home"]:not(:has(.ov:not([hidden]))) body{overscroll-behavior-y:auto}
 </style>
 
 <div class="skinbg" aria-hidden="true"></div>
