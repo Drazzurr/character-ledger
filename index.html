@@ -1873,9 +1873,30 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;gap:12px;align-items:center;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 14px;box-shadow:var(--shadow);max-width:calc(100vw - 28px)}
 #toast[hidden]{display:none}
 #printArea{display:none}
-@media print{body>*:not(#printArea){display:none!important}#printArea{display:block;color:#000;background:#fff;font:12px/1.35 Georgia,serif;padding:0}:root,body{background:#fff!important}
-#printArea h1{font-size:22px;margin:0 0 2px}#printArea h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #000;margin:12px 0 4px}#printArea p{margin:2px 0}
-#printArea table{border-collapse:collapse;width:100%;margin:8px 0}#printArea th,#printArea td{border:1px solid #444;padding:3px 6px;text-align:center;font-size:12px}}
+@page{size:letter;margin:.45in}
+@media print{body>*:not(#printArea){display:none!important}:root,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+html,body{height:auto!important;min-height:0!important;overflow:visible!important;padding:0!important;margin:0!important}#printArea{display:block;color:#1b1b1b;background:#fff;font:10.5px/1.38 Georgia,"Times New Roman",serif;padding:0}
+#printArea *{box-sizing:border-box}
+#printArea .ph{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;border-bottom:2.5px solid #1b1b1b;padding-bottom:5px;margin-bottom:8px}
+#printArea h1{font-size:26px;line-height:1.05;margin:0;letter-spacing:.01em}
+#printArea .psub{font-size:11.5px;color:#444;text-align:right}
+#printArea h2{font-size:10px;text-transform:uppercase;letter-spacing:.14em;background:#e9e6df;border-left:3px solid #1b1b1b;margin:9px 0 4px;padding:2px 6px;break-after:avoid}
+#printArea .g6{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+#printArea .g6 .bx,#printArea .gs .bx{border:1.3px solid #1b1b1b;border-radius:7px;text-align:center;padding:3px 2px 4px}
+#printArea .bx b{display:block;font-size:19px;line-height:1.1}#printArea .bx span{display:block;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:#444}#printArea .bx small{display:block;font-size:10px;color:#444}
+#printArea .gs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
+#printArea .gs.g7{grid-template-columns:repeat(7,1fr)}
+#printArea .cols{display:grid;grid-template-columns:1fr 1.35fr;gap:0 16px;align-items:start}
+#printArea .ls{list-style:none;margin:0;padding:0}#printArea .ls li{display:flex;gap:6px;border-bottom:1px dotted #999;padding:1px 0}
+#printArea .ls .d{width:22px;font-size:11px;line-height:1.2;letter-spacing:-1px}#printArea .ls .v{width:24px;text-align:right;font-weight:bold}#printArea .ls .n{flex:1}
+#printArea .it{break-inside:avoid;margin:0 0 5px;padding:0}#printArea .it b{font-size:11px}#printArea .it small{color:#555;font-style:italic}
+#printArea .two{columns:2;column-gap:16px}
+#printArea .slots{display:flex;flex-wrap:wrap;gap:6px}#printArea .slots .bx{min-width:52px;padding:2px 6px}#printArea .slots .bx b{font-size:14px}
+#printArea .sq{display:inline-block;width:9px;height:9px;border:1px solid #1b1b1b;margin-right:2px;vertical-align:-1px}
+#printArea table.atk{width:100%!important;table-layout:auto;border-collapse:collapse}#printArea .atk th{font-size:8.5px;text-transform:uppercase;letter-spacing:.08em;text-align:left;border-bottom:1.3px solid #1b1b1b;padding:1px 4px}#printArea .atk td{border-bottom:1px dotted #999;padding:2px 4px;text-align:left}
+#printArea p{margin:2px 0}
+#printArea .pf{margin-top:4px;break-before:avoid;font-size:8.5px;color:#777;text-align:center;border-top:1px solid #ccc;padding-top:3px}
+}
 
 .pip{position:relative}.pip::after{content:"";position:absolute;inset:-8px}
 .rctl .btn.sm,.srow .btn.sm{min-width:44px;min-height:44px}
@@ -9487,28 +9508,44 @@ document.addEventListener("input",e=>{
 function printHTML(c){
   const h=(t,b)=>b?`<h2>${t}</h2>${b}`:"";
   const txt=t=>`<p>${esc(String(t||"")).replace(/\n+/g,"<br>")}</p>`;
+  const bx=(l,v,sm)=>`<div class="bx"><span>${l}</span><b>${v}</b>${sm?`<small>${sm}</small>`:""}</div>`;
+  const dots=n=>n>=2?"\u25cf\u25cf":n>=1?"\u25cf":"\u25cb";
+  const foot=`<div class="pf">Character Ledger · ${new Date().toLocaleDateString()}</div>`;
+  const inv=l=>l.length?`<p>${l.map(i=>esc(i.name)+(num(i.qty)>1?" ×"+i.qty:"")).join(" · ")}</p>`:"";
   if(isPf(c)){
     const p=c.pf, v=k=>sgn(pfVal(c,k));
-    return `<h1>${esc(c.name)}</h1><p>${esc([c.race,c.pf.heritage,c.cls,"level "+c.level,c.background].filter(Boolean).join(" \u00b7 "))}</p>
-    <table><tr>${CRAB.map(k=>`<th>${k.toUpperCase()}</th>`).join("")}<th>HP</th><th>AC</th><th>Perception</th><th>Fort</th><th>Ref</th><th>Will</th></tr>
-    <tr>${CRAB.map(k=>`<td>${sgn(pfMod(c,k))}</td>`).join("")}<td>${num(c.hp)}/${num(c.hpMax)}</td><td>${pfVal(c,"ac")}</td><td>${v("perception")}</td><td>${v("fortitude")}</td><td>${v("reflex")}</td><td>${v("will")}</td></tr></table>
-    ${h("Skills",`<p>${PFSKILLS.filter(x=>num(p.skills[x[0]])>0).map(x=>x[1]+" "+v("skill."+x[0])).join(", ")||"None trained"}</p>`)}
-    ${h("Strikes",p.strikes.map((x,i)=>`<p><b>${esc(x.name)}</b> ${v("atk."+i)} \u00b7 ${esc(pfDmg(c,x).text)}</p>`).join(""))}
-    ${h("Spells",p.spells.length?`<p>${p.spells.map(x=>esc(x.name)+" ("+(x.k==="cantrip"?"cantrip":"rank "+x.lv)+")").join(", ")}</p>`:"")}
-    ${h("Feats and features",p.feats.map(f=>`<p><b>${esc(f.name)}</b> <small>${esc(f.cat||"")}</small></p>`).join(""))}
-    ${h("Inventory",`<p>${p.inv.map(i=>esc(i.name)+(num(i.qty)>1?" x"+i.qty:"")).join(", ")}</p>`)}`;
+    const sub=[c.race,p.heritage,c.cls,"Level "+c.level,c.background].filter(Boolean).join(" · ");
+    const tr=PFSKILLS.filter(x=>num(p.skills[x[0]])>0);
+    return `<div class="ph"><h1>${esc(c.name||"Unnamed")}</h1><div class="psub">${esc(sub)}<br>Pathfinder 2e</div></div>
+    <div class="g6">${CRAB.map(k=>bx(k.toUpperCase(),sgn(pfMod(c,k)))).join("")}</div>
+    <div class="gs g7">${bx("HP",num(c.hp)+"/"+num(c.hpMax))}${bx("AC",pfVal(c,"ac"))}${bx("Perception",v("perception"))}${bx("Fortitude",v("fortitude"))}${bx("Reflex",v("reflex"))}${bx("Will",v("will"))}${bx("Speed",num(c.speed))}</div>
+    <div class="cols"><div>${h("Skills",`<ul class="ls">${tr.map(x=>`<li><span class="d">${dots(1)}</span><span class="n">${x[1]}</span><span class="v">${v("skill."+x[0])}</span></li>`).join("")||"<li>None trained</li>"}</ul>`)}
+      ${h("Inventory",inv(p.inv))}</div>
+    <div>${h("Strikes",p.strikes.length?`<table class="atk"><tr><th>Strike</th><th>Attack</th><th>Damage</th></tr>${p.strikes.map((x,i)=>`<tr><td><b>${esc(x.name)}</b></td><td>${v("atk."+i)}</td><td>${esc(pfDmg(c,x).text)}</td></tr>`).join("")}</table>`:"")}
+      ${h("Spells",p.spells.length?`<p>DC ${pfVal(c,"spellDC")} · attack ${v("spellAtk")}</p><p>${p.spells.map(x=>esc(x.name)+" ("+(x.k==="cantrip"?"cantrip":"rank "+x.lv)+")").join(", ")}</p>`:"")}</div></div>
+    ${h("Feats and features",`<div class="two">${p.feats.map(f=>`<div class="it"><b>${esc(f.name)}</b> <small>${esc(f.cat||"")}</small>${f.desc?`<br>${esc(String(f.desc)).replace(/\n+/g," ")}`:""}</div>`).join("")}</div>`)}
+    ${c.notes?h("Notes",txt(c.notes)):""}${foot}`;
   }
-  const pb=prof(c);
-  return `<h1>${esc(c.name)}</h1><p>${esc([c.race,c.cls,c.subclass,"level "+c.level,c.background].filter(Boolean).join(" \u00b7 "))}</p>
-  <table><tr>${ABIL.map(a=>`<th>${a[0].toUpperCase()}</th>`).join("")}</tr><tr>${ABIL.map(a=>`<td>${abScore(c,a[0])} (${sgn(abMod(c,a[0]))})</td>`).join("")}</tr></table>
-  <table><tr><th>HP</th><th>AC</th><th>Initiative</th><th>Speed</th><th>Proficiency</th></tr><tr><td>${num(c.hp)}/${num(c.hpMax)}</td><td>${acOf(c)}</td><td>${sgn(initB(c))}</td><td>${speedOf(c)}</td><td>+${pb}</td></tr></table>
-  ${h("Saving throws",`<p>${ABIL.map(a=>a[0].toUpperCase()+" "+sgn(saveB(c,a[0]))+(saveP(c,a[0])?"*":"")).join(" \u00b7 ")}</p>`)}
-  ${h("Skills",`<p>${SKILLS.map(x=>x[1]+" "+sgn(skillB(c,x))+(skillP(c,x[0])?"*":"")).join(", ")}</p>`)}
-  ${h("Attacks",c.attacks.map(a=>`<p><b>${esc(a.name)}</b> ${esc(a.bonus)} \u00b7 ${esc(a.damage)}</p>`).join(""))}
-  ${h("Spells",c.spells.length?[0,1,2,3,4,5,6,7,8,9].map(l=>{const g=c.spells.filter(x=>num(x.level)===l);return g.length?`<p><b>${l?"Level "+l:"Cantrips"}:</b> ${g.map(x=>esc(x.name)).join(", ")}</p>`:""}).join(""):"")}
-  ${h("Features",c.features.map(f=>`<p><b>${esc(f.name)}</b> <small>${esc(f.source||"")}</small><br>${esc(String(f.desc||"")).replace(/\n+/g," ")}${(f.chosen||[]).map(x=>`<br><i>${esc(x.k)}:</i> ${esc(x.v)}`).join("")}${(f.opts||[]).map(o=>`<br><i>${esc(o.name)}:</i> ${esc(String(o.desc||"")).replace(/\n+/g," ")}`).join("")}</p>`).join(""))}
-  ${h("Inventory",`<p>${c.inventory.map(i=>esc(i.name)+(num(i.qty)>1?" x"+i.qty:"")).join(", ")}</p>`)}
-  ${c.notes?h("Notes",txt(c.notes)):""}`;
+  const pb=prof(c), sc=c.spellcasting||{}, ab=sc.ability;
+  const sub=[c.race,[c.cls,c.subclass].filter(Boolean).join(" – "),"Level "+c.level,c.background,c.alignment].filter(Boolean).join(" · ");
+  const slots=[1,2,3,4,5,6,7,8,9].filter(l=>sc.slots&&sc.slots[l]&&num(sc.slots[l].max)>0);
+  const sp=c.spells.length?[0,1,2,3,4,5,6,7,8,9].map(l=>{const g=c.spells.filter(x=>num(x.level)===l);return g.length?`<p><b>${l?"Level "+l:"Cantrips"}:</b> ${g.map(x=>esc(x.name)+(x.prepared&&l?"*":"")).join(", ")}</p>`:""}).join(""):"";
+  const coins=Object.entries(c.coins||{}).filter(x=>num(x[1])>0).map(x=>num(x[1])+" "+x[0]).join(" · ");
+  return `<div class="ph"><h1>${esc(c.name||"Unnamed")}</h1><div class="psub">${esc(sub)}<br>${c.rules==="2024"?"D&amp;D 5.5e":"D&amp;D 5e"}</div></div>
+  <div class="g6">${ABIL.map(a=>bx(a[0].toUpperCase(),sgn(abMod(c,a[0])),String(abScore(c,a[0])))).join("")}</div>
+  <div class="gs g7">${bx("HP",num(c.hp)+"/"+num(c.hpMax))}${bx("AC",acOf(c))}${bx("Initiative",sgn(initB(c)))}${bx("Speed",speedOf(c))}${bx("Proficiency","+"+pb)}${bx("Passive Perc.",passive(c))}${bx("Hit Dice",c.classes.filter(r=>String(r.name).trim()&&num(r.level)>0).map(r=>num(r.level)+"d"+hdOf(r)).join(" + ")||"-")}</div>
+  <div class="cols"><div>
+    ${h("Saving throws",`<ul class="ls">${ABIL.map(a=>`<li><span class="d">${dots(saveP(c,a[0])?1:0)}</span><span class="n">${a[1]||a[0].toUpperCase()}</span><span class="v">${sgn(saveB(c,a[0]))}</span></li>`).join("")}</ul>`)}
+    ${h("Skills",`<ul class="ls">${SKILLS.map(x=>`<li><span class="d">${dots(num(skillP(c,x[0])))}</span><span class="n">${x[1]}</span><span class="v">${sgn(skillB(c,x))}</span></li>`).join("")}</ul>`)}
+  </div><div>
+    ${h("Attacks",c.attacks.length?`<table class="atk"><tr><th>Name</th><th>Bonus</th><th>Damage</th></tr>${c.attacks.map(a=>`<tr><td><b>${esc(a.name)}</b></td><td>${esc(a.bonus)}</td><td>${esc(a.damage)}</td></tr>`).join("")}</table>`:"")}
+    ${ab?h("Spellcasting",`<div class="gs" style="grid-template-columns:repeat(3,1fr)">${bx("Ability",ab.toUpperCase())}${bx("Save DC",8+pb+abMod(c,ab)+fxSum(c,"spelldc"))}${bx("Attack",sgn(pb+abMod(c,ab)+fxSum(c,"spellatk")))}</div>${slots.length?`<div class="slots" style="margin-top:5px">${slots.map(l=>`<div class="bx"><span>Level ${l}</span><b>${Array.from({length:num(sc.slots[l].max)},()=>'<i class="sq"></i>').join("")}</b></div>`).join("")}</div>`:""}`):""}
+    ${h("Resources",c.resources.length?`<ul class="ls">${c.resources.map(r=>`<li><span class="n">${esc(r.name)}</span><span class="v" style="width:auto">${num(r.cur)}/${num(r.max)}</span><span>${esc(r.reset||"")}</span></li>`).join("")}</ul>`:"")}
+    ${h("Equipment",inv(c.inventory)+(coins?`<p><b>Coins:</b> ${coins}</p>`:""))}
+  </div></div>
+  ${h("Features and traits",`<div class="two">${c.features.map(f=>`<div class="it"><b>${esc(f.name)}</b> <small>${esc(f.source||"")}</small>${f.desc?`<br>${esc(String(f.desc)).replace(/\n+/g," ")}`:""}${(f.chosen||[]).map(x=>`<br><i>${esc(x.k)}:</i> ${esc(x.v)}`).join("")}${(f.opts||[]).map(o=>`<br><i>${esc(o.name)}:</i> ${esc(String(o.desc||"")).replace(/\n+/g," ")}`).join("")}</div>`).join("")}</div>`)}
+  ${h("Spells known"+(sp?" (* prepared)":""),sp)}
+  ${c.notes?h("Notes",txt(c.notes)):""}${foot}`;
 }
 document.addEventListener("click",e=>{
   const b=e.target.closest('[data-act="print-char"]'); if(!b)return; const c=cur(); if(!c)return;
