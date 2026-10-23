@@ -1882,6 +1882,19 @@ html[data-fx="off"] .rollout.crit,html[data-fx="off"] .rollout.fumble{animation:
 .nb{color:color-mix(in srgb,var(--muted) 72%,var(--ink))}
 html,body{overscroll-behavior-y:none}
 :root[data-view="home"]:not(:has(.ov:not([hidden]))),:root[data-view="home"]:not(:has(.ov:not([hidden]))) body{overscroll-behavior-y:auto}
+/* ===== homebrew builder ===== */
+.hbnew{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:10px 0}
+.hbwide{grid-column:1/-1}
+.hbcard>summary .sum-m{white-space:nowrap}
+.hbcard .ibody{display:flex;flex-direction:column;gap:10px}
+.hbfx .hbfxrow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.hbfx .hbfxrow>span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.hbpv{opacity:.75}
+.hbfxform{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px dashed var(--line);border-radius:var(--r-sm)}
+.hbchecks .checks{gap:8px 14px}
+.hbchecks>span{display:block;margin-bottom:4px}
+.hbab{grid-template-columns:repeat(auto-fit,minmax(70px,1fr))}
+.fxpick{margin:2px 0 6px 26px}
 </style>
 
 <div class="skinbg" aria-hidden="true"></div>
@@ -2133,7 +2146,8 @@ function itemFromRec(r){
   o.rng=r.rng||""; o.ac=r.ac||(r.stealth||r.str?"":"");
   if(r.ac){o.ac=r.ac+(r.stealth?" (stealth disadvantage)":"")+(r.str?" (Str "+r.str+")":"")}
   o.rar=r.rar||""; o.att=!!r.att; o.desc=r.desc||""; o.source=r.source||"";
-  if(o.rar)fxAttach(o,{item:1});
+  if(Array.isArray(r.fx)&&r.fx.length){o.fx=JSON.parse(JSON.stringify(r.fx));o.fxq="ok"}
+  else if(o.rar)fxAttach(o,{item:1});
   return o;
 }
 function attackFromItem(c,it){
@@ -2141,7 +2155,8 @@ function attackFromItem(c,it){
   const props=lc(it.props), ranged=/ammunition/.test(props);
   const fin=/finesse/.test(props);
   const mod=ranged?abMod(c,"dex"):fin?Math.max(abMod(c,"str"),abMod(c,"dex")):abMod(c,"str");
-  return {name:it.name,bonus:sgn(mod+prof(c)),damage:m[1]+(mod?sgn(mod):"")+(m[2]?" "+m[2]:"")};
+  const ab=fxSum(c,"atk"), db=mod+fxSum(c,"dmg");
+  return {name:it.name,bonus:sgn(mod+prof(c)+ab),damage:m[1]+(db?sgn(db):"")+(m[2]?" "+m[2]:"")};
 }
 function acFromItem(c,it){
   const m=String(it.ac||"").match(/^(\d+)/); if(!m)return null;
@@ -2869,7 +2884,7 @@ function blankChar(camp,rules){
   return o;
 }
 const mkFeat=name=>({id:uid(),name:name,source:"",desc:""});
-function fxAttach(o,opt){const r=fxParse((o.desc||"")+"",Object.assign({name:o.name},opt||{}));if(r.fx.length){o.fx=r.fx;o.fxq=r.review?"review":"ok"}else if(r.review)o.fxq="review";return o}
+function fxAttach(o,opt){const h=hbFxFor(o.name,o.desc);if(h){o.fx=h;o.fxq="ok";o.fxhb=1;return o}const r=fxParse((o.desc||"")+"",Object.assign({name:o.name},opt||{}));if(r.fx.length){o.fx=r.fx;o.fxq=r.review?"review":"ok"}else if(r.review)o.fxq="review";return o}
 const mkRes=name=>({id:uid(),name:name||"New resource",max:1,cur:1,reset:"long"});
 const mkSpell=name=>({id:uid(),name:name||"New spell",level:0,school:"",time:"1 action",range:"",components:"",duration:"",conc:false,ritual:false,prepared:false,desc:"",higher:""});
 const mkPick=w=>({id:uid(),weapon:w||"",prop:""});
@@ -2906,6 +2921,7 @@ function normChar(c){
     f.name=m[2]; f.source=from; f.type="class"; f.asi=1; f.desc=kind+" from "+(f.source.split(" \u00b7 ")[0])+" (character level "+m[1]+"). Already added to your ability scores.";
   });
   o.spellcasting=normSpellcasting(o);
+  o.fxHp=c.fxHp==null?null:num(c.fxHp);
   o.rules=c.rules==="2024"?"2024":"2014"; o.system="dnd5e";
   o.mastery=Object.assign({slots:0,picks:[]},c.mastery||{}); o.mastery.picks=migList(c.mastery&&c.mastery.picks,mkPick);
   o.bastion=Object.assign({name:"",location:"",desc:"",defenders:0,gold:0,log:"",facilities:[]},c.bastion||{});
@@ -3052,7 +3068,8 @@ const saveB=(c,k)=>abMod(c,k)+(saveP(c,k)?prof(c):0)+fxSum(c,"save."+k)+fxSum(c,
 const skillP=(c,id)=>Math.max(num(c.skills[id]),fxHas(c,"eskill."+id)?2:fxHas(c,"pskill."+id)?1:0);
 const skillB=(c,s)=>abMod(c,s[2])+skillP(c,s[0])*prof(c)+fxSum(c,"skill."+s[0])+fxSum(c,"skill.all");
 const initB=c=>abMod(c,"dex")+num(c.initExtra)+fxSum(c,"init");
-const acOf=c=>num(c.ac)+fxSum(c,"ac"), speedOf=c=>num(c.speed)+fxSum(c,"speed");
+/* an Armor Class formula effect (Unarmored Defense and the like) replaces the base AC when it is higher */
+const acOf=c=>Math.max(num(c.ac),fxMax(c,"acbase"))+fxSum(c,"ac"), speedOf=c=>num(c.speed)+fxSum(c,"speed");
 /* ===== effects: parse rules text into sheet effects, and total them ===== */
 const FXSK=[["acrobatics","Acrobatics"],["animal_handling","Animal Handling"],["arcana","Arcana"],["athletics","Athletics"],["deception","Deception"],["history","History"],["insight","Insight"],["intimidation","Intimidation"],["investigation","Investigation"],["medicine","Medicine"],["nature","Nature"],["perception","Perception"],["performance","Performance"],["persuasion","Persuasion"],["religion","Religion"],["sleight_of_hand","Sleight of Hand"],["stealth","Stealth"],["survival","Survival"]];
 const FXAB={strength:"str",dexterity:"dex",constitution:"con",intelligence:"int",wisdom:"wis",charisma:"cha"};
@@ -3106,8 +3123,20 @@ function fxParse(text,opt){
   });
   return {fx:out,review:review&&!out.length||(review&&out.some(e=>e.c))};
 }
+const FXMV=v=>v==="pb"?"proficiency bonus":typeof v==="number"?String(v):v&&typeof v==="object"?"by "+(v.by==="level"?"level":"class level")+" ("+fxTable(v.t).map(p=>p[0]+": "+p[1]).join(", ")+")":String(v==null?"":v);
 function fxLabel(e){
-  const k=e.k.split("."),a=k[0],b=k[1],sg=v=>v==="pb"?"proficiency bonus":(v>=0?"+":"")+v;
+  const k=String(e.k||"").split("."),a=k[0],b=k[1];
+  const sg=v=>{if(e.rv!=null)v=e.rv;if(typeof v==="number"||/^[-+]?\d+$/.test(String(v)))return (+v>=0?"+":"")+(+v);return v==="pb"?"+ proficiency bonus":"+ "+FXMV(v)};
+  const RS={long:"long rest",short:"short rest",manual:"no reset"};
+  switch(a){
+    case"acbase":return "Armor class "+(e.rv!=null?e.rv:FXMV(e.v))+" (base, when higher)";
+    case"atk":return sg(e.v)+" Weapon attack rolls";case"dmg":return sg(e.v)+" Weapon damage";
+    case"pr":return ({armor:"Armor",weapon:"Weapons",tool:"Tools",lang:"Language"}[b]||"Proficiency")+": "+(e.n||"");
+    case"cimm":return "Immunity: "+(e.n||"")+" condition";
+    case"pool":return (e.n||"Resource")+": "+(e.rv!=null?e.rv:FXMV(e.v))+" per "+(RS[e.r||"long"]||"long rest");
+    case"spell":return "Spell: "+(e.n||"")+" (always prepared)";
+    case"pick":{const W={abil:["ability score increase","ability score increases"],pskill:["skill proficiency","skill proficiencies"],eskill:["skill for expertise","skills for expertise"],psave:["saving throw proficiency","saving throw proficiencies"],lang:["language","languages"],tool:["tool proficiency","tool proficiencies"],res:["damage resistance","damage resistances"]};const n=Math.max(1,num(e.cnt,1)),w=W[e.of]||["option","options"];return "Choose "+n+" "+w[n>1?1:0]+(e.of==="abil"&&e.v&&+e.v!==1?" (+"+e.v+" each)":"")+((e.sel||[]).filter(Boolean).length?": "+(e.sel||[]).filter(Boolean).map(x=>fxPickName(e.of,x)).join(", "):"")}
+  }
   const sk=id=>(FXSK.find(x=>x[0]===id)||[0,id])[1];
   switch(a){
     case"ac":return sg(e.v)+" Armor class";case"speed":return sg(e.v)+" ft speed";case"init":return sg(e.v)+" Initiative";
@@ -3123,18 +3152,83 @@ function fxLabel(e){
   }
   return e.k+" "+e.v;
 }
+/* A choice effect (k "pick") counts as the options the player picked: "of" says what kind (abil, pskill, eskill, psave, lang, tool) */
+const fxPickKey=(of,id)=>of==="lang"?"pr.lang":of==="tool"?"pr.tool":of+"."+id;
 function fxList(c){
   const out=[];
-  const add=(arr,src,owner)=>(arr||[]).forEach((e,i)=>{if(e&&e.on!==false)out.push({k:e.k,v:e.v,src:src,e:e})});
-  (c.features||[]).forEach(f=>{if(f.fx&&f.fxOn!==false)add(f.fx,f.name)});
-  (c.inventory||[]).forEach(it=>{if(it.fx&&it.equipped&&(!it.att||it.attuned))add(it.fx,it.name)});
+  const add=(arr,src,o)=>(arr||[]).forEach(e=>{
+    if(!e||e.on===false)return;
+    if(e.k==="pick"){(e.sel||[]).forEach(id=>{if(id)out.push({k:fxPickKey(e.of,id),v:e.of==="abil"?(e.v==null?1:e.v):1,n:(e.of==="lang"||e.of==="tool")?id:undefined,src:src,o:o,e:e})});return}
+    out.push({k:e.k,v:e.v,n:e.n,r:e.r,src:src,o:o,e:e});
+  });
+  (c.features||[]).forEach(f=>{if(f.fx&&f.fxOn!==false)add(f.fx,f.name,f)});
+  (c.inventory||[]).forEach(it=>{if(it.fx&&it.equipped&&(!it.att||it.attuned))add(it.fx,it.name,it)});
   return out;
 }
-function fxVal(c,v){return v==="pb"?prof(c):num(v)}
-function fxSum(c,k){let t=0;fxList(c).forEach(x=>{if(x.k===k)t+=fxVal(c,x.v)});return t}
+/* Effect amounts: a number, "pb", a formula ("10+dex+con", "max(1,wis)", "1+clevel/2", rounded down), or a table by level ({by:"clevel",t:"1:2, 6:3"}) */
+const FXFN={min:Math.min,max:Math.max,floor:Math.floor,ceil:Math.ceil,round:Math.round,abs:Math.abs};
+const FXIDS=["level","clevel","pb","prof","str","dex","con","int","wis","cha","spellmod"];
+const FXAST=new Map();
+function fxCompile(src){
+  src=String(src==null?"":src).trim();
+  if(FXAST.has(src))return FXAST.get(src);
+  if(!src)throw new Error("Enter a number or a formula");
+  const toks=[], re=/\s*(\d+(?:\.\d+)?|[A-Za-z_][A-Za-z_0-9]*|[-+*\/(),])/y; re.lastIndex=0;
+  while(re.lastIndex<src.length){const at=re.lastIndex,m=re.exec(src);if(!m)throw new Error("I don't understand \""+src.slice(at,at+10).trim()+"\"");toks.push(m[1])}
+  let p=0; const peek=()=>toks[p], next=()=>toks[p++];
+  const expr=()=>{let n=term();while(peek()==="+"||peek()==="-"){const o=next();n=[o,n,term()]}return n};
+  const term=()=>{let n=unary();while(peek()==="*"||peek()==="/"){const o=next();n=[o,n,unary()]}return n};
+  const unary=()=>{if(peek()==="-"){next();return ["neg",unary()]}if(peek()==="+"){next();return unary()}return atom()};
+  const atom=()=>{
+    const t=next(); if(t==null)throw new Error("The formula ends too early");
+    if(/^\d/.test(t))return ["n",parseFloat(t)];
+    if(t==="("){const n=expr();if(next()!==")")throw new Error("A closing bracket is missing");return n}
+    if(/^[A-Za-z_]/.test(t)){
+      const id=t.toLowerCase();
+      if(peek()==="("){next();const a=[];if(peek()!==")"){a.push(expr());while(peek()===","){next();a.push(expr())}}if(next()!==")")throw new Error("A closing bracket is missing");if(!FXFN[id])throw new Error("Unknown function "+t);return ["f",id,a]}
+      if(!FXIDS.includes(id))throw new Error("Unknown name \""+t+"\". Use level, clevel, pb, str, dex, con, int, wis, cha or spellmod");
+      return ["v",id];
+    }
+    throw new Error("Unexpected \""+t+"\"");
+  };
+  const ast=expr(); if(p<toks.length)throw new Error("Unexpected \""+toks[p]+"\"");
+  FXAST.set(src,ast); return ast;
+}
+function fxRun(n,get){
+  switch(n[0]){
+    case"n":return n[1]; case"v":return get(n[1]); case"neg":return -fxRun(n[1],get);
+    case"+":return fxRun(n[1],get)+fxRun(n[2],get); case"-":return fxRun(n[1],get)-fxRun(n[2],get);
+    case"*":return fxRun(n[1],get)*fxRun(n[2],get); case"/":{const d=fxRun(n[2],get);return d?fxRun(n[1],get)/d:0}
+    case"f":return FXFN[n[1]].apply(null,n[2].map(a=>fxRun(a,get)));
+  }
+  return 0;
+}
+function fxTable(t){return String(t||"").split(/[,;\n]+/).map(s=>s.split(/[:=]/).map(x=>x.trim())).filter(p=>p.length===2&&/^\d+$/.test(p[0])&&/^-?\d+$/.test(p[1])).map(p=>[+p[0],+p[1]]).sort((a,b)=>a[0]-b[0])}
+function fxClevel(c,o){
+  const src=lc(o&&o.source||"");
+  if(src)for(const r of (c.classes||[])){const n=lc(r.name),s=lc(r.sub);if((n&&src.indexOf(n)===0)||(s&&src.indexOf(s)===0))return Math.max(1,num(r.level,1))}
+  return Math.max(1,num(c.level,1));
+}
+function fxGet(c,o){return id=>{switch(id){
+  case"level":return Math.max(1,num(c.level,1)); case"clevel":return fxClevel(c,o); case"pb":case"prof":return prof(c);
+  case"spellmod":return c.spellcasting&&c.spellcasting.ability?abMod(c,c.spellcasting.ability):0;
+  default:return CRAB.includes(id)?abMod(c,id):0}}}
+let FXV=0;
+function fxVal(c,v,o){
+  if(typeof v==="number")return v;
+  if(v==null||v===""||v===true)return v===true?1:0;
+  if(v==="pb")return prof(c);
+  if(typeof v==="object"){const T=fxTable(v.t),x=fxGet(c,o)(v.by==="level"?"level":"clevel");let r=0;T.forEach(([l,val])=>{if(x>=l)r=val});return r}
+  const s=String(v).trim(); if(/^[-+]?\d+$/.test(s))return parseInt(s,10);
+  if(FXV>4)return 0; FXV++;
+  try{return Math.floor(fxRun(fxCompile(s),fxGet(c,o))+1e-9)}catch(e){return 0}finally{FXV--}
+}
+function fxSum(c,k){let t=0;fxList(c).forEach(x=>{if(x.k===k)t+=fxVal(c,x.v,x.o)});return t}
 function fxHas(c,k){return fxList(c).some(x=>x.k===k)}
-function fxMax(c,k){let t=0;fxList(c).forEach(x=>{if(x.k===k)t=Math.max(t,num(x.v))});return t}
-function fxCap(c,k){const v=fxSum(c,k);return v?`<small class="fxcap">${v>0?"+":""}${v} from effects</small>`:""}
+function fxMax(c,k){let t=0;fxList(c).forEach(x=>{if(x.k===k)t=Math.max(t,fxVal(c,x.v,x.o))});return t}
+function fxCap(c,k){
+  if(k==="ac"){const b=fxMax(c,"acbase"),v=fxSum(c,"ac");if(!b&&!v)return "";const t=acOf(c);return t===num(c.ac)?"":`<small class="fxcap">${t} with effects</small>`}
+  const v=fxSum(c,k);return v?`<small class="fxcap">${v>0?"+":""}${v} from effects</small>`:""}
 
 const passive=c=>10+skillB(c,SKILLS.find(s=>s[0]==="perception"));
 
@@ -3151,7 +3245,7 @@ function setStatus(){
 }
 function save(){
   dirty=true; S.updated=Date.now();
-  const c=cur(); if(c){c.updated=S.updated;if(isPf(c)){try{c.ac=pfVal(c,"ac")}catch(e){}}}
+  const c=cur(); if(c){c.updated=S.updated;if(isPf(c)){try{c.ac=pfVal(c,"ac")}catch(e){}}else{try{if(fxGrants(c))setTimeout(()=>{rerender("res");if(ui.tab==="spells"){const b=$("#spellBox");if(b)b.innerHTML=spellsHTML(c)}},0)}catch(e){}}}
   try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
   mirror(); setStatus();
   clearTimeout(saveTimer); saveTimer=setTimeout(pushDb,700);
@@ -3303,7 +3397,8 @@ function attacksHTML(c){
     return `<div class="atkv"><span class="atk-t"><b>${esc(a.name||"Unnamed attack")}</b><span class="atkn">${esc(meta)}</span></span>
     <button class="btn sm" type="button" data-act="atk-edit" data-i="${i}">Edit</button></div>`;
   }).join("");
-  return (rows||`<p class="hint" style="margin:0 0 10px">No attacks yet.</p>`)+`<button class="btn sm" type="button" data-act="add-atk">Add attack</button>`;
+  const fa=fxSum(c,"atk"), fd=fxSum(c,"dmg"), fxn=fa||fd?`<p class="hint" style="margin:0 0 10px">Effects add ${[fa?sgn(fa)+" to hit":"",fd?sgn(fd)+" damage":""].filter(Boolean).join(" and ")} to weapon attacks. Attacks made from gear include it; check any you typed in by hand.</p>`:"";
+  return fxn+(rows||`<p class="hint" style="margin:0 0 10px">No attacks yet.</p>`)+`<button class="btn sm" type="button" data-act="add-atk">Add attack</button>`;
 }
 const LV=["Cantrips","1st level","2nd level","3rd level","4th level","5th level","6th level","7th level","8th level","9th level"];
 const SCHOOLS=["Abjuration","Conjuration","Divination","Enchantment","Evocation","Illusion","Necromancy","Transmutation"];
@@ -3371,10 +3466,10 @@ function resHTML(c){
     const ed=ui.edit.has(r.id), max=Math.max(0,num(r.max)), cur=Math.max(0,Math.min(max,num(r.cur)));
     const pips=(max>0&&max<=12)?`<div class="pips" role="group" aria-label="${esc(r.name)} available">`+
       Array.from({length:max},(_,n)=>`<button class="pip${n<cur?" on":""}" type="button" data-act="pip" data-i="${i}" data-n="${n+1}" aria-label="Set to ${n+1}"></button>`).join("")+`</div>`:"";
-    const edit=ed?`<div class="igrid">${fld(c,"Name","resources."+i+".name")}${fld(c,"Maximum","resources."+i+".max",{n:1})}
+    const edit=ed&&r.fxk?`<p class="hint" style="margin:0">Comes from ${esc(r.fxsrc||"a feature")}. Its maximum and recharge are set by that feature, so they update as you level. Edit or remove the feature to change it.</p>`:ed?`<div class="igrid">${fld(c,"Name","resources."+i+".name")}${fld(c,"Maximum","resources."+i+".max",{n:1})}
       <label class="fld"><span>Recharges on</span><select data-f="resources.${i}.reset">${Object.keys(RESET).map(k=>`<option value="${k}"${r.reset===k?" selected":""}>${RESET[k]}</option>`).join("")}</select></label></div>
       <div><button class="btn sm danger" type="button" data-act="del-res" data-i="${i}">Delete resource</button></div>`:"";
-    return `<div class="rcard"><div class="rhead"><b>${esc(r.name||"Untitled")}</b><span class="tag">${RESET[r.reset]||"Manual"}</span></div>${pips}
+    return `<div class="rcard"><div class="rhead"><b>${esc(r.name||"Untitled")}</b>${r.fxk?`<span class="tag ex">${esc(r.fxsrc||"Feature")}</span>`:""}<span class="tag">${RESET[r.reset]||"Manual"}</span></div>${pips}
       <div class="rctl"><button class="btn sm" type="button" data-act="res-d" data-i="${i}" data-d="-1" aria-label="Use one">-</button>
         <span class="rval">${cur} / ${max}</span>
         <button class="btn sm" type="button" data-act="res-d" data-i="${i}" data-d="1" aria-label="Restore one">+</button>
@@ -3384,11 +3479,41 @@ function resHTML(c){
 
 function fxRows(o,kind,i){
   if(!o.fx||!o.fx.length)return o.fxq==="review"?`<div class="fxbox"><b>Effects</b><p class="hint">This text may change a number on your sheet but I could not tell how. Add the effect by hand if you want it applied.</p></div>`:"";
-  return `<div class="fxbox"><b>Effects on your sheet</b>${o.fx.map((e,j)=>`<label class="chk fxrow"><input type="checkbox" data-act="fx-tog" data-kind="${kind}" data-i="${i}" data-j="${j}"${e.on!==false?" checked":""}><span>${esc(fxLabel(e))}${e.cond?`<small> \u00b7 ${esc(e.cond)}</small>`:""}</span></label>`).join("")}</div>`;
+  const c=cur();
+  return `<div class="fxbox"><b>Effects on your sheet</b>${o.fx.map((e,j)=>{
+    const lab=fxLabel(c?fxResolved(c,e,o):e);
+    if(e.k==="pool")return `<div class="chk fxrow"><span>${esc(lab)} <small>\u00b7 under Resources</small></span></div>`;
+    const row=`<label class="chk fxrow"><input type="checkbox" data-act="fx-tog" data-kind="${kind}" data-i="${i}" data-j="${j}"${e.on!==false?" checked":""}><span>${esc(lab)}${e.cond?`<small> \u00b7 ${esc(e.cond)}</small>`:""}</span></label>`;
+    return e.k==="pick"?row+fxPickHTML(e,kind,i,j):row;
+  }).join("")}</div>`;
+}
+/* the value an effect works out to for this character, for labels */
+function fxResolved(c,x,o){
+  if(x.k==="pick"||/^(pr|cimm|spell|move)\b/.test(x.k)||x.v==null)return x;
+  if(typeof x.v==="number")return x;
+  return Object.assign({},x,{rv:fxVal(c,x.v,o||x.o)});
+}
+function fxPickName(of,id){
+  if(of==="abil"||of==="psave")return FXABN[id]||id;
+  if(of==="pskill"||of==="eskill")return (FXSK.find(s=>s[0]===id)||[0,id])[1];
+  return String(id||"");
+}
+function fxPickOpts(e){
+  const L=(e.opts||[]).filter(Boolean);
+  if(e.of==="abil"||e.of==="psave")return (L.length?L:CRAB).map(k=>[k,FXABN[k]||k]);
+  if(e.of==="pskill"||e.of==="eskill")return (L.length?L:FXSK.map(s=>s[0])).map(k=>[k,fxPickName("pskill",k)]);
+  if(e.of==="res")return (L.length?L:FXDMG).map(k=>[k,k.charAt(0).toUpperCase()+k.slice(1)]);
+  if(e.of==="lang")return (L.length?L:HBLANGS).map(k=>[k,k]);
+  return L.map(k=>[k,k]);
+}
+function fxPickHTML(e,kind,i,j){
+  const n=Math.max(1,Math.min(10,num(e.cnt,1))), sel=e.sel||[], opts=fxPickOpts(e);
+  if(e.of==="tool"&&!opts.length)return `<div class="igrid fxpick">${Array.from({length:n},(_,p)=>`<label class="fld"><span>Choice ${p+1}</span><input type="text" data-act="fx-pick" data-kind="${kind}" data-i="${i}" data-j="${j}" data-p="${p}" value="${esc(sel[p]||"")}" placeholder="Tool name"></label>`).join("")}</div>`;
+  return `<div class="igrid fxpick">${Array.from({length:n},(_,p)=>`<label class="fld"><span>Choice ${p+1}</span><select data-act="fx-pick" data-kind="${kind}" data-i="${i}" data-j="${j}" data-p="${p}"><option value="">Choose...</option>${opts.map(([v,t])=>`<option value="${esc(v)}"${sel[p]===v?" selected":""}${sel[p]!==v&&e.of!=="abil"&&sel.includes(v)?" disabled":""}>${esc(t)}</option>`).join("")}</select></label>`).join("")}</div>`;
 }
 function fxSummary(c){
   const L=fxList(c); if(!L.length)return "";
-  return `<div class="fxbox fxsum"><b>Active effects</b><div class="tags">${L.map(x=>`<span class="tag ex" title="${esc(x.src)}">${esc(fxLabel(x))}</span>`).join("")}</div></div>`;
+  return `<div class="fxbox fxsum"><b>Active effects</b><div class="tags">${L.map(x=>`<span class="tag ex" title="${esc(x.src)}">${esc(fxLabel(fxResolved(c,x)))}</span>`).join("")}</div></div>`;
 }
 function featsHTML(c){
   if(!c.features.length)return `<div class="empty">No features yet. Add class features, racial traits and feats, then open any entry to read it. Use Edit inside an entry to change it.</div>`;
@@ -3433,7 +3558,7 @@ function featKind(c,f){
 function spellItem(c,s,i){
   const p="spells."+i+".";
   const ed=ui.edit.has(s.id);
-  const tags=(s.prepared?'<span class="tag ex">Prepared</span>':"")+(s.conc?"<span>Concentration</span>":"")+(s.ritual?"<span>Ritual</span>":"")+(s.school?`<span>${esc(s.school)}</span>`:"");
+  const tags=(s.fxk?`<span class="tag ex">Always prepared \u00b7 ${esc(s.src||"feature")}</span>`:s.prepared?'<span class="tag ex">Prepared</span>':"")+(s.conc?"<span>Concentration</span>":"")+(s.ritual?"<span>Ritual</span>":"")+(s.school?`<span>${esc(s.school)}</span>`:"");
   let body;
   if(ed){
     const lvlOpts=LV.map((n,l)=>`<option value="${l}"${l===num(s.level)?" selected":""}>${l===0?"Cantrip":"Level "+l}</option>`).join("");
@@ -3628,6 +3753,7 @@ function addFromSrd(i,btn){
 
 function renderSheet(){
   const c=cur(); ui.view="sheet";
+  if(c&&!isPf(c)){try{if(fxGrants(c))save()}catch(e){}}
   if(!tabsFor(c).some(t=>t[0]===ui.tab))ui.tab="sheet";
   if(MORE.includes(ui.tab))ui.lastMore=ui.tab;
   if(isPf(c)){renderPf(c);return}
@@ -3661,7 +3787,7 @@ function renderSheet(){
       <div class="hp">
         <div class="hprow">
           <label class="fld"><span>Current HP</span><input type="number" inputmode="numeric" data-t="n" data-f="hp" value="${esc(c.hp)}"></label>
-          <label class="fld"><span>Max HP</span><input type="number" inputmode="numeric" data-t="n" data-f="hpMax" value="${esc(c.hpMax)}"></label>
+          <label class="fld"><span>Max HP</span><input type="number" inputmode="numeric" data-t="n" data-f="hpMax" value="${esc(c.hpMax)}">${num(c.fxHp)?`<small class="fxcap">Includes ${sgn(num(c.fxHp))} from effects</small>`:""}</label>
           <label class="fld"><span>Temp HP</span><input type="number" inputmode="numeric" data-t="n" data-f="hpTemp" value="${esc(c.hpTemp)}"></label>
         </div>
         <div class="hpbar" aria-hidden="true"><i data-hpbar></i></div>
@@ -4251,7 +4377,7 @@ async function loadItems(r){
   ITEMDATA[r].forEach(x=>{x.ed=r});
   return ITEMDATA[r];
 }
-const libItemRec=x=>({ed:x.ed||"",n:x.name,cat:x.cat||"Library",cost:x.cost,w:x.w,dmg:x.dmg,props:x.props,ac:x.ac,rar:x.rar,att:x.att,desc:x.desc,source:x.source||"Library",lib:1});
+const libItemRec=x=>({ed:x.ed||"",n:x.name,cat:x.cat||"Library",cost:x.cost,w:x.w,dmg:x.dmg,props:x.props,ac:x.ac,rar:x.rar,att:x.att,desc:x.desc,source:x.source||"Library",fx:x.fx,lib:1});
 const gearList=r=>(ITEMDATA[r]||[]).concat(ITEMDATA[r==="2024"?"2014":"2024"]||[],dndLib("items").map(libItemRec));
 function gearRowMeta(s){return [edLabel(s.ed),s.cat,s.rar,s.cost,Number(s.w)?fmtW(s.w)+" lb":"",s.dmg,s.ac?"AC "+s.ac:"",s.att?"attunement":"",s.source].filter(Boolean).join(" \u00b7 ")}
 function renderGearList(){
@@ -4417,7 +4543,8 @@ function libListHTML(kind){
   return head+`<div class="items">`+rows.map(([x,i])=>`<div class="prow"><div class="pmain"><div class="plink"><b>${esc(x.name)}</b><span>${esc(libMeta(kind,x))}</span></div>
     ${kind==="sections"&&c&&sysOf(c)===sysOf(x)?`<button class="btn sm" type="button" data-act="lib-addfeat" data-i="${i}">Add to character</button>`:""}
     ${kind==="classes"?`<button class="btn sm pri" type="button" data-act="lib-view" data-i="${i}">View</button>`:""}
-    <button class="btn sm" type="button" data-act="lib-edit" data-i="${i}">Edit</button>
+    ${!pf&&hbTypeOfRec(kind,x)?`<button class="btn sm" type="button" data-act="hb-open" data-kind="${kind}" data-id="${esc(x.id)}">${x.hb?"Edit in builder":"Open in builder"}</button>`:""}
+    ${x.hb&&!pf?"":`<button class="btn sm" type="button" data-act="lib-edit" data-i="${i}">Edit</button>`}
     <button class="btn sm danger" type="button" data-act="lib-del" data-i="${i}">Delete</button></div></div>`).join("")+`</div>`;
 }
 function draftFrom(kind,x){
@@ -4483,25 +4610,27 @@ function renderLib(){
   const L=ui.lib, ov=$("#libOv"); libEnrich();
   const pf=L.sys==="pf2e", cnt=k=>LIB[k].filter(x=>sysOf(x)===L.sys).length;
   const tabs=pf?PFLIBTABS.concat([["spells","My spells ("+cnt("spells")+")"],["items","My items ("+cnt("items")+")"],["sections","My text ("+cnt("sections")+")"]])
-    :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["review","Needs review"+(libReviewList().length?" ("+libReviewList().length+")":"")],["book","Import a book"],["import","Import text"]];
+    :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["hb","Homebrew ("+hbAll().length+")"],["review","Needs review"+(libReviewList().length?" ("+libReviewList().length+")":"")],["book","Import a book"],["import","Import text"]];
   const sysBar=L.locked?`<div class="tags"><span class="tag ex">${pf?"Pathfinder 2e only":"D&amp;D 5e and 5.5e only"}</span></div>`
     :`<div class="seg" role="group" aria-label="Game system">${[["dnd5e","D&amp;D 5e and 5.5e"],["pf2e","Pathfinder 2e"]].map(([v,t])=>`<button class="btn sm${L.sys===v?" pri":""}" type="button" data-act="lib-sys" data-s="${v}" aria-pressed="${L.sys===v}">${t}</button>`).join("")}</div>`;
-  const edBar=!pf&&!L.draft&&!L.view?`<label class="fld" style="max-width:260px"><span>Edition for new entries</span><select data-lined>${[["","5e and 5.5e (both)"],["2014","5e (2014)"],["2024","5.5e (2024)"]].map(([v,t])=>`<option value="${v}"${String(L.ed||"")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:"";
+  const hbOn=!pf&&L.hb&&L.hb.d;
+  const edBar=!pf&&!L.draft&&!L.view&&!hbOn&&L.tab!=="hb"?`<label class="fld" style="max-width:260px"><span>Edition for new entries</span><select data-lined>${[["","5e and 5.5e (both)"],["2014","5e (2014)"],["2024","5.5e (2024)"]].map(([v,t])=>`<option value="${v}"${String(L.ed||"")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:"";
   let body;
-  if(L.draft){
+  if(hbOn){body=hbEditorHTML()}
+  else if(L.draft){
     body=`<h3>${L.editId?"Edit":"New"} ${LIBKIND[L.kind]}</h3>${libFormHTML()}<div class="msg err" role="alert">${esc(L.msg)}</div>
       <div class="btns"><button class="btn pri" type="button" data-act="lib-save">Save to library</button><button class="btn" type="button" data-act="lib-cancel">Cancel</button></div>`;
   }else if(!pf&&L.view&&LIB.classes[L.view.i]){
     body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-vback">Back to classes</button><button class="btn sm" type="button" data-act="lib-vedit">Edit</button></div>`+libClassViewHTML(LIB.classes[L.view.i]);
   }else if(!pf&&L.spl){
     body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-spl-back">Back to spells</button></div>`+libSplHTML();
-  }else body=L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():L.tab==="sources"?`<p>Books are now turned on per campaign. On the Characters screen, tap a campaign, then Books for this campaign.</p>`:L.tab==="review"?libReviewHTML():libListHTML(L.tab);
+  }else body=L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():L.tab==="sources"?`<p>Books are now turned on per campaign. On the Characters screen, tap a campaign, then Books for this campaign.</p>`:L.tab==="review"?libReviewHTML():L.tab==="hb"?hbListHTML():libListHTML(L.tab);
   ov.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="libT">
     <div class="bar" style="margin:0"><h2 id="libT">Library</h2><span class="status" id="libStatus">${esc(libStatusText())}</span><button class="btn sm pri" type="button" data-act="lib-close">Done</button></div>
     ${sysBar}
     <p>${pf?"Pathfinder 2e content. Your own additions are stored privately for you, apart from your characters, and are left out of character backups.":"Your own D&amp;D classes, spells, items and book text. It is stored privately for you, apart from your characters, and it is left out of character backups. Only add content you have the right to use, and keep it to yourself."}</p>
     ${edBar}
-    ${L.draft||L.view?"":`<div class="tabs" role="tablist" style="flex-wrap:wrap;overflow:visible">${tabs.map(t=>`<button class="tab" role="tab" type="button" data-act="lib-tab" data-tab="${t[0]}" aria-selected="${L.tab===t[0]}">${t[1]}</button>`).join("")}</div>`}
+    ${L.draft||L.view||hbOn?"":`<div class="tabs" role="tablist" style="flex-wrap:wrap;overflow:visible">${tabs.map(t=>`<button class="tab" role="tab" type="button" data-act="lib-tab" data-tab="${t[0]}" aria-selected="${L.tab===t[0]}">${t[1]}</button>`).join("")}</div>`}
     ${body}</div>`;
 }
 /* which spells are on a class's list: Library classes keep a list of names; Library spells name their classes */
@@ -5549,7 +5678,15 @@ function chAuto(groups,st){
 let CHCTX=null;
 /* a chosen option lives on the feature that gave it: f.opts (options with their own text) and f.chosen (skills, languages and similar) */
 function optShort(n){return String(n||"").replace(/^[^:]{3,60}:\s*/,"")}
-function chFx(f){const t={name:f.name,desc:[f.desc].concat((f.opts||[]).map(o=>o.desc||"")).join("\n\n")};fxAttach(t);if(t.fx){f.fx=t.fx;f.fxq=t.fxq}else if(t.fxq)f.fxq=t.fxq}
+/* effects of a feature plus the options picked on it; options built in the Homebrew builder bring their own effects */
+function chFx(f){
+  const hbo=[], plain=[];
+  (f.opts||[]).forEach(o=>{const h=hbFxFor(o.full||o.name,o.desc);if(h)h.forEach(e=>{e.fromOpt=1;hbo.push(e)});else plain.push(o.desc||"")});
+  if(f.fxhb){f.fx=(f.fx||[]).filter(e=>!e.fromOpt).concat(hbo);f.fxq="ok";return}
+  const t={name:f.name,desc:[f.desc].concat(plain).join("\n\n")};fxAttach(t);
+  if(t.fxhb)f.fxhb=1;
+  if(t.fx){f.fx=t.fx.concat(hbo);f.fxq=t.fxq}else if(hbo.length){f.fx=hbo;f.fxq="ok"}else if(t.fxq)f.fxq=t.fxq;
+}
 function featParent(c,name){const k=lc(name).replace(/\s*\(.*\)$/,"");return c.features.find(f=>!/:/.test(f.name||"")&&[k,k+"s"].includes(lc(f.name).replace(/\s*\(.*\)$/,"")))||c.features.find(f=>!/:/.test(f.name||"")&&lc(f.name).replace(/\s*\(.*\)$/,"")+"s"===k)}
 function attachOpt(c,parent,src,o,type){
   let f=typeof parent==="object"?parent:featParent(c,parent);
@@ -5714,6 +5851,7 @@ function libClassMeta(x){
     }
     m.T=T;
   }
+  if(x.hbMeta)hbMetaMerge(m,x);
   if(!m.sc&&x.caster&&x.caster!=="none"&&m.abil){
     m.sc=[]; for(let l=1;l<=20;l++){const s=x.caster==="custom"?customSlots(x,l):fullAt(x.caster==="full"?l:x.caster==="pact"?Math.min(9,Math.ceil(l/2)*2-1):x.caster==="third"?(l<3?0:Math.ceil(l/3)):Math.ceil(l/2));let maxl=0;s.forEach((v,i)=>{if(v)maxl=i+1});if(x.caster==="pact")maxl=PACTT[l][1];m.sc.push([0,0,maxl])}
     m.spk="prep";
@@ -7636,7 +7774,7 @@ async function crLoad5(){
 const crLib=(cat,ed)=>LIB.sections.filter(x=>sysOf(x)==="dnd5e"&&x.cat===cat&&crPackOn(x.source)&&(!x.ed||x.ed===ed));
 function crSpecies(ed){
   const out=(CRD.o[ed].species||[]).map(x=>({n:x.n,sz:x.sz,sp:x.sp,ab:x.ab||{},abo:x.abo,lg:x.lg||[],tr:x.tr||[],sub:x.sub||[],src:"SRD"}));
-  crLib("species",ed).forEach(x=>{const p=libSpeciesParts(x);out.push({n:x.name,sz:(x.data&&x.data.size)||"Medium",sp:(x.data&&x.data.speed)||30,ab:p.sub.length&&Object.keys(p.ab).length?p.ab:(x.data&&x.data.ab)||{},lg:p.lg,tr:p.tr,sub:p.sub,src:x.source||"Library",lib:x})});
+  crLib("species",ed).forEach(x=>{if(x.hb&&Array.isArray(x.traits)){const d=x.data||{};out.push({n:x.name,sz:d.size||"Medium",sp:num(d.speed,30),ab:d.ab||{},lg:d.lg||[],tr:x.traits.map(t=>({n:t.name,d:t.desc||""})),sub:[],src:x.source||"Homebrew",lib:x});return}const p=libSpeciesParts(x);out.push({n:x.name,sz:(x.data&&x.data.size)||"Medium",sp:(x.data&&x.data.speed)||30,ab:p.sub.length&&Object.keys(p.ab).length?p.ab:(x.data&&x.data.ab)||{},lg:p.lg,tr:p.tr,sub:p.sub,src:x.source||"Library",lib:x})});
   return out;
 }
 /* split an imported species write-up into separate traits (and subraces or lineages) like the SRD species */
@@ -7970,7 +8108,7 @@ async function crBuild5(s){
   const sp=s.speciesObj, bg=s.bgObj, cl=s.L.classes.find(x=>x.n===s.cls), meta=cl.meta;
   c.name=s.name.trim()||"New character"; c.level=s.level;
   c.race=(s.sub&&ed==="2014"?s.sub:s.species)||""; c.background=s.bg||"";
-  c.speed=sp?sp.sp:30;
+  c.speed=sp?sp.sp:30; c.fxHp=0;
   if(ed==="2014"&&sp&&s.sub){const sb=(sp.sub||[]).find(x=>x.n===s.sub);if(sb&&sb.sp)c.speed=sb.sp}
   const tot=crApplyAsi(s,crTotals(s)); CRAB.forEach(k=>{c.abilities[k]=tot[k]});
   c.classes=[mkClassRow(s.cls,s.subcls||"",s.level)];
@@ -8702,6 +8840,631 @@ document.addEventListener("click",e=>{
   }
   save(); recompute(); rerender(b.dataset.kind==="features"?"feat":"gear");
 });
+
+
+/* ===== Homebrew builder: classes, subclasses, species, backgrounds, feats, items and spells made in the app =====
+   Entries are saved into the Library in the same shape as imported ones (so the creator, level up, the gear and spell
+   pickers and the class picker all use them), plus structured effects. When a feature, trait or item made here lands on a
+   character, its effects come from the builder instead of being guessed from the text (see hbFxFor and fxAttach). */
+const HBLANGS=["Common","Common Sign Language","Draconic","Dwarvish","Elvish","Giant","Gnomish","Goblin","Halfling","Orc","Abyssal","Celestial","Deep Speech","Druidic","Infernal","Primordial","Sylvan","Thieves' Cant","Undercommon"];
+const HBTYPES=[["class","Class"],["subclass","Subclass"],["species","Species"],["background","Background"],["feat","Feat"],["item","Item"],["spell","Spell"]];
+const HBNAME=Object.fromEntries(HBTYPES);
+const HBPLURAL={class:"Classes",subclass:"Subclasses",species:"Species",background:"Backgrounds",feat:"Feats",item:"Items",spell:"Spells"};
+const HBKIND={class:"classes",subclass:"classes",species:"sections",background:"sections",feat:"sections",item:"items",spell:"spells"};
+const HBFEATCAT=[["general","General feat"],["origin","Origin feat"],["fighting-style","Fighting style"],["epic-boon","Epic boon"]];
+const HBITEMCATS=["Weapon","Armor","Shield","Wondrous item","Ring","Potion","Scroll","Wand","Staff","Rod","Ammunition","Adventuring gear","Tool"];
+const HBRARITY=["","Common","Uncommon","Rare","Very rare","Legendary","Artifact"];
+const HBSIZES=["Tiny","Small","Medium","Large","Small or Medium"];
+const HBCOND=["Blinded","Charmed","Deafened","Exhaustion","Frightened","Grappled","Incapacitated","Paralyzed","Petrified","Poisoned","Prone","Restrained","Stunned","Unconscious"];
+
+function hbTypeOfRec(kind,x){
+  if(!x||sysOf(x)!=="dnd5e")return null;
+  if(kind==="classes")return x.addOn?((x.subclasses||[]).length===1?"subclass":null):"class";
+  if(kind==="items")return "item"; if(kind==="spells")return "spell";
+  if(kind==="sections")return ["feat","species","background"].includes(x.cat)?x.cat:null;
+  return null;
+}
+function hbAll(){
+  const o=[];
+  ["classes","sections","items","spells"].forEach(k=>LIB[k].forEach(x=>{if(x&&x.hb&&sysOf(x)==="dnd5e"){const t=hbTypeOfRec(k,x);if(t)o.push({t:t,x:x,kind:k})}}));
+  return o;
+}
+
+/* ----- effects index: name + text of every homebrew feature, trait, feat, background and item ----- */
+let HBIX=null, HBIXU=-1;
+const hbNorm=t=>String(t||"").replace(/\*\*|__/g,"").replace(/\s+/g," ").trim().toLowerCase();
+function hbIndex(){
+  if(HBIX&&HBIXU===LIB.updated)return HBIX;
+  const m=new Map();
+  const put=(name,desc,fx)=>{if(!Array.isArray(fx)||!fx.length||!name)return;const d=hbNorm(desc);m.set(hbNorm(name)+"|"+d,fx);if(d.length>=24&&!m.has("|"+d))m.set("|"+d,fx)};
+  LIB.classes.forEach(x=>{if(!x.hb)return;(x.features||[]).forEach(f=>put(f.name,f.desc,f.fx));(x.subclasses||[]).forEach(sc=>(sc.features||[]).forEach(f=>put(f.name,f.desc,f.fx)))});
+  LIB.sections.forEach(x=>{if(!x.hb)return;put(x.name,x.text,x.fx);if(x.cat==="background")put(x.name+" background",x.text,x.fx);(x.traits||[]).forEach(t=>put(t.name,t.desc,t.fx))});
+  LIB.items.forEach(x=>{if(x.hb)put(x.name,x.desc,x.fx)});
+  HBIX=m; HBIXU=LIB.updated; return m;
+}
+function hbFxFor(name,desc){
+  try{
+    const m=hbIndex(); if(!m.size)return null;
+    const d=hbNorm(desc), fx=m.get(hbNorm(name)+"|"+d)||(d.length>=24?m.get("|"+d):null);
+    return fx?JSON.parse(JSON.stringify(fx)).map(e=>{if(e.c&&e.on===undefined)e.on=false;return e}):null;
+  }catch(e){return null}
+}
+
+/* ----- keeping a character in step with its effects: resources, spells always prepared, max HP ----- */
+function fxGrants(c){
+  if(!c||isPf(c))return false;
+  let ch=false;
+  c.resources=c.resources||[]; c.spells=c.spells||[];
+  const pools=new Map(), spells=new Map();
+  const scan=(o,active)=>(o.fx||[]).forEach((e,j)=>{
+    if(!e)return;
+    if(e.k==="pool"&&String(e.n||"").trim())pools.set(o.id+":"+j,{e:e,o:o});
+    if(e.k==="spell"&&String(e.n||"").trim()&&active&&e.on!==false)spells.set(lc(e.n),{e:e,o:o});
+  });
+  (c.features||[]).forEach(f=>{if(f.fx)scan(f,f.fxOn!==false)});
+  (c.inventory||[]).forEach(it=>{if(it.fx)scan(it,!!it.equipped&&(!it.att||it.attuned))});
+  pools.forEach(({e,o},key)=>{
+    const max=Math.max(0,fxVal(c,e.v,o)), reset=RESET[e.r]?e.r:"long";
+    let r=c.resources.find(x=>x.fxk===key);
+    if(!r){c.resources.push({id:uid(),name:String(e.n).trim(),max:max,cur:max,reset:reset,fxk:key,fxsrc:o.name});ch=true;return}
+    if(num(r.max)!==max){const used=Math.max(0,num(r.max)-num(r.cur));r.max=max;r.cur=Math.max(0,max-used);ch=true}
+    if(r.reset!==reset){r.reset=reset;ch=true}
+    if(r.name!==String(e.n).trim()){r.name=String(e.n).trim();ch=true}
+    if(r.fxsrc!==o.name){r.fxsrc=o.name;ch=true}
+  });
+  const nr=c.resources.length; c.resources=c.resources.filter(r=>!r.fxk||pools.has(r.fxk)); if(c.resources.length!==nr)ch=true;
+  if(spells.size){
+    const ed=c.rules==="2024"?"2024":"2014", all=spellList(ed);
+    if(!SPELLDATA[ed])loadSpells(ed).then(()=>{if(fxGrants(c))save()}).catch(()=>{});
+    spells.forEach(({e,o},k)=>{
+      const d=all.find(x=>lc(x.n)===k);
+      let s=c.spells.find(x=>lc(x.name)===k);
+      if(s){if(s.fxk&&!s.desc&&d){Object.assign(s,{level:d.l,school:d.s,time:d.t,range:d.r,components:d.c,duration:d.d,conc:d.k,ritual:d.ri,desc:d.desc,higher:d.hi});ch=true}return}
+      s=mkSpell(String(e.n).trim());
+      if(d)Object.assign(s,{name:d.n,level:d.l,school:d.s,time:d.t,range:d.r,components:d.c,duration:d.d,conc:d.k,ritual:d.ri,desc:d.desc,higher:d.hi});
+      Object.assign(s,{prepared:true,fxk:o.id,src:o.name}); c.spells.push(s); ch=true;
+    });
+  }
+  const ns=c.spells.length; c.spells=c.spells.filter(s=>!s.fxk||spells.has(lc(s.name))); if(c.spells.length!==ns)ch=true;
+  const want=fxSum(c,"hp")+fxSum(c,"hpl")*Math.max(1,num(c.level,1));
+  if(c.fxHp==null)c.fxHp=want;
+  else if(want!==num(c.fxHp)){const d=want-num(c.fxHp);c.hpMax=Math.max(1,num(c.hpMax)+d);c.hp=d>0?num(c.hp)+d:Math.min(num(c.hp),c.hpMax);c.fxHp=want;ch=true}
+  return ch;
+}
+/* a choice made on the sheet (Choose 2 skill proficiencies...) */
+function fxPickSet(t){
+  const c=cur(); if(!c)return;
+  const o=(c[t.dataset.kind]||[])[num(t.dataset.i)], e=o&&o.fx&&o.fx[num(t.dataset.j)]; if(!e||e.k!=="pick")return;
+  e.sel=Array.isArray(e.sel)?e.sel:[]; e.sel[num(t.dataset.p)]=String(t.value||"").trim();
+  save(); recompute(); rerender(t.dataset.kind==="features"?"feat":"gear");
+}
+document.addEventListener("change",e=>{const t=e.target;if(t&&t.dataset&&t.dataset.act==="fx-pick")fxPickSet(t)});
+
+/* class data the creator and level up read: skill choices, proficiencies, starting gear, spells known by level */
+function hbMetaMerge(m,x){
+  const h=x.hbMeta||{};
+  if(h.sk&&num(h.sk.n))m.sk={n:num(h.sk.n),from:h.sk.from&&h.sk.from.length?h.sk.from.slice():FXSK.map(q=>q[1])};
+  if(h.prof&&h.prof.length)m.prof=h.prof.slice();
+  if(h.fixed&&h.fixed.length)m.fixed=h.fixed.map(p=>p.slice());
+  if(h.primary)m.primary=h.primary;
+  if(x.ability)m.abil=lc(x.ability).slice(0,3);
+  const C=fxTable(h.cantripsT), K=fxTable(h.spellsT);
+  if(x.caster&&x.caster!=="none"&&(C.length||K.length)){
+    const at=(T,l)=>{let r=0;T.forEach(([a,v])=>{if(l>=a)r=v});return r};
+    m.sc=[];
+    for(let l=1;l<=20;l++){
+      const s=x.caster==="custom"?customSlots(x,l):fullAt(x.caster==="full"?l:x.caster==="pact"?Math.min(9,Math.ceil(l/2)*2-1):x.caster==="third"?(l<3?0:Math.ceil(l/3)):Math.ceil(l/2));
+      let maxl=0; s.forEach((v,i)=>{if(v)maxl=i+1}); if(x.caster==="pact")maxl=PACTT[l][1];
+      m.sc.push([at(C,l),at(K,l),maxl]);
+    }
+    m.spk=h.spk==="known"?"known":h.spk==="prep24"?"prep24":"prep";
+  }
+}
+
+/* ----- effect catalogue for the builder ----- */
+const HBFX=[
+  ["Ability scores",[["abil","Increase an ability score",["ab","val"]],["abilpick","Ability increase of the player's choice",["cnt","val","abs"]],["abilset","Set an ability score (if higher)",["ab","val"]]]],
+  ["Proficiencies",[["pskill","Skill proficiency",["sk"]],["skillpick","Skill proficiencies of the player's choice",["cnt","sks"]],["eskill","Expertise in a skill",["sk"]],["exppick","Expertise of the player's choice",["cnt","sks"]],
+    ["psave","Saving throw proficiency",["ab"]],["savepick","Saving throw proficiency of the player's choice",["cnt","abs"]],["pr","Armor, weapon or tool proficiency, or a language",["prt","txt"]],
+    ["langpick","Languages of the player's choice",["cnt"]],["toolpick","Tool proficiency of the player's choice",["cnt","txtlist"]]]],
+  ["Bonuses",[["ac","Bonus to Armor Class",["val"]],["acbase","Armor Class formula (Unarmored Defense and the like)",["val"]],["save","Bonus to saving throws",["abAll","val"]],["skill","Bonus to a skill",["skAll","val"]],
+    ["init","Bonus to Initiative",["val"]],["speed","Bonus to walking speed (feet)",["val"]],["hp","Bonus to max HP",["val"]],["hpl","Max HP bonus for every level",["val"]],
+    ["atk","Bonus to weapon attack rolls",["val"]],["dmg","Bonus to weapon damage rolls",["val"]],["spellatk","Bonus to spell attack rolls",["val"]],["spelldc","Bonus to spell save DC",["val"]]]],
+  ["Senses, movement and defenses",[["move","Fly, swim, climb or burrow speed",["mv","mval"]],["sense","Darkvision or another sense",["sn","val"]],["res","Damage resistance",["dt"]],["respick","Damage resistance of the player's choice",["cnt","dts"]],
+    ["imm","Damage immunity",["dt"]],["cimm","Condition immunity",["ci"]]]],
+  ["Things you use",[["pool","Resource: uses, points or charges",["txt","val","reset"]],["spell","Spell always prepared",["spell"]]]]
+];
+const HBFXT=Object.fromEntries(HBFX.flatMap(g=>g[1].map(x=>[x[0],x])));
+const HBTXT={pool:["Name","Ki Points"],pr:["Name","Light armor, Elvish"]};
+function hbValParse(s,allowEmpty){
+  s=String(s==null?"":s).trim();
+  if(!s){if(allowEmpty)return {v:"walk"};return {err:"Enter an amount."}}
+  if(/^\d+\s*[:=]/.test(s)){const T=fxTable(s);if(!T.length)return {err:"Write the table as level: amount, for example 1: 2, 6: 3, 12: 4."};return {v:{by:"clevel",t:T.map(p=>p[0]+": "+p[1]).join(", ")}}}
+  if(/^[-+]?\d+$/.test(s))return {v:parseInt(s,10)};
+  if(lc(s)==="pb"||lc(s)==="prof")return {v:"pb"};
+  try{fxCompile(s);return {v:s}}catch(e){return {err:e.message}}
+}
+function hbFxBuild(F){
+  const a=F.a||{}, t=F.t, out={};
+  const val=k=>{const r=hbValParse(a.val,k);if(r.err)throw new Error(r.err);return r.v};
+  const cnt=Math.max(1,Math.min(10,num(a.cnt,1)));
+  const list=k=>Array.isArray(a[k])?a[k].slice():[];
+  switch(t){
+    case"abil":out.k="abil."+(a.ab||"str");out.v=val();break;
+    case"abilset":out.k="abilset."+(a.ab||"str");out.v=val();break;
+    case"abilpick":Object.assign(out,{k:"pick",of:"abil",cnt:cnt,v:val(),opts:list("abs"),sel:[]});break;
+    case"pskill":out.k="pskill."+(a.sk||FXSK[0][0]);out.v=1;break;
+    case"eskill":out.k="eskill."+(a.sk||FXSK[0][0]);out.v=1;break;
+    case"psave":out.k="psave."+(a.ab||"str");out.v=1;break;
+    case"skillpick":Object.assign(out,{k:"pick",of:"pskill",cnt:cnt,opts:list("sks"),sel:[]});break;
+    case"exppick":Object.assign(out,{k:"pick",of:"eskill",cnt:cnt,opts:list("sks"),sel:[]});break;
+    case"savepick":Object.assign(out,{k:"pick",of:"psave",cnt:cnt,opts:list("abs"),sel:[]});break;
+    case"respick":Object.assign(out,{k:"pick",of:"res",cnt:cnt,opts:list("dts"),sel:[]});break;
+    case"langpick":Object.assign(out,{k:"pick",of:"lang",cnt:cnt,opts:[],sel:[]});break;
+    case"toolpick":Object.assign(out,{k:"pick",of:"tool",cnt:cnt,opts:String(a.txtlist||"").split(",").map(x=>x.trim()).filter(Boolean),sel:[]});break;
+    case"pr":if(!String(a.txt||"").trim())throw new Error("Enter what the proficiency is for.");Object.assign(out,{k:"pr."+(a.prt||"armor"),n:String(a.txt).trim(),v:1});break;
+    case"save":out.k="save."+(a.abAll||"all");out.v=val();break;
+    case"skill":out.k="skill."+(a.skAll||"all");out.v=val();break;
+    case"ac":case"acbase":case"init":case"speed":case"hp":case"hpl":case"atk":case"dmg":case"spellatk":case"spelldc":out.k=t;out.v=val();break;
+    case"move":{out.k="move."+(a.mv||"fly");const r=hbValParse(a.val,true);if(r.err)throw new Error(r.err);out.v=r.v;break}
+    case"sense":out.k="sense."+(a.sn||"darkvision");out.v=val();break;
+    case"res":case"imm":out.k=t+"."+(a.dt||FXDMG[0]);out.v=1;break;
+    case"cimm":Object.assign(out,{k:"cimm",n:a.ci||HBCOND[0],v:1});break;
+    case"pool":if(!String(a.txt||"").trim())throw new Error("Give the resource a name.");Object.assign(out,{k:"pool",n:String(a.txt).trim(),v:val(),r:a.reset||"long"});break;
+    case"spell":if(!String(a.spell||"").trim())throw new Error("Enter the spell's name.");Object.assign(out,{k:"spell",n:String(a.spell).trim(),v:1});break;
+    default:throw new Error("Choose an effect.");
+  }
+  if(String(a.cond||"").trim()){out.c=1;out.cond=String(a.cond).trim();out.on=false}
+  return out;
+}
+/* what a formula works out to at a few levels, with every ability modifier at +3 */
+function hbPreview(e){
+  const v=e.v; if(e.k==="pick"||v==null||typeof v==="number"||v==="walk"||/^(pr|cimm|spell)\b/.test(e.k))return "";
+  if(typeof v==="string"&&/^[-+]?\d+$/.test(v))return "";
+  const P=[1,5,11,17].map(L=>{const c={level:L,classes:[],abilities:{str:16,dex:16,con:16,int:16,wis:16,cha:16},features:[],inventory:[],skills:{},saveProf:{},spellcasting:{ability:"wis"}};return L+": "+fxVal(c,v,null)});
+  return "Level "+P.join(" · ")+(typeof v==="string"&&/str|dex|con|int|wis|cha|spellmod/i.test(v)?" (with a +3 modifier)":"");
+}
+const hbFxDef=t=>({val:t==="acbase"?"10+dex+con":t==="sense"?"60":t==="speed"?"10":t==="pool"?"pb":t==="move"?"":"1",cnt:1});
+const hbCopy=o=>JSON.parse(JSON.stringify(o==null?null:o));
+const hbAuto=(text,name,item)=>{try{return fxParse(String(text||""),Object.assign({name:name||""},item?{item:1}:{})).fx}catch(e){return []}};
+
+/* ----- drafts ----- */
+function hbBlank(t){
+  const L=ui.lib, b={name:"",source:"Homebrew",ed:L.ed||"",desc:"",fx:[]};
+  switch(t){
+    case"feat":return Object.assign(b,{cat:"general",lvl:0,preAb:"",preV:13});
+    case"species":return Object.assign(b,{size:"Medium",speed:30,ab:{},langs:"Common",traits:[{name:"",desc:"",fx:[]}]});
+    case"background":return Object.assign(b,{skills:[],tools:"",equip:"",gp:0,ab:[],feat:""});
+    case"item":return Object.assign(b,{cat:"Wondrous item",cost:"",w:0,dmg:"",props:"",ac:"",rar:"Uncommon",att:false});
+    case"spell":return Object.assign(b,{level:1,school:"Evocation",time:"1 action",range:"",components:"V, S",duration:"Instantaneous",conc:false,ritual:false,classes:[],higher:""});
+    case"class":return Object.assign(b,{hd:8,primary:"",saves:[],skN:2,skFrom:[],prof:"",equip:"",caster:"none",ability:"",slotsText:"",spk:"prep",cantripsT:"",spellsT:"",masteryText:"",features:[{lvl:1,name:"",opt:"",desc:"",fx:[]}],subclasses:[]});
+    case"subclass":return Object.assign(b,{parent:"",caster:"none",ability:"",features:[{lvl:3,name:"",opt:"",desc:"",fx:[]}]});
+  }
+  return b;
+}
+const hbSplitOpt=(list,f)=>{const m=String(f.name||"").match(/^([^:]{3,60}):\s*(.+)$/);if(m&&list.some(g=>g!==f&&lc(g.name)===lc(m[1])))return {opt:m[1].trim(),name:m[2].trim()};return {opt:"",name:f.name||""}};
+const hbFeatsDraft=(list,auto)=>(list||[]).map(f=>{const s=hbSplitOpt(list,f);return {lvl:Math.max(1,num(f.lvl,1)),name:s.name,opt:s.opt,desc:f.desc||f.d||"",fx:Array.isArray(f.fx)?hbCopy(f.fx):auto?hbAuto(f.desc||f.d,f.name):[]}});
+function hbDraftFromRec(t,x){
+  const d=hbBlank(t); d.name=x.name||""; d.source=x.source||""; d.ed=x.ed||"";
+  if(t==="feat"){const pa=x.pre&&x.pre.abil||{}, k=Object.keys(pa)[0]||"";Object.assign(d,{desc:x.text||"",cat:(x.data&&x.data.type)||"general",lvl:num(x.pre&&x.pre.lvl),preAb:k,preV:k?num(pa[k],13):13,fx:hbCopy(x.fx||[])})}
+  else if(t==="species"){
+    const dt=x.data||{};
+    if(Array.isArray(x.traits)){d.traits=x.traits.map(q=>({name:q.name||"",desc:q.desc||"",fx:hbCopy(q.fx||[])}));d.desc=x.intro||""}
+    else{const p=libSpeciesParts(x);d.traits=p.tr.map(q=>({name:q.n,desc:q.d,fx:hbAuto(q.d,q.n)}));if(Object.keys(p.ab||{}).length&&!dt.ab)d.ab=p.ab;if(p.lg.length)d.langs=p.lg.join(", ")}
+    Object.assign(d,{size:dt.size||"Medium",speed:num(dt.speed,30)}); if(dt.ab)d.ab=Object.assign({},dt.ab); if(dt.lg&&dt.lg.length)d.langs=dt.lg.join(", ");
+  }
+  else if(t==="background"){const dt=x.data||{};Object.assign(d,{desc:x.text||"",skills:(dt.skills||[]).slice(),tools:(dt.tools||[]).join(", "),equip:(dt.equip||[]).map(p=>Array.isArray(p)?(num(p[1],1)>1?p[1]+" ":"")+p[0]:String(p)).join("\n"),gp:num(dt.gp),ab:(dt.ab||[]).slice(),feat:dt.feat||"",fx:hbCopy(x.fx||[])})}
+  else if(t==="item")Object.assign(d,{cat:x.cat||"",cost:x.cost||"",w:Number(x.w)||0,dmg:x.dmg||"",props:x.props||"",ac:x.ac||"",rar:x.rar||"",att:!!x.att,desc:x.desc||"",fx:Array.isArray(x.fx)?hbCopy(x.fx):hbAuto(x.desc,x.name,1)});
+  else if(t==="spell")Object.assign(d,{level:num(x.level),school:x.school||"",time:x.time||"",range:x.range||"",components:x.components||"",duration:x.duration||"",conc:!!x.conc,ritual:!!x.ritual,classes:(x.classes||[]).slice(),desc:x.desc||"",higher:x.higher||""});
+  else if(t==="class"){
+    const h=x.hbMeta||{};
+    Object.assign(d,{desc:x.info||"",hd:num(x.hd,8),saves:(x.saves||[]).map(k=>lc(k).slice(0,3)),caster:x.caster||"none",ability:x.ability||"",slotsText:slotsToText(x.slots),masteryText:masteryText(x.mastery),
+      primary:h.primary||"",skN:h.sk?num(h.sk.n,2):2,skFrom:h.sk&&h.sk.from?h.sk.from.slice():[],prof:(h.prof||[]).join(", "),equip:(h.fixed||[]).map(p=>(num(p[1],1)>1?p[1]+" ":"")+p[0]).join("\n"),spk:h.spk||"prep",cantripsT:h.cantripsT||"",spellsT:h.spellsT||"",
+      features:hbFeatsDraft(x.features,!x.hb),subclasses:(x.subclasses||[]).map(sc=>({name:sc.name||"",caster:sc.caster||"none",ability:sc.ability||"",features:hbFeatsDraft(sc.features,!x.hb)}))});
+    if(!x.hb&&x.tableText)d.tableText=x.tableText;
+  }
+  else if(t==="subclass"){const sc=(x.subclasses||[])[0]||{};Object.assign(d,{parent:x.name||"",name:sc.name||"",caster:sc.caster||"none",ability:sc.ability||"",features:hbFeatsDraft(sc.features,!x.hb)})}
+  return d;
+}
+const hbEqLines=t=>String(t||"").split("\n").map(s=>s.trim()).filter(Boolean).map(s=>{const m=s.match(/^(\d+)\s*[x*]?\s+(.+)$/i);return m?[m[2].trim(),num(m[1],1)]:[s,1]});
+const hbList=t=>String(t||"").split(",").map(s=>s.trim()).filter(Boolean);
+const hbFeatsRec=list=>(list||[]).filter(f=>String(f.name||"").trim()).map(f=>{const o={lvl:Math.max(1,Math.min(20,num(f.lvl,1))),name:(String(f.opt||"").trim()?String(f.opt).trim()+": ":"")+String(f.name).trim(),desc:String(f.desc||"").trim()};if(f.fx&&f.fx.length)o.fx=hbCopy(f.fx);return o}).sort((a,b)=>a.lvl-b.lvl);
+function hbRecFromDraft(t,d){
+  const base={name:String(d.name||"").trim(),source:String(d.source||"").trim()||"Homebrew",ed:d.ed||"",system:"dnd5e",hb:1};
+  const fx=d.fx&&d.fx.length?hbCopy(d.fx):undefined;
+  switch(t){
+    case"feat":{const r=Object.assign(base,{cat:"feat",catq:"ok",text:String(d.desc||"").trim(),data:{type:d.cat||"general"},pre:{},fx:fx,fxq:fx?"ok":"none"});
+      if(num(d.lvl))r.pre.lvl=num(d.lvl); if(d.preAb)r.pre.abil={[d.preAb]:num(d.preV,13)}; return r}
+    case"species":{
+      const traits=(d.traits||[]).filter(q=>String(q.name||"").trim()).map(q=>({name:String(q.name).trim(),desc:String(q.desc||"").trim(),fx:q.fx&&q.fx.length?hbCopy(q.fx):undefined}));
+      const ab={}; CRAB.forEach(k=>{const v=num(d.ab&&d.ab[k]);if(v)ab[k]=v});
+      const text=[String(d.desc||"").trim()].concat(traits.map(q=>"**"+q.name+".** "+q.desc)).filter(Boolean).join("\n\n");
+      return Object.assign(base,{cat:"species",catq:"ok",text:text,intro:String(d.desc||"").trim(),traits:traits,data:{size:d.size||"Medium",speed:num(d.speed,30),ab:ab,lg:hbList(d.langs)},fxq:"none"});
+    }
+    case"background":return Object.assign(base,{cat:"background",catq:"ok",text:String(d.desc||"").trim(),data:{skills:(d.skills||[]).slice(),tools:hbList(d.tools),equip:hbEqLines(d.equip),gp:num(d.gp),ab:(d.ab||[]).slice(),feat:String(d.feat||"").trim()},fx:fx,fxq:fx?"ok":"none"});
+    case"item":return Object.assign(base,{cat:d.cat||"",cost:d.cost||"",w:Number(d.w)||0,dmg:d.dmg||"",props:d.props||"",ac:d.ac||"",rar:d.rar||"",att:!!d.att,desc:String(d.desc||"").trim(),fx:fx});
+    case"spell":return Object.assign(base,{level:Math.max(0,Math.min(9,num(d.level))),school:d.school||"",time:d.time||"",range:d.range||"",components:d.components||"",duration:d.duration||"",conc:!!d.conc,ritual:!!d.ritual,classes:(d.classes||[]).slice(),desc:String(d.desc||"").trim(),higher:String(d.higher||"").trim()});
+    case"class":{
+      const r=Object.assign(base,{hd:num(d.hd,8),caster:d.caster||"none",ability:d.caster&&d.caster!=="none"?(d.ability||""):"",saves:(d.saves||[]).slice(),info:String(d.desc||"").trim(),optv:1,
+        features:hbFeatsRec(d.features),subclasses:(d.subclasses||[]).filter(sc=>String(sc.name||"").trim()).map(sc=>{const o={name:String(sc.name).trim(),features:hbFeatsRec(sc.features)};if(sc.caster&&sc.caster!=="none"){o.caster=sc.caster;if(sc.ability)o.ability=sc.ability}return o}),
+        hbMeta:{primary:d.primary||"",sk:{n:num(d.skN),from:(d.skFrom||[]).slice()},prof:hbList(d.prof),fixed:hbEqLines(d.equip),spk:d.spk||"prep",cantripsT:String(d.cantripsT||"").trim(),spellsT:String(d.spellsT||"").trim()}});
+      if(r.caster==="custom")r.slots=parseSlotsText(d.slotsText);
+      const mm=parseMasteryText(d.masteryText); if(Object.keys(mm).length)r.mastery=mm;
+      if(d.tableText)r.tableText=d.tableText;
+      return r;
+    }
+    case"subclass":{const sc={name:base.name,features:hbFeatsRec(d.features)};if(d.caster&&d.caster!=="none"){sc.caster=d.caster;if(d.ability)sc.ability=d.ability}
+      return Object.assign(base,{name:String(d.parent||"").trim(),addOn:true,hd:0,caster:"none",features:[],subclasses:[sc],optv:1})}
+  }
+  return base;
+}
+function hbCheck(t,d){
+  if(!String(d.name||"").trim())return "Give it a name first.";
+  if(t==="subclass"&&!String(d.parent||"").trim())return "Choose the class this subclass belongs to.";
+  if(t==="class"&&d.caster!=="none"&&!d.ability)return "Choose the spellcasting ability.";
+  if(t==="class"&&d.caster==="custom"&&!Object.keys(parseSlotsText(d.slotsText)).length)return "Enter at least one line in the spell slot table.";
+  if(t==="class"&&!(d.features||[]).some(f=>String(f.name||"").trim()))return "Add at least one class feature.";
+  if(t==="species"&&!(d.traits||[]).some(q=>String(q.name||"").trim()))return "Add at least one trait.";
+  return "";
+}
+function hbSave(){
+  const H=ui.lib.hb, t=H.t, d=H.d;
+  const err=hbCheck(t,d); if(err){H.msg=err;hbRender();return}
+  const rec=hbRecFromDraft(t,d), kind=HBKIND[t];
+  rec.id=H.id||uid();
+  const A=LIB[kind], i=A.findIndex(x=>x.id===rec.id);
+  if(i>=0)A[i]=rec; else A.push(rec);
+  hbPackOn(libSrcName(rec));
+  saveLib(); HBIX=null;
+  const n=rec.addOn?rec.subclasses[0].name:rec.name;
+  ui.lib.hb=null; ui.lib.tab="hb"; ui.lib.hbNote=HBNAME[t]+" \""+n+"\" saved to your Library."+hbWhere(t);
+  renderLib();
+}
+const hbWhere=t=>({class:" Pick it on the Details tab, in level up or in the character creator.",subclass:" It shows up when you pick a subclass for that class.",species:" Pick it in the character creator.",background:" Pick it in the character creator.",feat:" It is offered in level up and the creator, or tap Add to character.",item:" Find it in the gear picker, or tap Add to character.",spell:" Find it in the spell picker. Use Class spell lists to put it on more lists."})[t]||"";
+/* sources made here are turned on for the creator, and for any campaign that has not decided about them yet */
+function hbPackOn(n){
+  if(!LIB.packs[n])LIB.packs[n]={creator:true};
+  let ch=false; S.campaigns.forEach(k=>{if(k.srcs&&!(n in k.srcs)){k.srcs[n]=true;ch=true}}); if(ch)save();
+}
+
+/* ----- start from an existing entry ----- */
+const hbEd=d=>d&&d.ed==="2014"?"2014":"2024";
+async function hbLoadClones(t,ed){
+  const out=[], L=ui.lib, seen=new Set();
+  const add=(label,fn)=>{const k=lc(label);if(seen.has(k))return;seen.add(k);out.push({label:label,fn:fn})};
+  const libRows=(kind,tt)=>LIB[kind].forEach(x=>{if(sysOf(x)==="dnd5e"&&hbTypeOfRec(kind,x)===tt&&(!x.ed||x.ed===ed))add((tt==="subclass"?x.name+": "+x.subclasses[0].name:x.name)+" · "+libSrcName(x),()=>hbDraftFromRec(tt,x))});
+  try{
+    if(t==="feat"||t==="species"||t==="background")await crLoad5();
+    if(t==="feat"){(CRD.o[ed].feats||[]).forEach(x=>add(x.n+" · SRD",()=>{const pa=x.pre||{},k=Object.keys(pa)[0]||"";return Object.assign(hbBlank("feat"),{name:x.n,desc:x.d||"",cat:x.t||"general",lvl:num(x.lv),preAb:k,preV:k?num(pa[k],13):13,fx:hbAuto(x.d,x.n)})}));libRows("sections","feat")}
+    if(t==="species"){(CRD.o[ed].species||[]).forEach(x=>add(x.n+" · SRD",()=>Object.assign(hbBlank("species"),{name:x.n,size:x.sz||"Medium",speed:num(x.sp,30),ab:Object.assign({},x.ab||{}),langs:(x.lg||[]).join(", "),traits:(x.tr||[]).map(q=>({name:q.n,desc:q.d,fx:hbAuto(q.d,q.n)}))})));libRows("sections","species")}
+    if(t==="background"){(CRD.o[ed].bg||[]).forEach(x=>add(x.n+" · SRD",()=>Object.assign(hbBlank("background"),{name:x.n,skills:(x.sk||[]).slice(),tools:(x.tool||[]).join(", "),equip:(x.eq||[]).map(p=>(num(p[1],1)>1?p[1]+" ":"")+p[0]).join("\n"),gp:num(x.gp),ab:(x.ab||[]).slice(),feat:x.feat||"",desc:x.d||"",fx:hbAuto(x.d,x.n)})));libRows("sections","background")}
+    if(t==="class"||t==="subclass"){
+      const D=await loadClasses(ed); try{await crLoad5()}catch(e){}
+      D.forEach(x=>{
+        if(t==="class")add(x.name+" · SRD",()=>{const m=(CRD.c&&CRD.c[ed]&&CRD.c[ed][x.name])||{};const d=hbDraftFromRec("class",Object.assign({},x,{hb:0,source:""}));Object.assign(d,{source:"Homebrew",skN:m.sk?num(m.sk.n,2):2,skFrom:m.sk&&m.sk.from?m.sk.from.slice():[],prof:(m.prof||[]).join(", "),primary:""});return d});
+        else (x.subclasses||[]).forEach(sc=>add(x.name+": "+sc.name+" · SRD",()=>Object.assign(hbBlank("subclass"),{parent:x.name,name:sc.name,caster:sc.caster||"none",ability:sc.ability||"",features:hbFeatsDraft(sc.features,true)})));
+      });
+      if(t==="class")libRows("classes","class");
+      else{LIB.classes.forEach(x=>{if(sysOf(x)!=="dnd5e"||(x.ed&&x.ed!==ed))return;(x.subclasses||[]).forEach(sc=>add(x.name+": "+sc.name+" · "+libSrcName(x),()=>Object.assign(hbBlank("subclass"),{parent:x.name,name:sc.name,caster:sc.caster||"none",ability:sc.ability||"",features:hbFeatsDraft(sc.features,!x.hb)})))})}
+    }
+    if(t==="item"){const D=await loadItems(ed);D.forEach(x=>add(x.n+" · SRD",()=>Object.assign(hbBlank("item"),{name:x.n,cat:x.cat||"",cost:x.cost||"",w:Number(x.w)||0,dmg:x.dmg||"",props:x.props||"",ac:x.ac||"",rar:x.rar||"",att:!!x.att,desc:x.desc||"",fx:hbAuto(x.desc,x.n,1)})));libRows("items","item")}
+    if(t==="spell"){const D=await loadSpells(ed);D.forEach(x=>add(x.n+" · SRD",()=>Object.assign(hbBlank("spell"),{name:x.n,level:num(x.l),school:x.s||"",time:x.t||"",range:x.r||"",components:x.c||"",duration:x.d||"",conc:!!x.k,ritual:!!x.ri,classes:(x.cl||[]).slice(),desc:x.desc||"",higher:x.hi||""})));libRows("spells","spell")}
+  }catch(e){}
+  out.sort((a,b)=>a.label.localeCompare(b.label));
+  return out;
+}
+
+/* ----- rendering ----- */
+function hbGet(path,o){return String(path).split(".").reduce((a,k)=>a==null?a:a[k],o||ui.lib.hb.d)}
+function hbSet(path,val){const p=String(path).split(".");let t=ui.lib.hb.d;for(let i=0;i<p.length-1;i++){if(t[p[i]]==null)t[p[i]]={};t=t[p[i]]}t[p[p.length-1]]=val}
+function hbRender(){
+  const ov=$("#libOv"), sh=ov&&ov.querySelector(".sheet"), a=ov?ov.scrollTop:0, b=sh?sh.scrollTop:0;
+  renderLib();
+  const sh2=ov&&ov.querySelector(".sheet"); if(ov)ov.scrollTop=a; if(sh2)sh2.scrollTop=b;
+}
+const hbOpts=(list,v)=>list.map(([a,b])=>`<option value="${esc(a)}"${String(v)===String(a)?" selected":""}>${esc(b)}</option>`).join("");
+function hbF(path,label,o){
+  o=o||{}; const v=hbGet(path), t=o.t||"text", ph=o.ph?` placeholder="${esc(o.ph)}"`:"";
+  if(t==="area")return `<label class="fld${o.wide?" hbwide":""}"><span>${label}</span><textarea data-hb="${esc(path)}"${ph} style="min-height:${o.h||100}px">${esc(v)}</textarea></label>`;
+  if(t==="sel")return `<label class="fld"><span>${label}</span><select data-hb="${esc(path)}"${o.re?' data-hbre="1"':""}${o.n?' data-hbt="n"':""}>${hbOpts(o.opts,v)}</select></label>`;
+  if(t==="chk")return `<label class="chk"><input type="checkbox" data-hb="${esc(path)}" data-hbt="b"${v?" checked":""}>${label}</label>`;
+  if(t==="num")return `<label class="fld"><span>${label}</span><input type="number" inputmode="numeric" step="any" data-hb="${esc(path)}" data-hbt="f" value="${esc(v)}"${ph}></label>`;
+  return `<label class="fld${o.wide?" hbwide":""}"><span>${label}</span><input type="text" data-hb="${esc(path)}" value="${esc(v)}"${ph}${o.list?` list="${o.list}"`:""}></label>`;
+}
+function hbChecks(path,opts,o){
+  const cur=hbGet(path)||[];
+  return `<div class="kv hbchecks"><span>${o&&o.label||""}</span><div class="checks">${opts.map(([v,t])=>`<label class="chk"><input type="checkbox" data-hbarr="${esc(path)}" data-v="${esc(v)}"${cur.includes(v)?" checked":""}>${esc(t)}</label>`).join("")}</div></div>`;
+}
+const HBAB=()=>ABIL.map(([k,n])=>[k,n]);
+const HBSK=()=>FXSK.map(([k,n])=>[k,n]);
+function hbFxHTML(path,descPath,title){
+  const H=ui.lib.hb, list=hbGet(path)||[], F=H.fe&&H.fe.path===path?H.fe:null;
+  const rows=list.map((e,j)=>{const pv=hbPreview(e);return `<div class="fxrow hbfxrow"><span>${esc(fxLabel(e))}${e.cond?`<small> · only ${esc(e.cond)}</small>`:""}${pv?`<small class="hbpv">${esc(pv)}</small>`:""}</span><button class="btn sm danger" type="button" data-act="hb-fxdel" data-path="${esc(path)}" data-j="${j}" aria-label="Remove effect">Remove</button></div>`}).join("");
+  return `<div class="fxbox hbfx"><b>${title||"Effects on the sheet"}</b>${rows||`<p class="hint" style="margin:0">None yet. Effects are what change numbers on a character's sheet.</p>`}
+    ${F?hbFxForm(F):`<div class="btns"><button class="btn sm pri" type="button" data-act="hb-fxnew" data-path="${esc(path)}">Add effect</button>${descPath?`<button class="btn sm" type="button" data-act="hb-fxauto" data-path="${esc(path)}" data-src="${esc(descPath)}">Find effects in the text</button>`:""}</div>`}</div>`;
+}
+function hbFxForm(F){
+  const a=F.a, def=HBFXT[F.t]||HBFX[0][1][0], fields=def[2];
+  const sel=(k,label,opts)=>`<label class="fld"><span>${label}</span><select data-hbfe="${k}">${hbOpts(opts,a[k]==null?opts[0][0]:a[k])}</select></label>`;
+  const multi=(k,label,opts)=>`<div class="kv hbchecks"><span>${label}</span><div class="checks">${opts.map(([v,t])=>`<label class="chk"><input type="checkbox" data-hbfea="${k}" data-v="${esc(v)}"${(a[k]||[]).includes(v)?" checked":""}>${esc(t)}</label>`).join("")}</div></div>`;
+  const inp=(k,label,ph,list)=>`<label class="fld"><span>${label}</span><input type="text" data-hbfe="${k}" value="${esc(a[k]==null?"":a[k])}"${ph?` placeholder="${esc(ph)}"`:""}${list?` list="${list}"`:""}></label>`;
+  let h="";
+  fields.forEach(f=>{
+    if(f==="ab")h+=sel("ab","Ability",HBAB());
+    else if(f==="abAll")h+=sel("abAll","Which saves",[["all","All saving throws"]].concat(HBAB()));
+    else if(f==="sk")h+=sel("sk","Skill",HBSK());
+    else if(f==="skAll")h+=sel("skAll","Which skill",[["all","All skills"]].concat(HBSK()));
+    else if(f==="val")h+=inp("val",F.t==="acbase"?"Armor Class":F.t==="pool"?"Maximum":F.t==="sense"?"Range (feet)":"Amount",F.t==="acbase"?"10+dex+con":F.t==="pool"?"pb, or 1: 2, 3: 3, 6: 4":"1");
+    else if(f==="mval")h+=inp("val","Speed (feet, or blank for equal to walking speed)","Blank = walking speed");
+    else if(f==="cnt")h+=`<label class="fld"><span>How many</span><input type="number" inputmode="numeric" min="1" max="10" data-hbfe="cnt" value="${esc(a.cnt==null?1:a.cnt)}"></label>`;
+    else if(f==="abs")h+=multi("abs","Allowed abilities (none ticked = any)",HBAB());
+    else if(f==="sks")h+=multi("sks","Allowed skills (none ticked = any)",HBSK());
+    else if(f==="dts")h+=multi("dts","Allowed damage types (none ticked = any)",FXDMG.map(x=>[x,x]));
+    else if(f==="dt")h+=sel("dt","Damage type",FXDMG.map(x=>[x,x.charAt(0).toUpperCase()+x.slice(1)]));
+    else if(f==="mv")h+=sel("mv","Movement",[["fly","Fly"],["swim","Swim"],["climb","Climb"],["burrow","Burrow"]]);
+    else if(f==="sn")h+=sel("sn","Sense",[["darkvision","Darkvision"],["blindsight","Blindsight"],["tremorsense","Tremorsense"],["truesight","Truesight"]]);
+    else if(f==="prt")h+=sel("prt","Kind",[["armor","Armor"],["weapon","Weapons"],["tool","Tools"],["lang","Language"]]);
+    else if(f==="reset")h+=sel("reset","Recharges on",[["long","Long rest"],["short","Short rest"],["manual","Never (manual)"]]);
+    else if(f==="ci")h+=sel("ci","Condition",HBCOND.map(x=>[x,x]));
+    else if(f==="txt")h+=inp("txt",(HBTXT[F.t]||["Name"])[0],(HBTXT[F.t]||["",""])[1]);
+    else if(f==="txtlist")h+=inp("txtlist","Tools to choose from (comma separated, blank = any)","Smith's tools, Brewer's supplies");
+    else if(f==="spell")h+=inp("spell","Spell","Spell name","hbSpells");
+  });
+  const groups=HBFX.map(([g,L])=>`<optgroup label="${esc(g)}">${L.map(x=>`<option value="${x[0]}"${x[0]===F.t?" selected":""}>${esc(x[1])}</option>`).join("")}</optgroup>`).join("");
+  const help=fields.includes("val")||fields.includes("mval")?`<p class="hint" style="margin:0">Amounts can be a number, a formula or a table. Formulas use <b>level</b> (character level), <b>clevel</b> (level in this class), <b>pb</b>, ability modifiers <b>str dex con int wis cha</b>, <b>spellmod</b>, and min( ), max( ), floor( ), ceil( ); they round down. A table by class level looks like <b>1: 2, 6: 3, 12: 4</b>.</p>`:"";
+  return `<div class="hbfxform"><div class="igrid"><label class="fld hbwide"><span>Effect</span><select data-hbfe="t" data-hbre="1">${groups}</select></label>${h}
+    <label class="fld hbwide"><span>Only while... (optional)</span><input type="text" data-hbfe="cond" value="${esc(a.cond||"")}" placeholder="raging, wearing no armor..."></label></div>${help}
+    ${a.cond?`<p class="hint" style="margin:0">Effects with a condition start switched off; the player ticks them on the sheet when they apply.</p>`:""}
+    <div class="msg err" role="alert">${esc(F.err||"")}</div>
+    <div class="btns"><button class="btn sm pri" type="button" data-act="hb-fxadd">Add this effect</button><button class="btn sm" type="button" data-act="hb-fxcancel">Cancel</button></div></div>`;
+}
+function hbFeatList(base,lvl0,asi){
+  const H=ui.lib.hb, list=hbGet(base)||[], names=list.map(f=>f.name).filter(Boolean), dl="hbFN-"+base.replace(/\./g,"-");
+  const cards=list.map((f,i)=>{
+    const p=base+"."+i, open=H.open.has(p)||!String(f.name||"").trim();
+    return `<details class="item hbcard" data-hbopen="${esc(p)}"${open?" open":""}><summary><span class="sum-t">${esc((f.opt?f.opt+": ":"")+(f.name||"New feature"))}</span><span class="sum-m">Level ${num(f.lvl,1)}${(f.fx||[]).length?" · "+f.fx.length+" effect"+(f.fx.length===1?"":"s"):""}</span></summary><div class="ibody">
+      <div class="igrid">${hbF(p+".lvl","Level",{t:"sel",n:1,opts:Array.from({length:20},(_,k)=>[k+1,String(k+1)])})}${hbF(p+".name","Feature name")}${hbF(p+".opt","Option of (optional)",{ph:"Parent feature",list:dl})}</div>
+      ${hbF(p+".desc","What it does",{t:"area",h:110})}
+      ${hbFxHTML(p+".fx",p+".desc")}
+      <div class="btns"><button class="btn sm danger" type="button" data-act="hb-rm" data-path="${esc(base)}" data-j="${i}">Remove feature</button></div></div></details>`;
+  }).join("");
+  return `<datalist id="${dl}">${[...new Set(names)].map(n=>`<option value="${esc(n)}">`).join("")}</datalist><div class="items">${cards||`<div class="empty">No features yet.</div>`}</div>
+    <div class="btns"><button class="btn sm pri" type="button" data-act="hb-addfeat" data-path="${esc(base)}" data-lvl="${lvl0||1}">Add feature</button>${asi?`<button class="btn sm" type="button" data-act="hb-asi">Add Ability Score Improvements</button>`:""}</div>
+    <p class="hint" style="margin:0">An option the player chooses (like a fighting style) is a feature with <b>Option of</b> set to the feature that offers the choice. That parent's text should say how many to choose.</p>`;
+}
+function hbClassNames(){
+  return SRDCLASSES.concat(LIB.classes.filter(x=>sysOf(x)==="dnd5e"&&!x.addOn).map(x=>x.name)).filter((n,i,a)=>a.findIndex(m=>lc(m)===lc(n))===i);
+}
+function hbEditorHTML(){
+  const H=ui.lib.hb, t=H.t, d=H.d, cast=Object.keys(KINDS).map(k=>[k,KINDS[k]]);
+  let h=`<div class="btns" style="margin-top:0"><button class="btn sm" type="button" data-act="hb-cancel">Back to homebrew</button></div><h3 style="margin:.2em 0">${H.id?"Edit":"New"} ${esc(lc(HBNAME[t]))}</h3>`;
+  if(!H.id&&H.cl!==false){
+    if(H.cl===undefined){H.cl=null;const e=hbEd(d);hbLoadClones(t,e).then(L=>{if(ui.lib.hb===H){H.cl=L;H.clEd=e;hbRender()}})}
+    h+=`<div class="crd hbclone"><label class="fld"><span>Start from an existing ${esc(lc(HBNAME[t]))} (optional)</span><select data-hbclone="1"${H.cl?"":" disabled"}><option value="">${H.cl?"Start from scratch":"Loading..."}</option>${(H.cl||[]).map((x,i)=>`<option value="${i}">${esc(x.label)}</option>`).join("")}</select></label>
+      <p class="hint" style="margin:0">Copies its text and fills in effects found in the text. Check them, then change whatever you like.</p></div>`;
+  }
+  h+=`<div class="igrid">${hbF(t==="subclass"?"name":"name",t==="subclass"?"Subclass name":"Name")}${t==="subclass"?`<label class="fld"><span>For the class</span><select data-hb="parent"><option value="">Choose...</option>${hbOpts(hbClassNames().map(n=>[n,n]),d.parent)}</select></label>`:""}
+    ${hbF("source","Source (groups your homebrew)",{ph:"Homebrew"})}
+    ${hbF("ed","Edition",{t:"sel",re:1,opts:[["","5e and 5.5e"],["2014","5e (2014)"],["2024","5.5e (2024)"]]})}</div>`;
+  if(t==="feat"){
+    h+=`<div class="igrid">${hbF("cat","Kind of feat",{t:"sel",opts:HBFEATCAT})}${hbF("lvl","Minimum level (0 = none)",{t:"num"})}
+      ${hbF("preAb","Ability prerequisite",{t:"sel",re:1,opts:[["","None"]].concat(HBAB())})}${d.preAb?hbF("preV","Minimum score",{t:"num"}):""}</div>
+      ${hbF("desc","Description",{t:"area",h:140})}${hbFxHTML("fx","desc")}`;
+  }else if(t==="species"){
+    h+=`<div class="igrid">${hbF("size","Size",{t:"sel",opts:HBSIZES.map(x=>[x,x])})}${hbF("speed","Walking speed (feet)",{t:"num"})}${hbF("langs","Languages (comma separated)",{ph:"Common, Elvish"})}</div>
+      ${d.ed!=="2024"?`<div class="kv"><span>Ability score increases (5e 2014; in 5.5e they come from the background)</span><div class="igrid hbab">${ABIL.map(([k,n])=>hbF("ab."+k,n.slice(0,3),{t:"num"})).join("")}</div></div>`:""}
+      ${hbF("desc","About this species (optional)",{t:"area",h:80})}
+      <div class="lvlh"><span>Traits</span><span>${(d.traits||[]).length}</span></div><div class="items">${(d.traits||[]).map((q,i)=>{const p="traits."+i,open=H.open.has(p)||!String(q.name||"").trim();
+        return `<details class="item hbcard" data-hbopen="${p}"${open?" open":""}><summary><span class="sum-t">${esc(q.name||"New trait")}</span><span class="sum-m">${(q.fx||[]).length?(q.fx.length+" effect"+(q.fx.length===1?"":"s")):"No effects"}</span></summary><div class="ibody">
+          ${hbF(p+".name","Trait name")}${hbF(p+".desc","What it does",{t:"area",h:90})}${hbFxHTML(p+".fx",p+".desc")}
+          <div class="btns"><button class="btn sm danger" type="button" data-act="hb-rm" data-path="traits" data-j="${i}">Remove trait</button></div></div></details>`}).join("")}</div>
+      <div class="btns"><button class="btn sm pri" type="button" data-act="hb-addtrait">Add trait</button></div>`;
+  }else if(t==="background"){
+    h+=hbChecks("skills",FXSK.map(x=>[x[1],x[1]]),{label:"Skill proficiencies (usually two)"})+
+      `<div class="igrid">${hbF("tools","Tool proficiencies (comma separated)")}${hbF("gp","Starting gold",{t:"num"})}${d.ed!=="2014"?hbF("feat","Origin feat (5.5e)",{list:"hbFeatList",ph:"Feat name"}):""}</div>
+      ${d.ed!=="2014"?hbChecks("ab",HBAB(),{label:"Ability scores it can raise (5.5e, pick three)"}):""}
+      ${hbF("equip","Starting equipment (one item per line, a number first for more than one)",{t:"area",h:90,ph:"Traveler's clothes\n2 Daggers"})}
+      ${hbF("desc",d.ed==="2024"?"Description (optional)":"Background feature",{t:"area",h:110})}${hbFxHTML("fx","desc","Effects of the background feature")}
+      <datalist id="hbFeatList">${hbFeatNames().map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`;
+  }else if(t==="item"){
+    h+=`<div class="igrid">${hbF("cat","Category",{list:"hbItemCats"})}${hbF("rar","Rarity",{t:"sel",opts:HBRARITY.map(x=>[x,x||"None (mundane)"])})}${hbF("cost","Cost",{ph:"50 gp"})}${hbF("w","Weight (lb)",{t:"num"})}
+      ${hbF("dmg","Damage (weapons)",{ph:"1d8 slashing"})}${hbF("props","Properties",{ph:"Finesse, light"})}${hbF("ac","Armor class (armor)",{ph:"14 + Dex (max 2)"})}</div>
+      <div class="checks">${hbF("att","Requires attunement",{t:"chk"})}</div>
+      <datalist id="hbItemCats">${HBITEMCATS.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
+      ${hbF("desc","Description",{t:"area",h:120})}${hbFxHTML("fx","desc","Effects while equipped (and attuned, if it needs it)")}`;
+  }else if(t==="spell"){
+    h+=`<div class="igrid">${hbF("level","Level",{t:"sel",n:1,opts:LV.map((n,l)=>[l,l?"Level "+l:"Cantrip"])})}${hbF("school","School",{t:"sel",opts:[["",""]].concat(SCHOOLS.map(x=>[x,x]))})}${hbF("time","Casting time")}${hbF("range","Range")}${hbF("components","Components")}${hbF("duration","Duration")}</div>
+      <div class="checks">${hbF("conc","Concentration",{t:"chk"})}${hbF("ritual","Ritual",{t:"chk"})}</div>
+      ${hbChecks("classes",hbClassNames().map(n=>[n,n]),{label:"Spell lists it is on"})}
+      ${hbF("desc","Description",{t:"area",h:140})}${hbF("higher","At higher levels",{t:"area",h:70})}`;
+  }else if(t==="class"){
+    h+=`<div class="igrid">${hbF("hd","Hit die",{t:"sel",n:1,opts:[[6,"d6"],[8,"d8"],[10,"d10"],[12,"d12"]]})}${hbF("primary","Primary ability",{t:"sel",opts:[["",""]].concat(HBAB())})}</div>
+      ${hbChecks("saves",HBAB().map(([k,n])=>[k,n.slice(0,3)]),{label:"Saving throw proficiencies"})}
+      <div class="igrid">${hbF("skN","Skills to choose",{t:"num"})}</div>${hbChecks("skFrom",FXSK.map(x=>[x[1],x[1]]),{label:"Skills to choose from (none ticked = any)"})}
+      ${hbF("prof","Armor, weapon and tool proficiencies (comma separated)",{wide:1,ph:"Light armor, Shields, Simple weapons"})}
+      ${hbF("equip","Starting equipment (one per line)",{t:"area",h:70,ph:"Leather Armor\n2 Daggers"})}
+      <div class="lvlh"><span>Spellcasting</span></div>
+      <div class="igrid">${hbF("caster","Spellcasting",{t:"sel",re:1,opts:cast})}${d.caster!=="none"?hbF("ability","Casting ability",{t:"sel",opts:[["",""]].concat(HBAB())})+hbF("spk","How spells are learned",{t:"sel",opts:[["prep","Prepared: ability modifier + level"],["prep24","Prepared: number from the table below"],["known","Known: a set number"]]}):""}</div>
+      ${d.caster==="custom"?hbF("slotsText","Spell slots by class level (level: 1st 2nd 3rd...)",{t:"area",h:90,ph:"1: 2\n2: 3\n3: 4 2"}):""}
+      ${d.caster!=="none"?`<div class="igrid">${hbF("cantripsT","Cantrips known by class level",{ph:"1: 2, 4: 3, 10: 4"})}${hbF("spellsT","Spells known or prepared by class level",{ph:"1: 2, 2: 3, 3: 4"})}</div><p class="hint" style="margin:0">Level up and the creator use these to offer spells. Put spells on this class's list under Spells, Class spell lists, or tick the class on your homebrew spells.</p>`:""}
+      ${hbF("masteryText","Weapon masteries by level (5.5e, optional)",{ph:"1: 2, 4: 3, 10: 4"})}
+      ${hbF("desc","About this class (optional)",{t:"area",h:80})}
+      <div class="lvlh"><span>Class features</span><span>${(d.features||[]).length}</span></div>${hbFeatList("features",1,1)}
+      <div class="lvlh"><span>Subclasses</span><span>${(d.subclasses||[]).length}</span></div><div class="items">${(d.subclasses||[]).map((sc,i)=>{const p="subclasses."+i,open=H.open.has(p)||!String(sc.name||"").trim();
+        return `<details class="item hbcard" data-hbopen="${p}"${open?" open":""}><summary><span class="sum-t">${esc(sc.name||"New subclass")}</span><span class="sum-m">${(sc.features||[]).length} features</span></summary><div class="ibody">
+          <div class="igrid">${hbF(p+".name","Subclass name")}${hbF(p+".caster","Spellcasting (like an Eldritch Knight)",{t:"sel",re:1,opts:cast})}${sc.caster&&sc.caster!=="none"?hbF(p+".ability","Casting ability",{t:"sel",opts:[["",""]].concat(HBAB())}):""}</div>
+          ${hbFeatList(p+".features",3)}
+          <div class="btns"><button class="btn sm danger" type="button" data-act="hb-rm" data-path="subclasses" data-j="${i}">Remove subclass</button></div></div></details>`}).join("")}</div>
+      <div class="btns"><button class="btn sm pri" type="button" data-act="hb-addsub">Add subclass</button></div>
+      <p class="hint" style="margin:0">The subclass is picked at the lowest level that any subclass has a feature.</p>`;
+  }else if(t==="subclass"){
+    h+=`<div class="igrid">${hbF("caster","Spellcasting (like an Eldritch Knight)",{t:"sel",re:1,opts:Object.keys(KINDS).map(k=>[k,KINDS[k]])})}${d.caster!=="none"?hbF("ability","Casting ability",{t:"sel",opts:[["",""]].concat(HBAB())}):""}</div>
+      <div class="lvlh"><span>Subclass features</span><span>${(d.features||[]).length}</span></div>${hbFeatList("features",3)}`;
+  }
+  if(H.fe&&H.fe.t==="spell")h+=`<datalist id="hbSpells">${hbSpellNames(d).map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`;
+  h+=`<div class="msg err" role="alert">${esc(H.msg||"")}</div>
+    <div class="btns"><button class="btn pri" type="button" data-act="hb-save">Save to library</button><button class="btn" type="button" data-act="hb-cancel">Cancel</button></div>`;
+  return h;
+}
+function hbSpellNames(d){
+  const e=hbEd(d); if(!SPELLDATA[e])loadSpells(e).catch(()=>{});
+  return [...new Set(spellList(e).map(x=>x.n))].sort().slice(0,1200);
+}
+function hbFeatNames(){
+  const out=LIB.sections.filter(x=>sysOf(x)==="dnd5e"&&x.cat==="feat").map(x=>x.name);
+  try{if(CRD.o)out.push(...(CRD.o["2024"].feats||[]).map(x=>x.n))}catch(e){}
+  return [...new Set(out)].sort();
+}
+function hbMeta(e){
+  const x=e.x, n=[edLabel(x.ed),libSrcName(x)];
+  const fxn=x=>(x||[]).length;
+  if(e.t==="class")n.push("d"+(x.hd||"?"),(x.features||[]).length+" features",(x.subclasses||[]).length+" subclasses");
+  if(e.t==="subclass")n.unshift("For "+x.name);
+  if(e.t==="species")n.push((x.traits||[]).length+" traits");
+  if(e.t==="feat")n.push((HBFEATCAT.find(c=>c[0]===(x.data&&x.data.type))||[0,"Feat"])[1]);
+  if(e.t==="item")n.push(x.cat,x.rar);
+  if(e.t==="spell")n.push(num(x.level)?"Level "+x.level:"Cantrip",x.school);
+  let f=fxn(x.fx); if(e.t==="class")f=(x.features||[]).concat(...(x.subclasses||[]).map(s=>s.features||[])).reduce((a,q)=>a+fxn(q.fx),0);
+  if(e.t==="subclass")f=((x.subclasses[0]||{}).features||[]).reduce((a,q)=>a+fxn(q.fx),0);
+  if(e.t==="species")f=(x.traits||[]).reduce((a,q)=>a+fxn(q.fx),0);
+  if(e.t!=="spell")n.push(f?f+" effect"+(f===1?"":"s"):"no effects");
+  return n.filter(Boolean).join(" · ");
+}
+function hbListHTML(){
+  const L=ui.lib, all=hbAll(), c=cur(), dnd=c&&ui.view==="sheet"&&!isPf(c);
+  const srcs=[...new Set(all.map(e=>libSrcName(e.x)))].sort();
+  let h=`<p>Make your own content with real rules attached: ability bonuses, proficiencies, Armor Class formulas, resources that grow with level, spells always prepared, choices for the player and more. It is saved in your Library and works everywhere an SRD option does.</p>
+    <div class="hbnew">${HBTYPES.map(([t,n])=>`<button class="btn" type="button" data-act="hb-new" data-t="${t}">New ${esc(lc(n))}</button>`).join("")}</div>
+    ${L.hbNote?`<div class="msg" role="status">${esc(L.hbNote)}</div>`:""}`;
+  if(!all.length)h+=`<div class="empty">No homebrew yet. Start with a feat or an item to get a feel for effects, or open an imported entry with Open in builder to give it effects.</div>`;
+  HBTYPES.forEach(([t])=>{
+    const rows=all.filter(e=>e.t===t); if(!rows.length)return;
+    h+=`<div class="lvlh"><span>${HBPLURAL[t]}</span><span>${rows.length}</span></div><div class="items">`+rows.map(e=>{
+      const x=e.x, nm=e.t==="subclass"?x.subclasses[0].name:x.name, canAdd=dnd&&(e.t==="feat"||e.t==="item"||e.t==="spell");
+      return `<div class="prow"><div class="pmain"><div class="plink"><b>${esc(nm)}</b><span>${esc(hbMeta(e))}</span></div>
+        ${canAdd?`<button class="btn sm" type="button" data-act="hb-addchar" data-kind="${e.kind}" data-id="${esc(x.id)}">Add to ${esc(c.name||"character")}</button>`:""}
+        <button class="btn sm pri" type="button" data-act="hb-open" data-kind="${e.kind}" data-id="${esc(x.id)}">Edit</button>
+        <button class="btn sm" type="button" data-act="hb-dup" data-kind="${e.kind}" data-id="${esc(x.id)}">Duplicate</button>
+        <button class="btn sm danger" type="button" data-act="hb-del" data-kind="${e.kind}" data-id="${esc(x.id)}">Delete</button></div></div>`}).join("")+`</div>`;
+  });
+  h+=`<div class="lvlh"><span>Share homebrew</span></div>
+    <p class="hint" style="margin:0 0 6px">Save your homebrew as a file to back it up or give it to your players; they open it here with Import a homebrew file. Effects come along.</p>
+    <div class="igrid"><label class="fld"><span>What to export</span><select id="hbExpSrc"><option value="">All homebrew (${all.length})</option>${srcs.map(s=>`<option value="${esc(s)}">${esc(s)} (${all.filter(e=>libSrcName(e.x)===s).length})</option>`).join("")}</select></label></div>
+    <div class="btns"><button class="btn" type="button" data-act="hb-export"${all.length?"":" disabled"}>Export to a file</button><span class="btn filebtn">Import a homebrew file<input id="hbFile" type="file" accept=".json,application/json,text/plain,*/*" aria-label="Import a homebrew file"></span></div>
+    <div class="msg" id="hbMsg" role="status"></div>
+    <details class="item"><summary><span class="sum-t">How effects work</span></summary><div class="ibody">
+      <p>Each feature, trait, feat or item can carry effects. When it is on a character, the sheet applies them: scores, saves, skills, Armor Class, speed, initiative, max HP, spell attack and DC, weapon attacks. Resources appear under Resources and refill on the rests you chose. Spells always prepared are added to the Spells tab. Choices (like two skills of the player's choice) show menus on the feature.</p>
+      <p>Amounts can be numbers, formulas or tables. Formulas know <b>level</b>, <b>clevel</b> (level in the class that gave the feature), <b>pb</b>, the ability modifiers <b>str dex con int wis cha</b> and <b>spellmod</b>, with + - * / and min( ), max( ), floor( ), ceil( ); results round down. Examples: <b>10+dex+con</b>, <b>max(1,cha)</b>, <b>clevel*5</b>, <b>1: 2, 3: 3, 6: 4</b>.</p>
+      <p>An effect with a condition (only while raging) starts switched off. The player ticks it on the feature when it applies.</p></div></details>`;
+  return h;
+}
+
+/* ----- actions ----- */
+function hbFind(kind,id){return (LIB[kind]||[]).find(x=>x.id===id)}
+function hbStart(t,d,id,kind,noClone){ui.lib.hb={t:t,d:d,id:id||null,kind:kind||HBKIND[t],msg:"",open:new Set(),fe:null};if(noClone)ui.lib.hb.cl=false;ui.lib.hbNote="";hbRender()}
+function hbAddToChar(kind,id,btn){
+  const c=cur(), x=hbFind(kind,id); if(!c||!x||isPf(c))return;
+  if(kind==="sections"){const f=mkFeat(x.name);f.source=x.source||"Homebrew";f.desc=x.text||"";f.type="feat";if(x.fx&&x.fx.length){f.fx=hbCopy(x.fx);f.fxq="ok";f.fxhb=1}c.features.push(f)}
+  else if(kind==="items"){const it=itemFromRec(libItemRec(x));c.inventory.push(it)}
+  else if(kind==="spells"){if(c.spells.some(s=>lc(s.name)===lc(x.name))){btn.textContent="Already known";btn.disabled=true;return}c.spells.push(Object.assign(mkSpell(x.name),{level:num(x.level),school:x.school||"",time:x.time||"",range:x.range||"",components:x.components||"",duration:x.duration||"",conc:!!x.conc,ritual:!!x.ritual,desc:x.desc||"",higher:x.higher||""}))}
+  save(); btn.textContent="Added"; btn.disabled=true;
+  if(ui.view==="sheet"){rerender(kind==="items"?"gear":kind==="spells"?"spell":"feat");recompute()}
+}
+function hbExport(){
+  const src=($("#hbExpSrc")||{}).value||"", all=hbAll().filter(e=>!src||libSrcName(e.x)===src);
+  const pack={ledgerHomebrew:1,exportedAt:new Date().toISOString(),source:src||"All homebrew",entries:{classes:[],sections:[],items:[],spells:[]}};
+  all.forEach(e=>pack.entries[e.kind].push(hbCopy(e.x)));
+  const text=JSON.stringify(pack,null,2), name="homebrew-"+fileSafe(src||"all")+".json";
+  const say=(t,err)=>{const m=$("#hbMsg");if(m){m.textContent=t;m.className="msg"+(err?" err":"")}};
+  (async()=>{
+    if(!window.claude){try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();a.remove();say(all.length+" entries saved as "+name+". It is in your Downloads folder.");return}catch(e){}}
+    try{const d=await window.claude.use("downloads");if(!d)throw 0;await d.save({filename:name,data:text});say(all.length+" entries saved as "+name+".")}
+    catch(e){if(e&&e.code==="declined"){say("Save cancelled.");return}try{await navigator.clipboard.writeText(text);say("File saving is not available here, so the homebrew was copied to the clipboard instead.")}catch(e2){say("File saving is not available here.",true)}}
+  })();
+}
+function hbImport(text){
+  const say=(t,err)=>{ui.lib.hbNote="";hbRender();const m=$("#hbMsg");if(m){m.textContent=t;m.className="msg"+(err?" err":"")}};
+  let p; try{p=JSON.parse(text)}catch(e){say("That file is not a homebrew file (it is not JSON).",true);return}
+  const E=p&&p.ledgerHomebrew&&p.entries; if(!E){say("That file is not a Character Ledger homebrew file.",true);return}
+  let added=0, updated=0; const srcs=new Set();
+  ["classes","sections","items","spells"].forEach(k=>(Array.isArray(E[k])?E[k]:[]).forEach(x=>{
+    if(!x||typeof x!=="object"||x.name==null)return;
+    const r=Object.assign({},x,{system:"dnd5e",hb:1}); if(!hbTypeOfRec(k,r))return;
+    r.id=String(r.id||uid()); const i=LIB[k].findIndex(y=>y.id===r.id);
+    if(i>=0){LIB[k][i]=r;updated++}else{LIB[k].push(r);added++}
+    srcs.add(libSrcName(r));
+  }));
+  if(!added&&!updated){say("Nothing in that file could be used.",true);return}
+  srcs.forEach(hbPackOn); saveLib(); HBIX=null;
+  say("Imported "+added+" new"+(updated?" and updated "+updated:"")+" homebrew entr"+(added+updated===1?"y":"ies")+".");
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-act^="hb-"]'); if(!b||!ui.lib)return;
+  const a=b.dataset.act, H=ui.lib.hb;
+  if(a==="hb-new"){hbStart(b.dataset.t,hbBlank(b.dataset.t));return}
+  if(a==="hb-open"||a==="hb-dup"){
+    const x=hbFind(b.dataset.kind,b.dataset.id), t=x&&hbTypeOfRec(b.dataset.kind,x); if(!t)return;
+    const d=hbDraftFromRec(t,x);
+    if(a==="hb-dup"){d.name=d.name+" (copy)";hbStart(t,d,null,b.dataset.kind,1);return}
+    hbStart(t,d,x.id,b.dataset.kind); return;
+  }
+  if(a==="hb-del"){if(!confirmTwice(b,"Tap again to delete"))return;const A=LIB[b.dataset.kind],i=A.findIndex(x=>x.id===b.dataset.id);if(i>=0){A.splice(i,1);saveLib();HBIX=null;ui.lib.hbNote="Deleted.";hbRender()}return}
+  if(a==="hb-addchar"){hbAddToChar(b.dataset.kind,b.dataset.id,b);return}
+  if(a==="hb-export"){hbExport();return}
+  if(!H)return;
+  if(a==="hb-cancel"){ui.lib.hb=null;ui.lib.tab="hb";hbRender();return}
+  if(a==="hb-save"){hbSave();return}
+  if(a==="hb-fxnew"){H.fe={path:b.dataset.path,t:"abil",a:hbFxDef("abil")};hbRender();return}
+  if(a==="hb-fxcancel"){H.fe=null;hbRender();return}
+  if(a==="hb-fxadd"){
+    const F=H.fe; if(!F)return;
+    try{const fx=hbFxBuild(F);const list=hbGet(F.path)||[];list.push(fx);hbSet(F.path,list);H.fe=null}catch(err){F.err=err.message}
+    hbRender(); return;
+  }
+  if(a==="hb-fxdel"){const list=hbGet(b.dataset.path)||[];list.splice(num(b.dataset.j),1);hbRender();return}
+  if(a==="hb-fxauto"){
+    const list=hbGet(b.dataset.path)||[], txt=hbGet(b.dataset.src)||"", nm=hbGet(b.dataset.src.replace(/desc$/,"name"))||H.d.name;
+    const have=new Set(list.map(x=>x.k+"|"+JSON.stringify(x.v)));
+    const found=hbAuto(txt,nm,H.t==="item").filter(x=>!have.has(x.k+"|"+JSON.stringify(x.v)));
+    found.forEach(x=>list.push(x)); hbSet(b.dataset.path,list);
+    H.msg=found.length?"":"No effects found in that text. Add them with Add effect."; hbRender(); return;
+  }
+  if(a==="hb-rm"){const list=hbGet(b.dataset.path)||[];list.splice(num(b.dataset.j),1);hbRender();return}
+  if(a==="hb-addfeat"){const list=hbGet(b.dataset.path)||[];list.push({lvl:num(b.dataset.lvl,1),name:"",opt:"",desc:"",fx:[]});hbSet(b.dataset.path,list);hbRender();return}
+  if(a==="hb-addtrait"){H.d.traits=H.d.traits||[];H.d.traits.push({name:"",desc:"",fx:[]});hbRender();return}
+  if(a==="hb-addsub"){H.d.subclasses=H.d.subclasses||[];H.d.subclasses.push({name:"",caster:"none",ability:"",features:[{lvl:3,name:"",opt:"",desc:"",fx:[]}]});hbRender();return}
+  if(a==="hb-asi"){
+    const L=H.d.features=H.d.features||[], lv=H.d.ed==="2024"?[4,8,12,16]:[4,8,12,16,19];
+    lv.forEach(l=>{if(!L.some(f=>num(f.lvl)===l&&/^ability score improvement/i.test(f.name||"")))L.push({lvl:l,name:"Ability Score Improvement",opt:"",desc:"Increase one ability score of your choice by 2, or two ability scores of your choice by 1. You can't increase an ability score above 20 using this feature. Instead, you can take a feat.",fx:[]})});
+    if(H.d.ed==="2024"&&!L.some(f=>num(f.lvl)===19))L.push({lvl:19,name:"Epic Boon",opt:"",desc:"You gain an Epic Boon feat or another feat of your choice for which you qualify.",fx:[]});
+    L.sort((x,y)=>num(x.lvl)-num(y.lvl)); hbRender(); return;
+  }
+});
+document.addEventListener("input",e=>{
+  const t=e.target, H=ui.lib&&ui.lib.hb; if(!H||!t.dataset)return;
+  if(t.dataset.hb&&t.tagName!=="SELECT"&&t.type!=="checkbox"){hbSet(t.dataset.hb,t.dataset.hbt==="f"?(parseFloat(t.value)||0):t.value);return}
+  if(t.dataset.hbfe&&t.tagName!=="SELECT"&&H.fe){H.fe.a[t.dataset.hbfe]=t.value}
+});
+document.addEventListener("change",e=>{
+  const t=e.target; if(!t||!t.dataset)return;
+  if(t.id==="hbFile"&&t.files&&t.files[0]){const r=new FileReader();r.onload=()=>hbImport(String(r.result||""));r.readAsText(t.files[0]);t.value="";return}
+  const H=ui.lib&&ui.lib.hb; if(!H)return;
+  if(t.dataset.hbclone){const x=(H.cl||[])[num(t.value,-1)];if(t.value!==""&&x){const d=x.fn();d.source="Homebrew";if(H.d.ed)d.ed=H.d.ed;const keep=H.cl;H.d=d;H.cl=keep;H.open=new Set();H.msg="Copied. Rename it and check the effects before saving."}hbRender();return}
+  if(t.dataset.hb){
+    const v=t.dataset.hbt==="b"?t.checked:t.dataset.hbt==="n"?num(t.value):t.dataset.hbt==="f"?(parseFloat(t.value)||0):t.value;
+    hbSet(t.dataset.hb,v);
+    if(t.dataset.hb==="ed"&&H.cl&&!H.id){H.cl=undefined}
+    if(t.dataset.hbre||t.dataset.hb==="ed"||/\.(name|lvl|opt)$/.test(t.dataset.hb)&&t.tagName==="SELECT")hbRender();
+    return;
+  }
+  if(t.dataset.hbarr){const L=(hbGet(t.dataset.hbarr)||[]).filter(v=>v!==t.dataset.v);if(t.checked)L.push(t.dataset.v);hbSet(t.dataset.hbarr,L);return}
+  if(H.fe&&t.dataset.hbfe){
+    if(t.dataset.hbfe==="t"){H.fe={path:H.fe.path,t:t.value,a:Object.assign(hbFxDef(t.value),{cond:H.fe.a.cond||""})};hbRender();return}
+    H.fe.a[t.dataset.hbfe]=t.value; if(t.dataset.hbfe==="cond")hbRender(); return;
+  }
+  if(H.fe&&t.dataset.hbfea){const k=t.dataset.hbfea,L=(H.fe.a[k]||[]).filter(v=>v!==t.dataset.v);if(t.checked)L.push(t.dataset.v);H.fe.a[k]=L;return}
+});
+document.addEventListener("toggle",e=>{const d=e.target;if(d&&d.dataset&&d.dataset.hbopen&&ui.lib&&ui.lib.hb){d.open?ui.lib.hb.open.add(d.dataset.hbopen):ui.lib.hb.open.delete(d.dataset.hbopen)}},true);
 
 
 /* ===== favourites ===== */
