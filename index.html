@@ -1970,7 +1970,7 @@ html,body{overscroll-behavior-y:none}
       <textarea id="inBox" placeholder="Paste JSON here" aria-label="JSON to import"></textarea>
       <div class="btns">
         <button class="btn pri" type="button" data-act="import">Import pasted JSON</button>
-        <span class="btn filebtn">Choose file<input id="inFile" type="file" accept=".json,application/json,text/plain,*/*" aria-label="Choose a file"></span>
+        <span class="btn filebtn">Choose file<input id="inFile" type="file" accept=".json,.pdf,application/json,application/pdf,text/plain,*/*" aria-label="Choose a file"></span>
       </div>
       <details class="item"><summary><span class="sum-t">How to get a character from D&amp;D Beyond</span></summary><div class="ibody">
         <p>D&amp;D Beyond has no official export for other apps. This uses the same data its own character page loads, which is unofficial and could stop working.</p>
@@ -4004,6 +4004,7 @@ document.addEventListener("change",e=>{
     const k=S.campaigns.find(k=>k.id===t.dataset.cname);
     if(k){k.name=t.value.trim()||"Untitled campaign";save();renderHome()}
   }
+  if(t.id==="inFile"&&t.files&&t.files[0]&&(/\.pdf$/i.test(t.files[0].name)||t.files[0].type==="application/pdf")){dhRunImport(t.files[0]);t.value="";return}
   if(t.id==="inFile"&&t.files&&t.files[0]){
     const r=new FileReader();
     r.onload=()=>{$("#inBox").value=String(r.result||"");doImport()};
@@ -10585,6 +10586,109 @@ function dhPrint(c){
   </div></div>
   ${h("Domain cards: loadout",`<div class="two">${d.loadout.map(card).join("")}</div>`)}${d.vault.length?h("Vault",`<div class="two">${d.vault.map(card).join("")}</div>`):""}
   ${c.notes?h("Notes",`<p>${esc(c.notes).replace(/\n+/g,"<br>")}</p>`):""}<div class="pf">Character Ledger \u00b7 Daggerheart SRD content \u00b7 ${new Date().toLocaleDateString()}</div>`;
+}
+
+/* ---------- Daggerheart: import the official fillable character sheet PDF ---------- */
+async function dhReadPdfFields(file){
+  const L=await pdfLib(), doc=await L.getDocument({data:await file.arrayBuffer()}).promise, F={};
+  for(let p=1;p<=doc.numPages;p++){
+    const an=await (await doc.getPage(p)).getAnnotations();
+    an.forEach(a=>{
+      if(!a.fieldName)return;
+      if(a.checkBox||a.radioButton){const on=a.fieldValue&&a.fieldValue!=="Off"&&a.fieldValue!==false;F[a.fieldName]=on?"1":(F[a.fieldName]||"")}
+      else if(a.fieldValue!=null&&String(a.fieldValue)!=="")F[a.fieldName]=Array.isArray(a.fieldValue)?a.fieldValue.join(", "):String(a.fieldValue);
+    });
+  }
+  return F;
+}
+function dhPdfDamage(t){
+  const m=String(t||"").match(/(\d*)\s*d\s*(\d+)\s*(?:\+\s*(\d+))?\s*(phy|mag|physical|magic)?/i); if(!m)return "";
+  return "d"+m[2]+(m[3]?"+"+m[3]:"")+(m[4]?" "+(/^m/i.test(m[4])?"mag":"phy"):" phy");
+}
+function dhPdfFeat(c,k,src,text){
+  const t=String(text||"").replace(/\s+/g," ").trim(); if(!t)return;
+  if(/^SPELLCAST TRAIT/i.test(t))return;
+  const m=t.match(/^([^:]{2,40}):\s*(.+)$/), name=m?m[1].trim():t.slice(0,30), body=m?m[2].trim():t;
+  if(c.dh.features.some(f=>lc(f.name)===lc(name)))return;
+  c.dh.features.push({id:uid(),k:k,name:name,text:body,src:src});
+}
+async function dhImportPdf(file){
+  let F, D;
+  try{F=await dhReadPdfFields(file); D=await dhLoad()}catch(e){return {err:"That PDF could not be read here."}}
+  if(!("agility" in F)&&!("class" in F)&&!("heritage" in F))return {err:"This PDF has no Daggerheart form fields. The importer works with the official fillable character sheet from Darrington Press, filled in on a computer."};
+  const g=k=>String(F[k]==null?"":F[k]).trim(), cnt=pre=>Object.keys(F).filter(k=>k.startsWith(pre)&&F[k]==="1").length;
+  const camp=S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"";
+  const c=dhNorm({id:uid(),campaign:camp,name:g("name")||"Imported character",level:Math.max(1,Math.min(10,num(g("level"),1)))}), d=c.dh, said=[];
+  d.pron=g("pronouns");
+  const cl=g("class").split(/\s+-\s+|\s+\u2013\s+/); c.cls=cl[0]||""; c.subclass=cl[1]||g("subclass_name_1");
+  const anc=g("ancestry_name"), com=g("community_name"), her=g("heritage");
+  c.race=anc||""; c.background=com||"";
+  if(!anc&&her){const A=D.ancestries.find(x=>lc(her).includes(lc(x.name)));if(A)c.race=A.name}
+  if(!com&&her){const C=D.communities.find(x=>lc(her).includes(lc(x.name)));if(C)c.background=C.name}
+  DHT.forEach(t=>{d.traits[t[0]]=num(g(t[0]));if(F[t[0]+"_marked"]==="1")d.marked[t[0]]=true});
+  /* class, ancestry and community rules give the baseline; the sheet's own numbers then win through the adjustment fields */
+  const pre=dhApplyCore(c,D,"all");
+  d.features=d.features.filter(f=>false);
+  d.ancPlus={};
+  d.exp=[0,1,2,3,4,5].map(i=>({n:g("experience_name."+i),v:g("experience_bonus."+i)})).filter(x=>x.n).map(x=>({id:uid(),n:x.n,v:num(x.v,2)}));
+  d.hopeMax=Math.max(6,cnt("hope.")); d.hope=cnt("hope.");
+  d.hpMarked=cnt("hp."); d.stressMarked=cnt("stress."); d.armorMarked=cnt("armor_slot.");
+  d.gold={h:cnt("gold_handful"),b:cnt("gold_bag"),c:cnt("gold_chest")};
+  /* weapons: the active boxes first, then inventory rows flagged primary or secondary */
+  const wk=(slot)=>{
+    if(g(slot+"_weapon_name"))return {name:g(slot+"_weapon_name"),trait:(g(slot+"_weapon_trait").split(/\s+/)[0]||""),range:g(slot+"_weapon_trait").split(/\s+/).slice(1).join(" "),damage:dhPdfDamage(g(slot+"_weapon_damage")),burden:"",feature:g(slot+"_weapon_feature")};
+    for(let i=0;i<8;i++){
+      if(F["inventory_"+(i+1)+"_"+slot]==="1"&&g("inventory_weapon_name."+i)){
+        const tr=g("inventory_weapon_trait."+i).split(/\s+/);
+        return {name:g("inventory_weapon_name."+i),trait:tr[0]||"",range:tr.slice(1).join(" "),damage:dhPdfDamage(g("inventory_weapon_damage."+i)),burden:F["inventory_"+(i+1)+"_hand_2"]==="1"?"Two-Handed":"One-Handed",feature:g("inventory_weapon_feature."+i)};
+      }
+    }
+    return null;
+  };
+  d.weapons.primary=wk("primary"); d.weapons.secondary=wk("secondary");
+  /* armor */
+  const th=g("armor_thresholds").match(/(\d+)\s*[\/ ]\s*(\d+)/);
+  d.armor=Object.assign(dhBlankDh().armor,{name:g("armor_name"),feature:g("armor_feature"),score:num(g("armor_score")||g("armor")),major:th?num(th[1]):0,severe:th?num(th[2]):0});
+  if(g("armor_name")){const a=dhFind(D.armor,g("armor_name"));if(a)d.armor=Object.assign(d.armor,dhArmorFrom(a),{score:d.armor.score||a.score})}
+  /* sheet totals win: make the adjustment fields cover any difference */
+  d.plus={};
+  const sheetMajor=num(g("majorDamage")), sheetSevere=num(g("severeDamage"));
+  if(!th&&sheetMajor){d.armor.major=sheetMajor-c.level;d.armor.severe=(sheetSevere||sheetMajor*2)-c.level}
+  else if(sheetMajor)d.plus.thr=sheetMajor-dhMajor(c);
+  d.plus.hp=num(g("hp_max"),0)?num(g("hp_max"))-dhHpSlots(c):0;
+  d.plus.stress=num(g("stress_max"),0)?num(g("stress_max"))-dhStressSlots(c):0;
+  d.plus.eva=g("evasion")!==""?num(g("evasion"))-dhEva(c):0;
+  d.plus.prof=Math.max(1,cnt("proficiency."))-dhProf(c);
+  Object.keys(d.plus).forEach(k=>{if(!d.plus[k])delete d.plus[k]});
+  /* features */
+  d.features=[];
+  dhPdfFeat(c,"hope",(c.cls||"Class")+" hope feature",g("hope_feature"));
+  for(let i=0;i<6;i++)dhPdfFeat(c,"class",(c.cls||"Class")+" class feature",g("classfeature."+i));
+  dhPdfFeat(c,"anc",(anc||"Ancestry")+" ancestry",g("ancestry_feature_1")); dhPdfFeat(c,"anc",(anc||"Ancestry")+" ancestry",g("ancestry_feature_2"));
+  dhPdfFeat(c,"com",(com||"Community")+" community",g("community_feature"));
+  for(let n=1;n<=3;n++)for(const kind of ["feature"])["","_a"].forEach(()=>{});
+  for(let n=1;n<=3;n++){const nm=g("subclass_name_"+n);["feature","specialization","mastery"].forEach(kind=>{dhPdfFeat(c,"sub",(nm||"Subclass")+" "+(kind==="feature"?"card":kind),g("subclass_"+kind+"_"+n))})}
+  d.subRank=F["subclass_mastery_1"]==="1"?3:F["subclass_specialization_1"]==="1"?2:1;
+  /* domain cards */
+  for(let r=0;r<6;r++)for(let col=0;col<6;col++){
+    const nm=g("domain_card_name."+r+"."+col); if(!nm)continue;
+    const x=dhFind(D.cards,nm), dom=g("domain_card_domain."+r+"."+col);
+    dhAddCard(c,x||{name:nm,domain:dom?dhCap(dom):"Custom",level:1,type:dhCap(g("domain_card_type."+r+"."+col)||"Ability"),recall:num(g("domain_card_recall."+r+"."+col)),text:g("domain_card_feature."+r+"."+col)});
+  }
+  /* inventory */
+  d.inv=g("inventory").split(/\s*,\s*/).filter(Boolean).map(n=>({id:uid(),n:n,q:1}));
+  dhSync(c);
+  return {c:c,notes:["Level "+c.level+" "+[c.cls,c.subclass].filter(Boolean).join(" \u2013 "),d.exp.length+" Experience"+(d.exp.length===1?"":"s"),d.loadout.length+d.vault.length+" domain card"+(d.loadout.length+d.vault.length===1?"":"s")]};
+}
+async function dhRunImport(file){
+  const say=t=>{msg(t,false)};
+  say("Reading "+file.name+"...");
+  const r=await dhImportPdf(file);
+  if(r.err){msg(r.err,true);return}
+  const c=r.c, old=S.characters.find(x=>x.name===c.name&&isDh(x));
+  S.characters.push(c); ui.sel=c.id; ui.tab="sheet"; ui.view="sheet"; save();
+  $("#syncOv").hidden=true; renderSheet(); window.scrollTo(0,0);
+  dhToast("<b>Imported "+esc(c.name)+"</b><br><small>"+esc(r.notes.join(" \u00b7 "))+(old?". You already had a character with this name, so this one was added as a copy.":".")+" Check the sheet over, since a few things (portrait, notes) do not come from the PDF.</small>");
 }
 
 render(); setStatus();
