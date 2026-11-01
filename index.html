@@ -1916,6 +1916,36 @@ html,body{overscroll-behavior-y:none}
 .hbchecks>span{display:block;margin-bottom:4px}
 .hbab{grid-template-columns:repeat(auto-fit,minmax(70px,1fr))}
 .fxpick{margin:2px 0 6px 26px}
+.dhtraits{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.dht{display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field)}
+.dht-n{display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--muted)}
+.dht-n .ab-s{width:64px}
+.dht-v{font:700 26px/1 var(--display);color:var(--ink)}
+.dht small{font-size:11.5px;color:var(--muted)}
+.dhtrk{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.dhtrk>span{font:600 13.5px var(--body)}.dhtrk small{font-weight:400;color:var(--muted);margin-left:6px}
+.dhpips{display:flex;flex-wrap:wrap;gap:8px}
+.dhp{width:30px;height:30px;border:2px solid var(--line);background:transparent;padding:0;cursor:pointer;color:var(--accent)}
+.dhp:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.dhpips.sq .dhp{border-radius:6px}.dhpips.ci .dhp{border-radius:50%}.dhpips.sh .dhp{border-radius:4px 4px 14px 14px}
+.dhpips.di .dhp{transform:rotate(45deg) scale(.78);border-radius:5px}
+.dhp.on{background:var(--accent);border-color:var(--accent)}
+.dhws{display:flex;flex-direction:column;gap:10px}
+.dhw{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field)}
+.dhw>div:first-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dhx{display:grid;grid-template-columns:1fr 70px auto;gap:8px;align-items:center;margin-bottom:8px}
+.dhxs{display:flex;flex-direction:column;gap:6px}
+.chk{display:flex;gap:8px;align-items:center;font-size:14px}
+.dhres{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field);min-height:56px}
+.dhrow{display:flex;gap:12px;align-items:center}
+.dhdie{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;font:700 20px var(--display);border-radius:10px;color:#fff;flex:none}
+.dhdie.hope{background:#b8860b}.dhdie.fear{background:#5b2d83}
+.dhdie+.dhdie{margin-left:-4px}
+.tag.ok{background:var(--accent-soft);color:var(--ink)}.tag.bad{background:rgba(190,60,60,.18);color:var(--ink)}
+#dhToast{position:fixed;left:0;right:0;bottom:calc(76px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;padding:0 16px;z-index:60;pointer-events:none}
+#dhToast[hidden]{display:none}
+.dhtoast{pointer-events:auto;max-width:520px;width:100%;padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--panel);box-shadow:0 8px 28px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:8px}
+
 </style>
 
 <div class="skinbg" aria-hidden="true"></div>
@@ -1973,6 +2003,7 @@ html,body{overscroll-behavior-y:none}
       <p class="hint" style="margin:0">Your characters save automatically as you type, in two places on this device. If the browser ever loses one copy, the app restores it from the other.</p></section>
     <section><h3>About and licenses</h3>
       <p>D&amp;D 5e and 5.5e content is from the SRD 5.1 and SRD 5.2 under their Creative Commons licenses. Pathfinder 2e (Remaster) content comes from the open data of the Foundry VTT Pathfinder 2e system, limited to entries published under the ORC License or the Open Game License.</p>
+      <p>Daggerheart content (classes, ancestries, communities, domain cards, weapons, armor and transformations) is from the free Daggerheart SRD and the Hope &amp; Fear expansion text published under the Darrington Press Community Gaming License. This app is an independent product and is not published, endorsed or approved by Darrington Press or Critical Role. Daggerheart is a trademark of Darrington Press, LLC.</p>
       <p>This app uses trademarks and copyrights owned by Paizo Inc., used under Paizo's Community Use Policy (paizo.com/communityuse). It is not published, endorsed, or specifically approved by Paizo. Pathfinder is a trademark of Paizo Inc.</p>
     </section>
     <div class="msg" id="syncMsg" role="status"></div>
@@ -2917,6 +2948,7 @@ function migList(v,mk){
 }
 function normChar(c){
   if(c&&c.system==="pf2e")return pfNorm(c);
+  if(c&&c.system==="dh")return dhNorm(c);
   const b=blankChar(c.campaign);
   const o=Object.assign(b,c);
   o.abilities=Object.assign(b.abilities,c.abilities||{});
@@ -2992,7 +3024,7 @@ function seed(){
 }
 
 /* ---------- systems: D&D 5e / 5.5e and Pathfinder 2e ---------- */
-const sysOf=x=>x&&x.system==="pf2e"?"pf2e":"dnd5e";
+const sysOf=x=>x&&x.system==="pf2e"?"pf2e":x&&x.system==="dh"?"dh":"dnd5e";
 const isPf=c=>!!c&&c.system==="pf2e";
 const EDL={"2014":"5e","2024":"5.5e"};
 const edLabel=e=>EDL[e]||"5e / 5.5e";
@@ -3266,7 +3298,7 @@ function setStatus(){
 }
 function save(){
   dirty=true; S.updated=Date.now();
-  const c=cur(); if(c){c.updated=S.updated;if(isPf(c)){try{c.ac=pfVal(c,"ac")}catch(e){}}else{try{if(fxGrants(c))setTimeout(()=>{rerender("res");if(ui.tab==="spells"){const b=$("#spellBox");if(b)b.innerHTML=spellsHTML(c)}},0)}catch(e){}}}
+  const c=cur(); if(c){c.updated=S.updated;if(isPf(c)){try{c.ac=pfVal(c,"ac")}catch(e){}}else if(isDh(c)){try{dhSync(c)}catch(e){}}else{try{if(fxGrants(c))setTimeout(()=>{rerender("res");if(ui.tab==="spells"){const b=$("#spellBox");if(b)b.innerHTML=spellsHTML(c)}},0)}catch(e){}}}
   try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
   mirror(); setStatus();
   clearTimeout(saveTimer); saveTimer=setTimeout(pushDb,700);
@@ -3340,7 +3372,7 @@ function setChrome(top,nav,fab){
 const HOMENAV=[["home","Characters","users","nav-home"],["lib","Library","book","lib-open"],["sync","Import","swap","sync-open"],["theme","Themes","palette","theme-open"]];
 const AVC=["#2e5d55","#4b3a6b","#6b4a2a","#2f4a6b","#6b2f3f","#4a5a2a"];
 const hpPct=c=>c.hpMax>0?Math.max(0,Math.min(100,num(c.hp)/num(c.hpMax)*100)):0;
-const subOf=c=>[c.race,c.cls&&(c.cls+" "+num(c.level,1)),isPf(c)?"PF2e":c.rules==="2024"?"5.5e":"5e"].filter(Boolean).join(" \u00b7 ");
+const subOf=c=>[c.race,c.cls&&(c.cls+" "+num(c.level,1)),isPf(c)?"PF2e":isDh(c)?"Daggerheart":c.rules==="2024"?"5.5e":"5e"].filter(Boolean).join(" \u00b7 ");
 
 function renderHome(){
   ui.view="home";
@@ -3355,13 +3387,13 @@ function renderHome(){
 
   let strip="";
   if(ui.newChar){
-    const gm=ui.newGame||"2024", ga=gm==="pf2e"?'data-sys="pf2e"':'data-rules="'+gm+'"';
+    const gm=ui.newGame||"2024", ga=gm==="pf2e"?'data-sys="pf2e"':gm==="dh"?'data-sys="dh"':'data-rules="'+gm+'"';
     strip=`<div class="rulepick"><b>New character</b>
-      <div class="seg" role="group" aria-label="Game">${[["2024","D&amp;D 5.5e"],["2014","D&amp;D 5e"],["pf2e","Pathfinder 2e"]].map(([v,t])=>`<button class="btn sm${gm===v?" pri":""}" type="button" data-act="new-game" data-v="${v}" aria-pressed="${gm===v}">${t}</button>`).join("")}</div>
+      <div class="seg" role="group" aria-label="Game">${[["2024","D&amp;D 5.5e"],["2014","D&amp;D 5e"],["pf2e","Pathfinder 2e"],["dh","Daggerheart"]].map(([v,t])=>`<button class="btn sm${gm===v?" pri":""}" type="button" data-act="new-game" data-v="${v}" aria-pressed="${gm===v}">${t}</button>`).join("")}</div>
       <button class="btn pri" type="button" data-act="creator" ${ga}>Build step by step</button>
       <button class="btn" type="button" data-act="creator-rand" ${ga}>Random character</button>
       <button class="btn" type="button" data-act="create-char" ${ga}>Blank sheet</button>
-      <p class="hint" style="margin:0">${gm==="pf2e"?"Pathfinder characters level up from their Feats section.":"Every character can switch between Guided and Manual levelling at any time, under More, Details."}</p>
+      <p class="hint" style="margin:0">${gm==="dh"?"Daggerheart characters level up from the Level up button on their Details tab.":gm==="pf2e"?"Pathfinder characters level up from their Feats section.":"Every character can switch between Guided and Manual levelling at any time, under More, Details."}</p>
       <button class="btn" type="button" data-act="cancel-new">Cancel</button></div>`;
   }else if(ui.addCamp){
     strip=`<div class="strip"><label class="fld"><span>New campaign name</span><input id="newCampName" type="text" maxlength="60" placeholder="Curse of Strahd"></label>
@@ -3386,11 +3418,11 @@ function renderHome(){
     return `<button class="card" type="button" data-act="open" data-id="${esc(c.id)}" data-q="${esc(hq)}"${ui.hs&&ui.hq&&hq.indexOf(String(ui.hq).toLowerCase())<0?" hidden":""}>
       ${portAv(c,ini,av,"")}
       <span class="card-main">
-        <span class="card-t"><span class="card-n">${esc(c.name||"Unnamed")}</span><span class="tag">${isPf(c)?"PF2e":c.rules==="2024"?"5.5e":"5e"}</span>${c.example?'<span class="tag ex">Example</span>':""}</span>
+        <span class="card-t"><span class="card-n">${esc(c.name||"Unnamed")}</span><span class="tag">${isPf(c)?"PF2e":isDh(c)?"Daggerheart":c.rules==="2024"?"5.5e":"5e"}</span>${c.example?'<span class="tag ex">Example</span>':""}</span>
         <span class="sub">${esc(sub)}${ui.camp==="all"&&c.campaign?" \u00b7 "+esc(campName(c.campaign)):""}</span>
         <span class="card-hp"><span class="hpbar${pct<34?" low":""}" aria-hidden="true"><i style="width:${pct}%"></i></span><b>${num(c.hp)} / ${num(c.hpMax)}</b></span>
       </span>
-      <span class="actile"><span>AC</span><b>${isPf(c)?num(c.ac):acOf(c)}</b></span>
+      <span class="actile"><span>${isDh(c)?"EVA":"AC"}</span><b>${isPf(c)||isDh(c)?num(c.ac):acOf(c)}</b></span>
     </button>`}).join("");
   const label=ui.camp==="all"?"All characters":ui.camp==="none"?"Unassigned":campName(ui.camp);
 
@@ -3425,6 +3457,7 @@ const LV=["Cantrips","1st level","2nd level","3rd level","4th level","5th level"
 const SCHOOLS=["Abjuration","Conjuration","Divination","Enchantment","Evocation","Illusion","Necromancy","Transmutation"];
 const MORE=["feats","details","mastery","bastion"];
 function tabsFor(c){
+  if(isDh(c))return DHTABS;
   if(isPf(c))return [["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["feats","Feats ("+c.pf.feats.length+")"],["details","Details"]];
   const t=[["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["details","Details"]];
   if(c.rules==="2024")t.push(["mastery","Mastery"],["bastion","Bastion"]);
@@ -3444,6 +3477,7 @@ function profileCard(c){
       ${lv>=20?"":`<div class="pc-lvbtns"><button class="btn sm pri" type="button" data-act="lvl-start">Level up</button>${lvGuided(c)&&Array.isArray(c.lvlHist)&&c.lvlHist.length?`<button class="btn sm" type="button" data-act="lvl-undo">Undo level up</button>`:""}</div>`}</div></section>`;
 }
 function barHTML(c){
+  if(isDh(c))return dhBar(c);
   const _tabs=[["sheet","Overview"],["play","Play"],["spells","Spells"],["gear","Gear"],["more","More"]], _cur=MORE.includes(ui.tab)?"more":ui.tab;
   const ttabs=`<div class="ttabs" role="group" aria-label="Sections">${_tabs.map(([id,l])=>`<button type="button" class="tt" data-act="tab" data-tab="${id==="more"?(isPf(c)?(ui.lastMore||"feats"):(MORE.includes(ui.lastMore)&&ui.lastMore!=="feats"?ui.lastMore:"details")):id}"${id===_cur?' aria-current="page"':""}>${l}</button>`).join("")}</div>`;
   const top=`<div class="top-row">
@@ -3470,6 +3504,7 @@ function barHTML(c){
 }
 function updVitals(c){
   const T=$("#top"); if(!T||!c)return;
+  if(isDh(c)){dhVitals(c);return}
   const q=k=>T.querySelector('[data-v="'+k+'"]'), set=(k,v)=>{const el=q(k);if(el)el.textContent=v};
   set("hp",num(c.hp)); set("hpMax",num(c.hpMax)); set("tmp",num(c.hpTemp)?"+"+num(c.hpTemp):"");
   set("ac",isPf(c)?num(c.ac):acOf(c)); set("init",sgn(isPf(c)?pfVal(c,"perception"):initB(c))); set("speed",isPf(c)?num(c.speed):speedOf(c));
@@ -3774,9 +3809,10 @@ function addFromSrd(i,btn){
 
 function renderSheet(){
   const c=cur(); ui.view="sheet";
-  if(c&&!isPf(c)){try{if(fxGrants(c))save()}catch(e){}}
+  if(c&&!isPf(c)&&!isDh(c)){try{if(fxGrants(c))save()}catch(e){}}
   if(!tabsFor(c).some(t=>t[0]===ui.tab))ui.tab="sheet";
   if(MORE.includes(ui.tab))ui.lastMore=ui.tab;
+  if(isDh(c)){renderDh(c);return}
   if(isPf(c)){renderPf(c);return}
   if(ui.tab==="spells"){renderSpells(c);return}
   if(ui.tab==="gear"){renderGear(c);return}
@@ -3873,6 +3909,7 @@ function setDot(key,v){const el=$(`[data-prof="${key}"]`);if(!el)return;el.class
 function recompute(){
   const c=cur(); if(!c||ui.view!=="sheet")return;
   updVitals(c);
+  if(isDh(c)){dhRecompute(c);return}
   if(isPf(c)){pfRecompute(c);return}
   if(ui.tab==="feats"||ui.tab==="details")return;
   if(ui.tab==="mastery"){
@@ -4190,7 +4227,7 @@ document.addEventListener("click",e=>{
     case "new-game": ui.newGame=b.dataset.v; renderHome(); break;
     case "camp-src": ui.campSrc=!ui.campSrc; renderHome(); break;
     case "create-char": {
-      const camp0=S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"", ch=b.dataset.sys==="pf2e"?pfBlank(camp0):blankChar(camp0,b.dataset.rules);
+      const camp0=S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"", ch=b.dataset.sys==="dh"?dhNorm({campaign:camp0}):b.dataset.sys==="pf2e"?pfBlank(camp0):blankChar(camp0,b.dataset.rules);
       ui.newChar=false; S.characters.push(ch); ui.sel=ch.id; ui.tab="details"; ui.q=""; save(); renderSheet(); window.scrollTo(0,0);
       const n=$('[data-f="name"]'); if(n){n.focus();n.select()} break;}
     case "del-char":
@@ -4974,7 +5011,7 @@ function exportBackup(asFile){
 const fileSafe=n=>String(n||"character").replace(/[^A-Za-z0-9 _-]+/g,"").trim().replace(/\s+/g,"-")||"character";
 function exportCharFile(kind){
   const c=cur(); if(!c){msg("Open a character first.",true);return}
-  if(kind==="r20"&&isPf(c)){msg("Roll20 export uses the D&D 5e sheet, so it is only for D&D characters. Use Save open character as a file instead.",true);return}
+  if(kind==="r20"&&(isPf(c)||isDh(c))){msg("Roll20 export uses the D&D 5e sheet, so it is only for D&D characters. Use Save open character as a file instead.",true);return}
   if(kind==="r20")saveTextFile(fileSafe(c.name)+"-roll20.json",JSON.stringify({name:c.name,attribs:r20Attribs(c)},null,2),"Roll20 file for "+c.name+" saved.");
   else saveTextFile(fileSafe(c.name)+"-ledger.json",JSON.stringify(Object.assign(backupObj(),{campaigns:S.campaigns.filter(k=>k.id===c.campaign),characters:[c]}),null,2),c.name+" saved.");
 }
@@ -5006,7 +5043,7 @@ function r20Attribs(c){
 }
 function exportR20(){
   const c=cur(); if(!c){msg("Open a character first.",true);return}
-  if(isPf(c)){msg("Roll20 export uses the D&D 5e sheet, so it is only for D&D characters. Use Save open character as a file instead.",true);return}
+  if(isPf(c)||isDh(c)){msg("Roll20 export uses the D&D 5e sheet, so it is only for D&D characters. Use Save open character as a file instead.",true);return}
   giveText(JSON.stringify({name:c.name,attribs:r20Attribs(c)},null,2),"Roll20 attributes for "+c.name+" ready.");
 }
 function fromR20(name,attribs,camp){
@@ -6146,7 +6183,7 @@ function featAbils(f){
 }
 async function openLevelUp(c,i,opt){
   opt=opt||{}; PACKCAMP=c.campaign||null;
-  if(isPf(c))return;
+  if(isPf(c)||isDh(c))return;
   if(totalDice(c)>=20){luSay("Already at level 20.",true);return}
   if(!lvGuided(c)){openQuickLevel(c,i==null?0:i);return}
   const first=c.classes.findIndex(r=>String(r.name||"").trim());
@@ -6451,8 +6488,8 @@ document.addEventListener("click",e=>{
   if(a==="lvl-roll"&&ui.lvl&&c){const L=ui.lvl;L.gain=Math.max(1,rd(L.die)+L.mod);L.rolled=true;renderQuickLevel(c);return}
   if(a==="lvl-ok"&&ui.lvl&&c){levelDone(c);return}
   if(a==="lvl-cancel"){$("#lvlOv").hidden=true;ui.lvl=null;return}
-  if(c&&!isPf(c)&&ui.view==="sheet"&&ui.tab==="play")playClick(c,b);
-  if(c&&!isPf(c)&&ui.view==="sheet"&&(a==="ovds"||a==="ovds-clear")){
+  if(c&&!isPf(c)&&!isDh(c)&&ui.view==="sheet"&&ui.tab==="play")playClick(c,b);
+  if(c&&!isPf(c)&&!isDh(c)&&ui.view==="sheet"&&(a==="ovds"||a==="ovds-clear")){
     c.deathSaves=Object.assign({s:0,f:0},c.deathSaves||{});
     if(a==="ovds"){const k=b.dataset.t,n=num(b.dataset.n);c.deathSaves[k]=num(c.deathSaves[k])===n?n-1:n}
     else c.deathSaves={s:0,f:0};
@@ -8585,6 +8622,8 @@ document.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]");
   if(b){
     const a=b.dataset.act;
+    if(a==="creator"&&b.dataset.sys==="dh"){dhOpenCreator(false);return}
+    if(a==="creator-rand"&&b.dataset.sys==="dh"){dhOpenCreator(true);return}
     if(a==="creator"){openCreator(b.dataset.sys==="pf2e"?"pf2e":"dnd5e",b.dataset.rules||"2024",false);return}
     if(a==="creator-rand"){openCreator(b.dataset.sys==="pf2e"?"pf2e":"dnd5e",b.dataset.rules||"2024",true);return}
   }
@@ -8765,7 +8804,7 @@ function qrBuild(){
   document.body.appendChild(qrEl); return qrEl;
 }
 function qrSync(){
-  const el=qrBuild(), c=cur(), show=ui.view==="sheet"&&c&&ui.tab!=="play"&&$("#libOv").hidden&&$("#crOv").hidden&&$("#lvlOv").hidden;
+  const el=qrBuild(), c=cur(), show=ui.view==="sheet"&&c&&!isDh(c)&&ui.tab!=="play"&&$("#libOv").hidden&&$("#crOv").hidden&&$("#lvlOv").hidden;
   el.hidden=!show;
   const b=$("#qrAdv"); if(b){b.textContent=ui.adv===1?"Adv":ui.adv===-1?"Dis":"Normal";b.classList.toggle("pri",ui.adv!==0)}
 }
@@ -9506,6 +9545,7 @@ document.addEventListener("input",e=>{
 
 /* ===== print / save as PDF ===== */
 function printHTML(c){
+  if(isDh(c))return dhPrint(c);
   const h=(t,b)=>b?`<h2>${t}</h2>${b}`:"";
   const txt=t=>`<p>${esc(String(t||"")).replace(/\n+/g,"<br>")}</p>`;
   const bx=(l,v,sm)=>`<div class="bx"><span>${l}</span><b>${v}</b>${sm?`<small>${sm}</small>`:""}</div>`;
@@ -9612,6 +9652,940 @@ function crStory(s){
   document.addEventListener("touchend",end,{passive:true});
   document.addEventListener("touchcancel",end,{passive:true});
 })();
+
+/* ===== Daggerheart: third game system (data from the free Daggerheart SRD; see About) ===== */
+const DHT=[["agility","Agility",["Sprint","Leap","Maneuver"]],["strength","Strength",["Lift","Smash","Grapple"]],["finesse","Finesse",["Control","Hide","Tinker"]],["instinct","Instinct",["Perceive","Sense","Navigate"]],["presence","Presence",["Charm","Perform","Deceive"]],["knowledge","Knowledge",["Recall","Analyze","Comprehend"]]];
+const DHTABS=[["sheet","Overview"],["play","Play"],["cards","Cards"],["gear","Gear"],["details","Details"]];
+const DHCOND=["Hidden","Restrained","Vulnerable"];
+function isDh(c){return !!c&&c.system==="dh"}
+let DHD=null, DHP=null;
+function dhLoad(){
+  if(DHD)return Promise.resolve(DHD);
+  if(!DHP)DHP=fetch("daggerheart-srd.json").then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(d=>{DHD=d;return d});
+  return DHP.catch(e=>{DHP=null;throw e});
+}
+const dhCap=s=>String(s||"").replace(/^./,m=>m.toUpperCase());
+const dhFind=(arr,n)=>{const k=lc(n);return k?(arr||[]).find(x=>lc(x.name)===k):undefined};
+function dhTier(l){return l<=1?1:l<=4?2:l<=7?3:4}
+function dhBlankDh(){
+  return {base:{hp:6,stress:6,eva:10},ancPlus:{},plus:{},traits:{agility:0,strength:0,finesse:0,instinct:0,presence:0,knowledge:0},marked:{},
+    anc2:"",trans:"",subRank:1,hpMarked:0,stressMarked:0,armorMarked:0,hope:2,hopeMax:6,
+    armor:{name:"",major:0,severe:0,score:0,feature:"",ev:0,tm:{}},weapons:{primary:null,secondary:null},
+    exp:[],loadout:[],vault:[],features:[],inv:[],gold:{h:0,b:0,c:0},cond:[],bg:[],cn:[],look:"",pron:"",player:"",multi:null,adv:{},hist:[],spell:""};
+}
+function dhNorm(c){
+  const o=Object.assign(blankChar(c.campaign),c), D=dhBlankDh(), p=c.dh&&typeof c.dh==="object"?c.dh:{};
+  o.system="dh"; o.rules="2014"; o.level=Math.max(1,Math.min(10,num(c.level,1)));
+  const d=o.dh=Object.assign(D,p);
+  ["base","ancPlus","plus","traits","marked","gold"].forEach(k=>{d[k]=Object.assign(dhBlankDh()[k],p[k]&&typeof p[k]==="object"?p[k]:{})});
+  d.armor=Object.assign(dhBlankDh().armor,p.armor&&typeof p.armor==="object"?p.armor:{}); d.armor.tm=d.armor.tm&&typeof d.armor.tm==="object"?d.armor.tm:{};
+  d.weapons={primary:p.weapons&&p.weapons.primary&&typeof p.weapons.primary==="object"?p.weapons.primary:null,secondary:p.weapons&&p.weapons.secondary&&typeof p.weapons.secondary==="object"?p.weapons.secondary:null};
+  const arr=v=>Array.isArray(v)?v.filter(x=>x&&typeof x==="object").map(x=>Object.assign({},x,{id:x.id||uid()})):[];
+  ["exp","loadout","vault","features","inv","bg","cn","hist"].forEach(k=>{d[k]=arr(p[k])});
+  d.cond=Array.isArray(p.cond)?p.cond.map(String):[]; d.adv=p.adv&&typeof p.adv==="object"?p.adv:{};
+  o.attacks=[]; o.features=[]; o.spells=[]; o.resources=[]; o.inventory=[];
+  dhSync(o); return o;
+}
+/* derived values */
+function dhAdvN(c,k){return Object.values(c.dh.adv||{}).reduce((a,t)=>a+num(t&&t[k]),0)}
+function dhProf(c){return 1+(c.level>=2?1:0)+(c.level>=5?1:0)+(c.level>=8?1:0)+dhAdvN(c,"prof")+num(c.dh.plus.prof)}
+function dhHpSlots(c){return Math.max(1,num(c.dh.base.hp)+num(c.dh.ancPlus.hp)+num(c.dh.plus.hp)+dhAdvN(c,"hp"))}
+function dhStressSlots(c){return Math.max(1,num(c.dh.base.stress)+num(c.dh.ancPlus.stress)+num(c.dh.plus.stress)+dhAdvN(c,"stress"))}
+function dhEva(c){return num(c.dh.base.eva)+num(c.dh.ancPlus.eva)+num(c.dh.plus.eva)+dhAdvN(c,"eva")+num(c.dh.armor.ev)}
+function dhArmorScore(c){return Math.max(0,num(c.dh.armor.score)+num(c.dh.ancPlus.armor)+num(c.dh.plus.armor))}
+function dhMajor(c){return num(c.dh.armor.major)+c.level+num(c.dh.ancPlus.thr)+num(c.dh.plus.thr)}
+function dhSevere(c){return num(c.dh.armor.severe)+c.level+num(c.dh.ancPlus.thr)+num(c.dh.plus.thr)}
+function dhTrait(c,k){return num(c.dh.traits[k])+num(c.dh.armor.tm&&c.dh.armor.tm[k])}
+function dhSync(c){
+  const d=c.dh;
+  d.hpMarked=Math.max(0,Math.min(dhHpSlots(c),num(d.hpMarked))); d.stressMarked=Math.max(0,Math.min(dhStressSlots(c),num(d.stressMarked)));
+  d.armorMarked=Math.max(0,Math.min(dhArmorScore(c),num(d.armorMarked))); d.hopeMax=Math.max(1,num(d.hopeMax,6)); d.hope=Math.max(0,Math.min(d.hopeMax,num(d.hope)));
+  c.hpMax=dhHpSlots(c); c.hp=c.hpMax-d.hpMarked; c.hpTemp=0; c.ac=dhEva(c);
+}
+/* Armor and weapons are stored as plain objects so edits and homebrew work the same as list picks */
+function dhArmorFrom(a){
+  const f=String(a.feature||""), m=f.match(/([+\-\u2212]\d+)\s+(?:to\s+)?Evasion/i), tm={};
+  const sg=s=>num(String(s).replace("\u2212","-"));
+  let ev=m?sg(m[1]):0;
+  const t=f.match(/([+\-\u2212]\d+)\s+to\s+(Agility|Finesse|Strength|Instinct|Presence|Knowledge)\b/i);
+  if(t)tm[t[2].toLowerCase()]=sg(t[1]);
+  const all=f.match(/([+\-\u2212]\d+)\s+to\s+all\s+character\s+traits/i); if(all)DHT.forEach(x=>{tm[x[0]]=sg(all[1])});
+  return {name:a.name,major:a.major,severe:a.severe,score:a.score,feature:f==="\u2014"?"":f,ev:ev,tm:tm};
+}
+function dhWeaponFrom(w){return {name:w.name,trait:w.trait,range:w.range,damage:w.damage,burden:w.burden,feature:w.feature==="\u2014"?"":w.feature,tier:w.tier}}
+function dhDmgExpr(w,prof){
+  const m=String((w&&w.damage)||"").match(/^\s*(?:(\d+))?d(\d+)\s*(?:\+\s*(\d+))?\s*(.*)$/i); if(!m)return null;
+  const n=Math.max(1,prof), sides=num(m[2]), mod=num(m[3]);
+  return {n:n,sides:sides,mod:mod,type:(m[4]||"").trim(),text:n+"d"+sides+(mod?"+"+mod:"")+(m[4]?" "+m[4].trim():"")};
+}
+/* ---------- chrome ---------- */
+function dhBar(c){
+  const cur0=ui.tab, tabs=DHTABS;
+  const top=`<div class="top-row">
+      <button class="ibtn" type="button" data-act="back" aria-label="Back to characters">${ico("back")}</button>
+      ${PORT[c.id]?`<button class="avatar sm has-img" type="button" data-act="tab" data-tab="details" style="--img:url('${PORT[c.id]}')" aria-label="Edit character details and portrait"></button>`:""}
+      <div class="who-box"><span class="who" data-live="name">${esc(c.name||"Untitled")}</span><span class="who-sub">${esc(subOf(c))}</span></div>
+      <button class="ibtn" type="button" data-act="tab" data-tab="details" aria-label="Edit character details">${ico("edit")}</button>
+    </div>
+    <div class="ttabs" role="group" aria-label="Sections">${tabs.map(([id,l])=>`<button type="button" class="tt" data-act="tab" data-tab="${id}"${id===cur0?' aria-current="page"':""}>${l}</button>`).join("")}</div>
+    <div class="vitals">
+      <button class="vit hpv" type="button" data-act="tab" data-tab="play" aria-label="Hit points. Open Play"><span>Hit points</span>
+        <b><span data-v="hp">0</span><small>/ <span data-v="hpMax">0</span></small></b>
+        <span class="hpbar" aria-hidden="true"><i data-v="bar"></i></span></button>
+      <div class="vit"><span>Evasion</span><b data-v="ac">0</b></div>
+      <div class="vit"><span>Hope</span><b data-v="hope">0</b></div>
+      <div class="vit"><span>Stress</span><b data-v="stress">0</b></div>
+    </div>`;
+  const nav=navHTML([["sheet","Overview","grid","tab",'data-tab="sheet"'],["play","Play","d20","tab",'data-tab="play"'],["cards","Cards","wand","tab",'data-tab="cards"'],["gear","Gear","bag","tab",'data-tab="gear"'],["details","Details","edit","tab",'data-tab="details"']],cur0);
+  setChrome(top,nav,"");
+  dhVitals(c);
+  return "";
+}
+function dhVitals(c){
+  const T=$("#top"); if(!T)return;
+  const set=(k,v)=>{const el=T.querySelector('[data-v="'+k+'"]');if(el)el.textContent=v};
+  set("hp",num(c.hp)); set("hpMax",num(c.hpMax)); set("ac",dhEva(c)); set("hope",c.dh.hope); set("stress",c.dh.stressMarked+"/"+dhStressSlots(c));
+  const pct=hpPct(c), bar=T.querySelector('[data-v="bar"]'); if(bar){bar.style.width=pct+"%";bar.parentNode.classList.toggle("low",pct<34)}
+  const sub=T.querySelector(".who-sub"); if(sub)sub.textContent=subOf(c);
+}
+function dhRecompute(c){
+  dhSync(c);
+  const set=(k,t)=>document.querySelectorAll('[data-dhv="'+k+'"]').forEach(e=>{e.textContent=t});
+  set("eva",String(dhEva(c))); set("major",String(dhMajor(c))); set("severe",String(dhSevere(c))); set("prof",String(dhProf(c))); set("armor",String(dhArmorScore(c)));
+  DHT.forEach(t=>set("tr."+t[0],sgn(dhTrait(c,t[0]))));
+  ["primary","secondary"].forEach(k=>{const w=c.dh.weapons[k],e=w&&dhDmgExpr(w,dhProf(c));set("dmg."+k,e?e.text:"")});
+  dhVitals(c);
+}
+function dhRefresh(){const y=window.scrollY;renderSheet();window.scrollTo(0,y)}
+/* ---------- small builders ---------- */
+function dhPips(c,k){
+  const d=c.dh; let n,on,cls;
+  if(k==="hp"){n=dhHpSlots(c);on=d.hpMarked;cls="sq"}
+  else if(k==="stress"){n=dhStressSlots(c);on=d.stressMarked;cls="ci"}
+  else if(k==="armor"){n=dhArmorScore(c);on=d.armorMarked;cls="sh"}
+  else {n=d.hopeMax;on=d.hope;cls="di"}
+  if(!n)return `<span class="hint" style="margin:0">None yet</span>`;
+  return `<div class="dhpips ${cls}" role="group" aria-label="${k} slots">`+Array.from({length:n},(_,i)=>`<button type="button" class="dhp${i<on?" on":""}" data-act="dh-pip" data-k="${k}" data-n="${i+1}" aria-pressed="${i<on}" aria-label="${k} ${i+1}"></button>`).join("")+`</div>`;
+}
+const dhFmt=t=>esc(t).replace(/\s*\u2022\s*/g,"<br>\u2022 ").replace(/^<br>/,"");
+function dhNumF(label,path,val){return `<label class="fld"><span>${label}</span><input type="number" inputmode="numeric" data-t="n" data-f="${path}" value="${esc(val)}"></label>`}
+function dhSel(path,cur,opts,label){return `<label class="fld"><span>${label}</span><select data-f="${path}">${opts.map(o=>`<option value="${esc(o)}"${o===cur?" selected":""}>${esc(o)}</option>`).join("")}</select></label>`}
+function dhFeatHTML(f,i){
+  return `<details class="item" data-id="${esc(f.id)}"${ui.open.has(f.id)?" open":""}><summary><span class="sum-t">${esc(f.name||"Feature")}</span><span class="sum-m">${esc(f.src||"")}</span></summary>
+    <div class="ibody"><div class="prose">${dhFmt(f.text||"")}</div><div class="btns" style="margin-top:8px"><button class="btn sm danger" type="button" data-act="dh-delfeat" data-i="${i}">Remove</button></div></div></details>`;
+}
+function dhCardHTML(k,card,i,c){
+  const tags=[card.domain,"Level "+card.level,card.type].filter(Boolean).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+  const other=k==="loadout"?"vault":"loadout", full=other==="loadout"&&c.dh.loadout.length>=5;
+  return `<details class="item" data-id="${esc(card.id)}"${ui.open.has(card.id)?" open":""}><summary><span class="sum-t">${esc(card.name)}</span><span class="sum-m">${esc(card.domain||"Custom")} \u00b7 L${esc(card.level||"")} \u00b7 Recall ${num(card.recall)}</span></summary>
+    <div class="ibody"><div class="chips" style="margin:0 0 8px">${tags}<span class="tag">Recall ${num(card.recall)}</span></div><div class="prose">${dhFmt(card.text||"")}</div>
+    <div class="btns" style="margin-top:8px"><button class="btn sm" type="button" data-act="dh-cardmv" data-k="${k}" data-i="${i}"${full?" disabled":""}>${k==="loadout"?"Move to vault":"Move to loadout"}</button><button class="btn sm danger" type="button" data-act="dh-cardrm" data-k="${k}" data-i="${i}">Remove</button></div>
+    ${k==="vault"&&full?`<p class="hint" style="margin:6px 0 0">Your loadout is full (5 cards). Move one to the vault first.</p>`:""}</div></details>`;
+}
+/* ---------- sheet tabs ---------- */
+function renderDh(c){
+  dhSync(c);
+  const t=ui.tab;
+  if(t==="play")return renderDhPlay(c);
+  if(t==="cards")return renderDhCards(c);
+  if(t==="gear")return renderDhGear(c);
+  if(t==="details")return renderDhDetails(c);
+  renderDhSheet(c);
+}
+function dhWeaponRow(c,slot){
+  const w=c.dh.weapons[slot], e=w&&dhDmgExpr(w,dhProf(c)), lbl=slot==="primary"?"Primary weapon":"Secondary weapon";
+  if(!w)return `<div class="dhw"><b>${lbl}</b><span class="hint" style="margin:0">None. Choose one on the Gear tab.</span></div>`;
+  return `<div class="dhw"><div><b>${esc(w.name||lbl)}</b><span class="atkn">${esc([w.trait,w.range,w.burden].filter(Boolean).join(" \u00b7 "))}</span>${w.feature?`<span class="atkn">${esc(w.feature)}</span>`:""}</div>
+    <div class="btns"><button class="btn sm pri" type="button" data-act="dh-atk" data-slot="${slot}">Attack ${w.trait?esc(sgn(dhTrait(c,lc(w.trait)))):""}</button><button class="btn sm" type="button" data-act="dh-dmg" data-slot="${slot}">Damage <span data-dhv="dmg.${slot}">${e?esc(e.text):""}</span></button></div></div>`;
+}
+function renderDhSheet(c){
+  const d=c.dh;
+  const traits=DHT.map(([k,n,sk])=>`<div class="dht"><label class="dht-n"><span>${n}</span><input class="ab-s" type="number" inputmode="numeric" data-t="n" data-f="dh.traits.${k}" value="${esc(d.traits[k])}" aria-label="${n}"></label>
+    <b class="dht-v" data-dhv="tr.${k}">${esc(sgn(dhTrait(c,k)))}</b><small>${sk.join(", ")}</small><button class="btn sm" type="button" data-act="dh-troll" data-k="${k}" aria-label="Roll ${n}">Roll</button></div>`).join("");
+  const exp=d.exp.map((x,i)=>`<div class="dhx"><input class="cell" type="text" data-f="dh.exp.${i}.n" placeholder="Experience" value="${esc(x.n)}" aria-label="Experience name"><input class="cell n" type="number" inputmode="numeric" data-t="n" data-f="dh.exp.${i}.v" value="${esc(x.v)}" aria-label="Modifier">
+    <button class="btn sm danger" type="button" data-act="dh-delexp" data-i="${i}" aria-label="Remove experience">Remove</button></div>`).join("");
+  app.innerHTML=`${dhBar(c)}
+  <div class="grid">
+    <section class="panel span2"><h3>Traits</h3><div class="dhtraits">${traits}</div>
+      <p class="hint">Tap Roll to make a Duality roll with that trait. Set advantage and Experiences on the Play tab.${Object.keys(d.marked).filter(k=>d.marked[k]).length?" Marked (raised this tier): "+Object.keys(d.marked).filter(k=>d.marked[k]).map(dhCap).join(", ")+".":""}</p></section>
+
+    <section class="panel"><h3>Defense</h3>
+      <div class="stats"><div class="stat"><span>Evasion</span><b data-dhv="eva">${dhEva(c)}</b></div><div class="stat"><span>Proficiency</span><b data-dhv="prof">${dhProf(c)}</b></div>
+        <div class="stat"><span>Major</span><b data-dhv="major">${dhMajor(c)}</b></div><div class="stat"><span>Severe</span><b data-dhv="severe">${dhSevere(c)}</b></div></div>
+      <p class="hint">Damage below Major marks 1 Hit Point, Major marks 2, Severe marks 3. Armor: ${esc(d.armor.name||"none worn")}${d.armor.feature?" ("+esc(d.armor.feature)+")":""}.</p></section>
+
+    <section class="panel"><h3>Trackers</h3>
+      <div class="dhtrk"><span>Hit Points <small>${d.hpMarked} marked</small></span>${dhPips(c,"hp")}</div>
+      <div class="dhtrk"><span>Stress <small>${d.stressMarked} marked</small></span>${dhPips(c,"stress")}</div>
+      <div class="dhtrk"><span>Armor Slots <small>${d.armorMarked} marked</small></span>${dhPips(c,"armor")}</div>
+      <div class="dhtrk"><span>Hope <small>${d.hope} of ${d.hopeMax}</small></span>${dhPips(c,"hope")}</div>
+      ${d.hpMarked>=dhHpSlots(c)?`<p class="msg err" role="status">Your last Hit Point is marked. Choose a death move: Blaze of Glory, Avoid Death, or Risk It All.</p>`:""}
+      ${d.stressMarked>=dhStressSlots(c)?`<p class="hint" style="margin:6px 0 0">Your last Stress is marked. You are Vulnerable until you clear one.</p>`:""}</section>
+
+    <section class="panel span2"><h3>Experiences</h3>
+      <div class="listbar"><button class="btn pri" type="button" data-act="dh-addexp">Add Experience</button></div>
+      ${exp||`<p class="hint" style="margin:0 0 6px">No Experiences yet. Each one is a few words about your past, with a modifier that you can add to a roll by spending a Hope.</p>`}</section>
+
+    <section class="panel span2"><h3>Weapons</h3><div class="dhws">${dhWeaponRow(c,"primary")}${dhWeaponRow(c,"secondary")}</div></section>
+
+    <section class="panel span2"><h3>Conditions</h3><div class="chips" role="group" aria-label="Conditions">${DHCOND.map(n=>`<button class="chip" type="button" data-act="dh-cond" data-n="${n}" aria-pressed="${d.cond.includes(n)}">${n}</button>`).join("")}</div></section>
+  </div>`;
+}
+const dhOpt=(a,sel)=>a.map(x=>`<option value="${esc(x)}"${x===sel?" selected":""}>${esc(x)}</option>`).join("");
+function renderDhPlay(c){
+  const d=c.dh, tier=dhTier(c.level), A=ui.dhAdv||0, X=ui.dhExp||[];
+  const expRows=d.exp.length?d.exp.map(x=>`<label class="chk"><input type="checkbox" data-dhx="${esc(x.id)}"${X.includes(x.id)?" checked":""}> ${esc(x.n||"Experience")} <b>${esc(sgn(num(x.v)))}</b></label>`).join(""):`<span class="hint" style="margin:0">No Experiences yet.</span>`;
+  app.innerHTML=`${dhBar(c)}
+  <div class="grid">
+    <section class="panel span2"><h3>Duality roll</h3>
+      <div class="igrid"><label class="fld"><span>Trait</span><select id="dhRollT">${DHT.map(([k,n])=>`<option value="${k}"${(ui.dhTrait||"agility")===k?" selected":""}>${n} ${esc(sgn(dhTrait(c,k)))}</option>`).join("")}</select></label>
+        <label class="fld"><span>Extra modifier</span><input id="dhRollM" type="number" inputmode="numeric" value="${esc(ui.dhMod||0)}"></label>
+        <label class="fld"><span>Difficulty (optional)</span><input id="dhRollD" type="number" inputmode="numeric" value="${esc(ui.dhDiff==null?"":ui.dhDiff)}" placeholder="12"></label></div>
+      <div class="seg" role="group" aria-label="Advantage" style="margin:10px 0"><button class="btn sm${A===1?" pri":""}" type="button" data-act="dh-adv" data-v="1" aria-pressed="${A===1}">Advantage +d6</button><button class="btn sm${A===0?" pri":""}" type="button" data-act="dh-adv" data-v="0" aria-pressed="${A===0}">Normal</button><button class="btn sm${A===-1?" pri":""}" type="button" data-act="dh-adv" data-v="-1" aria-pressed="${A===-1}">Disadvantage -d6</button></div>
+      <div class="dhxs"><span class="lvlbl">Spend a Hope to add an Experience</span>${expRows}</div>
+      <div class="btns" style="margin-top:10px"><button class="btn pri" type="button" data-act="dh-roll">Roll Hope and Fear</button></div>
+      <div id="dhRes" class="dhres" role="status" aria-live="polite">${ui.dhLast||'<span class="hint" style="margin:0">Your last roll shows here.</span>'}</div></section>
+
+    <section class="panel"><h3>Take damage</h3>
+      <div class="igrid"><label class="fld"><span>Damage taken</span><input id="dhDmgIn" type="number" inputmode="numeric" min="0" placeholder="0"></label>
+        <label class="fld"><span>Spend an Armor Slot</span><select id="dhDmgArm"><option value="0">No</option><option value="1">Yes, reduce by one step</option></select></label></div>
+      <div class="btns" style="margin-top:10px"><button class="btn pri" type="button" data-act="dh-hit">Apply damage</button></div>
+      <p class="hint">Thresholds: Major ${dhMajor(c)}, Severe ${dhSevere(c)}. Armor slots: ${dhArmorScore(c)-d.armorMarked} left of ${dhArmorScore(c)}.</p><div class="msg" id="dhHitMsg" role="status"></div></section>
+
+    <section class="panel"><h3>Trackers</h3>
+      <div class="dhtrk"><span>Hit Points <small>${d.hpMarked} marked</small></span>${dhPips(c,"hp")}</div>
+      <div class="dhtrk"><span>Stress <small>${d.stressMarked} marked</small></span>${dhPips(c,"stress")}</div>
+      <div class="dhtrk"><span>Armor Slots <small>${d.armorMarked} marked</small></span>${dhPips(c,"armor")}</div>
+      <div class="dhtrk"><span>Hope <small>${d.hope} of ${d.hopeMax}</small></span>${dhPips(c,"hope")}</div></section>
+
+    <section class="panel span2"><h3>Rest</h3>
+      <p class="hint" style="margin:0 0 8px">Each rest gives two downtime moves (the same one twice is fine). Short rest healing is 1d4 + your tier (${tier}).</p>
+      <div class="igrid"><label class="fld"><span>Rest type</span><select id="dhRestT"><option value="short">Short rest</option><option value="long">Long rest</option></select></label>
+        <label class="fld"><span>First move</span><select id="dhRestA"></select></label><label class="fld"><span>Second move</span><select id="dhRestB"></select></label></div>
+      <div class="btns" style="margin-top:10px"><button class="btn pri" type="button" data-act="dh-rest">Take the rest</button></div>
+      <div class="msg" id="dhRestMsg" role="status"></div>
+      <p class="hint">Remember to swap domain cards between loadout and vault, and refresh features that recharge on a rest.</p></section>
+  </div>`;
+  dhFillRest();
+  dhVitals(c);
+}
+const DHREST={short:[["wounds","Tend to Wounds (clear 1d4 + tier Hit Points)"],["stress","Clear Stress (1d4 + tier)"],["armor","Repair Armor (clear 1d4 + tier Armor Slots)"],["prep","Prepare (gain a Hope)"]],
+  long:[["wounds","Tend to All Wounds (clear all Hit Points)"],["stress","Clear All Stress"],["armor","Repair All Armor"],["prep","Prepare (gain a Hope)"],["proj","Work on a Project"]]};
+function dhFillRest(){
+  const t=$("#dhRestT"); if(!t)return;
+  const fill=()=>{const L=DHREST[t.value];["dhRestA","dhRestB"].forEach(id=>{const s=$("#"+id);if(s)s.innerHTML=L.map(x=>`<option value="${x[0]}">${esc(x[1])}</option>`).join("")})};
+  fill(); t.addEventListener("change",fill);
+}
+function renderDhCards(c){
+  const d=c.dh;
+  const sec=(t,arr,k)=>arr.length?arr.map((f,i)=>dhCardHTML(k,f,i,c)).join(""):`<p class="hint" style="margin:0">${t}</p>`;
+  app.innerHTML=`${dhBar(c)}
+  <div class="grid">
+    <section class="panel span2"><h3>Features</h3>
+      <div class="listbar"><button class="btn sm pri" type="button" data-act="dh-addfeat">Add a feature</button><button class="btn sm" type="button" data-act="dh-apply" data-w="all">Refill class, heritage and community features</button></div>
+      <div class="msg" id="dhMsg" role="status"></div>
+      ${d.features.length?d.features.map((f,i)=>dhFeatHTML(f,i)).join(""):`<p class="hint" style="margin:0">No features yet. Pick a class, ancestry and community on the Details tab, then use the refill button.</p>`}</section>
+    <section class="panel span2"><h3>Domain cards: loadout (${d.loadout.length} of 5)</h3>
+      <div class="listbar"><button class="btn sm pri" type="button" data-act="dh-cardpick">Add a domain card</button><button class="btn sm" type="button" data-act="dh-cardcustom">Add a custom card</button></div>
+      ${sec("Nothing in your loadout. Active cards go here, up to five.",d.loadout,"loadout")}</section>
+    <section class="panel span2"><h3>Vault (${d.vault.length})</h3>${sec("Cards you own but are not using right now.",d.vault,"vault")}
+      <p class="hint">Swap between loadout and vault during a rest. Moving a card in mid-adventure costs its Recall Cost in Stress.</p></section>
+  </div>`;
+}
+function renderDhGear(c){
+  const d=c.dh, A=d.armor, inv=d.inv.map((x,i)=>`<div class="dhx"><input class="cell" type="text" data-f="dh.inv.${i}.n" placeholder="Item" value="${esc(x.n)}" aria-label="Item"><input class="cell n" type="number" inputmode="numeric" data-t="n" data-f="dh.inv.${i}.q" value="${esc(x.q==null?1:x.q)}" aria-label="Quantity">
+    <button class="btn sm danger" type="button" data-act="dh-delinv" data-i="${i}" aria-label="Remove item">Remove</button></div>`).join("");
+  const wf=(slot)=>{const w=d.weapons[slot]||{};return `<div class="igrid">
+    <label class="fld"><span>Name</span><input type="text" data-f="dh.weapons.${slot}.name" value="${esc(w.name)}" ${d.weapons[slot]?"":"disabled"}></label>
+    <label class="fld"><span>Trait</span><input type="text" data-f="dh.weapons.${slot}.trait" value="${esc(w.trait)}" ${d.weapons[slot]?"":"disabled"}></label>
+    <label class="fld"><span>Range</span><input type="text" data-f="dh.weapons.${slot}.range" value="${esc(w.range)}" ${d.weapons[slot]?"":"disabled"}></label>
+    <label class="fld"><span>Damage</span><input type="text" data-f="dh.weapons.${slot}.damage" value="${esc(w.damage)}" placeholder="d8+3 phy" ${d.weapons[slot]?"":"disabled"}></label>
+    <label class="fld"><span>Burden</span><input type="text" data-f="dh.weapons.${slot}.burden" value="${esc(w.burden)}" ${d.weapons[slot]?"":"disabled"}></label>
+    <label class="fld" style="grid-column:1/-1"><span>Feature</span><input type="text" data-f="dh.weapons.${slot}.feature" value="${esc(w.feature)}" ${d.weapons[slot]?"":"disabled"}></label></div>
+    <div class="btns" style="margin-top:8px"><button class="btn sm pri" type="button" data-act="dh-wpick" data-slot="${slot}">Choose from the list</button>${d.weapons[slot]?`<button class="btn sm" type="button" data-act="dh-wclear" data-slot="${slot}">Unequip</button>`:`<button class="btn sm" type="button" data-act="dh-wnew" data-slot="${slot}">Write my own</button>`}</div>`};
+  app.innerHTML=`${dhBar(c)}
+  <div class="grid">
+    <section class="panel span2"><h3>Primary weapon</h3>${wf("primary")}<p class="hint" style="margin-top:8px">Damage dice equal your Proficiency (${dhProf(c)}), so the damage shown on the Overview scales as you level. Enter the die as it appears in the book, for example d8+3 phy.</p></section>
+    <section class="panel span2"><h3>Secondary weapon</h3>${wf("secondary")}</section>
+    <section class="panel span2"><h3>Armor</h3><div class="igrid">
+      <label class="fld"><span>Name</span><input type="text" data-f="dh.armor.name" value="${esc(A.name)}"></label>
+      ${dhNumF("Base Major threshold","dh.armor.major",A.major)}${dhNumF("Base Severe threshold","dh.armor.severe",A.severe)}${dhNumF("Armor Score (slots)","dh.armor.score",A.score)}${dhNumF("Evasion from armor","dh.armor.ev",A.ev)}
+      <label class="fld" style="grid-column:1/-1"><span>Feature</span><input type="text" data-f="dh.armor.feature" value="${esc(A.feature)}"></label></div>
+      <div class="btns" style="margin-top:8px"><button class="btn sm pri" type="button" data-act="dh-apick">Choose from the list</button><button class="btn sm" type="button" data-act="dh-aclear">Take armor off</button></div>
+      <p class="hint" style="margin-top:8px">Your thresholds are the armor's base values plus your level (${c.level}). Armor Score is the number of Armor Slots you can mark.</p></section>
+    <section class="panel span2"><h3>Gold</h3><div class="igrid">${dhNumF("Handfuls","dh.gold.h",d.gold.h)}${dhNumF("Bags","dh.gold.b",d.gold.b)}${dhNumF("Chests","dh.gold.c",d.gold.c)}</div>
+      <p class="hint">10 handfuls make a bag, and 10 bags make a chest.</p></section>
+    <section class="panel span2"><h3>Inventory</h3><div class="listbar"><button class="btn pri" type="button" data-act="dh-addinv">Add item</button></div>
+      ${inv||`<p class="hint" style="margin:0">Nothing carried yet.</p>`}</section>
+  </div>`;
+}
+function renderDhDetails(c){
+  const d=c.dh;
+  const campOpts=`<option value="">Unassigned</option>`+S.campaigns.map(k=>`<option value="${esc(k.id)}"${k.id===c.campaign?" selected":""}>${esc(k.name)}</option>`).join("");
+  const qa=(arr,key,title)=>arr.length?`<h4 style="margin:12px 0 6px">${title}</h4>`+arr.map((x,i)=>`<label class="fld"><span>${esc(x.q)}</span><textarea data-f="dh.${key}.${i}.a" style="min-height:56px">${esc(x.a)}</textarea></label>`).join(""):"";
+  const pl=(k,v)=>`<label class="fld"><span>${k}</span><input type="number" inputmode="numeric" data-t="n" data-f="${v[0]}" value="${esc(v[1])}"></label>`;
+  app.innerHTML=`${dhBar(c)}
+  <div class="grid">${portraitPanel(c)}
+    <section class="panel span2"><div class="ident">
+      <div class="fld name"><span>Character name</span><input data-f="name" aria-label="Character name" type="text" value="${esc(c.name)}"></div>
+      <label class="fld"><span>Class</span><input data-f="cls" type="text" list="dhClsList" value="${esc(c.cls)}"></label>
+      <label class="fld"><span>Subclass</span><input data-f="subclass" type="text" list="dhSubList" value="${esc(c.subclass)}"></label>
+      <label class="fld"><span>Ancestry</span><input data-f="race" type="text" list="dhAncList" value="${esc(c.race)}"></label>
+      <label class="fld"><span>Second ancestry (mixed)</span><input data-f="dh.anc2" type="text" list="dhAncList" value="${esc(d.anc2)}" placeholder="Leave empty if not mixed"></label>
+      <label class="fld"><span>Community</span><input data-f="background" type="text" list="dhComList" value="${esc(c.background)}"></label>
+      <label class="fld"><span>Transformation</span><input data-f="dh.trans" type="text" list="dhTrList" value="${esc(d.trans)}" placeholder="Optional"></label>
+      <label class="fld"><span>Level</span><input type="number" inputmode="numeric" min="1" max="10" data-t="n" data-f="level" value="${esc(c.level)}"></label>
+      <label class="fld"><span>Player name</span><input data-f="dh.player" type="text" value="${esc(d.player)}"></label>
+      <label class="fld"><span>Pronouns</span><input data-f="dh.pron" type="text" value="${esc(d.pron)}"></label>
+      <label class="fld"><span>Campaign</span><select data-f="campaign">${campOpts}</select></label>
+      <datalist id="dhClsList"></datalist><datalist id="dhSubList"></datalist><datalist id="dhAncList"></datalist><datalist id="dhComList"></datalist><datalist id="dhTrList"></datalist></div>
+    <div class="btns" style="margin-top:12px"><button class="btn sm" type="button" data-act="dh-apply" data-w="class">Apply class</button><button class="btn sm" type="button" data-act="dh-apply" data-w="sub">Apply subclass</button><button class="btn sm" type="button" data-act="dh-apply" data-w="ancestry">Apply ancestry</button><button class="btn sm" type="button" data-act="dh-apply" data-w="community">Apply community</button><button class="btn sm" type="button" data-act="dh-apply" data-w="trans">Apply transformation</button></div>
+    <div class="btns" style="margin-top:8px"><button class="btn sm pri" type="button" data-act="dh-levelup"${c.level>=10?" disabled":""}>Level up</button>${d.hist.length?`<button class="btn sm" type="button" data-act="dh-lvundo">Undo last level up</button>`:""}</div>
+    <div class="msg" id="dhMsg" role="status"></div>
+    <p class="hint">Type a class, subclass, ancestry or community from the Daggerheart list and use Apply to fill in what it grants: Evasion, Hit Points and features. Apply never changes your traits, cards or equipment.</p></section>
+    <section class="panel span2"><h3>Adjustments</h3><div class="igrid">${pl("Hit Point slots (bonus)",["dh.plus.hp",num(d.plus.hp)])}${pl("Stress slots (bonus)",["dh.plus.stress",num(d.plus.stress)])}${pl("Evasion (bonus)",["dh.plus.eva",num(d.plus.eva)])}${pl("Armor Score (bonus)",["dh.plus.armor",num(d.plus.armor)])}${pl("Thresholds (bonus)",["dh.plus.thr",num(d.plus.thr)])}${pl("Proficiency (bonus)",["dh.plus.prof",num(d.plus.prof)])}${pl("Hope maximum",["dh.hopeMax",d.hopeMax])}</div>
+      <p class="hint">Use these for anything the app does not work out by itself, such as a magic item or a special ability. Ancestry bonuses and level-up picks are added for you.</p></section>
+    <section class="panel span2"><details class="item"><summary><span class="sum-t">Background and connections</span><span class="sum-m">your answers</span></summary><div class="ibody">
+      ${qa(d.bg,"bg","Background")}${qa(d.cn,"cn","Connections")}${!d.bg.length&&!d.cn.length?`<p class="hint" style="margin:0">Use Apply class to add the class's background and connection questions.</p>`:""}</div></details></section>
+    <section class="panel span2"><details class="item"><summary><span class="sum-t">Description</span><span class="sum-m">appearance and look</span></summary><div class="ibody"><label class="fld"><span>Appearance</span><textarea data-f="dh.look" style="min-height:70px">${esc(d.look)}</textarea></label></div></details></section>
+    <section class="panel span2"><label class="fld"><span>Notes</span><textarea data-f="notes" placeholder="Backstory, session notes, goals">${esc(c.notes)}</textarea></label></section>
+  </div>
+  <div class="foot"><span class="status">Last edited ${new Date(c.updated||Date.now()).toLocaleString()} \u00b7 <span id="status" role="status"></span></span>
+    <button class="btn" type="button" data-act="print-char">Print or save as PDF</button>
+    <button class="btn danger" type="button" data-act="del-char">Delete character</button></div>`;
+  dhRecompute(c); dhFillLists(); setStatus();
+}
+async function dhFillLists(){
+  try{
+    const D=await dhLoad(), c=cur(); if(!c||!isDh(c))return;
+    const set=(id,arr)=>{const e=$("#"+id);if(e)e.innerHTML=arr.map(n=>`<option value="${esc(n)}">`).join("")};
+    set("dhClsList",D.classes.map(x=>x.name)); set("dhAncList",D.ancestries.map(x=>x.name)); set("dhComList",D.communities.map(x=>x.name)); set("dhTrList",D.transformations.map(x=>x.name));
+    const k=dhFind(D.classes,c.cls); set("dhSubList",k?k.subclasses.map(x=>x.name):D.classes.flatMap(x=>x.subclasses.map(s=>s.name)));
+  }catch(e){}
+}
+
+/* ---------- Daggerheart: overlay, pickers, rolls and actions ---------- */
+function dhOvEl(){let o=$("#dhOv");if(!o){o=document.createElement("div");o.className="ov";o.id="dhOv";o.hidden=true;document.body.appendChild(o)}return o}
+function dhClose(){const o=$("#dhOv");if(o){o.hidden=true;o.innerHTML=""}DHC=null;DHL=null;DHPK=null;if(ui.view==="home")renderHome()}
+function dhOvHTML(title,body,foot,wide){
+  const o=dhOvEl(); o.hidden=false;
+  o.innerHTML=`<div class="sheet${wide?" wide":""}" role="dialog" aria-labelledby="dhOvT"><div class="bar" style="margin:0"><h2 id="dhOvT">${esc(title)}</h2><button class="btn sm" type="button" data-dh="close">Close</button></div>${body}${foot||""}</div>`;
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){const o=$("#dhOv");if(o&&!o.hidden)dhClose()}});
+let DHPK=null, DHC=null, DHL=null;
+function dhMsg(t,err){const m=$("#dhMsg");if(m){m.textContent=t;m.className="msg"+(err?" err":"")}ui.dhNote=t}
+function dhToast(html){
+  let t=$("#dhToast"); if(!t){t=document.createElement("div");t.id="dhToast";t.setAttribute("role","status");document.body.appendChild(t)}
+  t.innerHTML=`<div class="dhtoast">${html}<button class="btn sm" type="button" data-dh="toast-x">Close</button></div>`; t.hidden=false;
+  clearTimeout(dhToast.t); dhToast.t=setTimeout(()=>{t.hidden=true},12000);
+}
+function dhShowRoll(html){
+  ui.dhLast=html; const r=$("#dhRes");
+  if(r&&ui.view==="sheet"&&ui.tab==="play")r.innerHTML=html; else dhToast(html);
+}
+/* ---------- rolling ---------- */
+function dhDuality(c,o){
+  const d=c.dh, X=o.exp||[], A=o.adv||0;
+  const exps=d.exp.filter(x=>X.includes(x.id));
+  if(exps.length>d.hope){dhShowRoll(`<b>Not enough Hope</b> to add ${exps.length} Experience${exps.length>1?"s":""}. You have ${d.hope}.`);return}
+  const h=rd(12), f=rd(12), crit=h===f, adv=A?rd(6):0;
+  const tv=o.trait?dhTrait(c,o.trait):0, em=exps.reduce((a,x)=>a+num(x.v),0), mod=num(o.mod);
+  const total=h+f+tv+em+mod+(A>0?adv:A<0?-adv:0);
+  d.hope-=exps.length;
+  const parts=[`Hope ${h}`,`Fear ${f}`];
+  if(o.trait)parts.push(`${dhCap(o.trait)} ${sgn(tv)}`);
+  exps.forEach(x=>parts.push(`${esc(x.n||"Experience")} ${sgn(num(x.v))}`));
+  if(mod)parts.push(`Modifier ${sgn(mod)}`); if(A)parts.push(`${A>0?"Advantage +":"Disadvantage -"}${adv}`);
+  const diff=o.diff!=null&&o.diff!==""&&Number.isFinite(Number(o.diff))?num(o.diff):null;
+  let verdict, act="";
+  if(crit){verdict=`Critical success`;act=`<button class="btn sm pri" type="button" data-act="dh-gain" data-k="crit">Gain a Hope and clear a Stress</button>`}
+  else if(h>f){verdict=`With Hope`;act=`<button class="btn sm pri" type="button" data-act="dh-gain" data-k="hope">Gain a Hope</button>`}
+  else {verdict=`With Fear`;act=`<span class="hint" style="margin:0">The GM gains a Fear.</span>`}
+  let ok="";
+  if(diff!=null){ok=crit||total>=diff?`<span class="tag ok">Success against ${diff}</span>`:`<span class="tag bad">Failure against ${diff}</span>`}
+  const dice=`<span class="dhdie hope">${h}</span><span class="dhdie fear">${f}</span>`;
+  save();
+  dhShowRoll(`<div class="dhrow">${dice}<div><b>${esc(o.label||"Roll")}: ${total}</b> <span class="tag">${verdict}</span> ${ok}<br><small>${parts.join(" + ").replace(/\+ -/g,"- ")}${exps.length?` (spent ${exps.length} Hope)`:""}</small></div></div><div class="btns" style="margin-top:8px">${act}</div>`);
+  dhVitals(c);
+  if(ui.view==="sheet")dhRefresh();
+}
+function dhRollDamage(c,slot){
+  const w=c.dh.weapons[slot], e=w&&dhDmgExpr(w,dhProf(c)); if(!e){dhShowRoll("This weapon has no damage written in a form the app can roll, for example d8+3 phy.");return}
+  const r=[]; for(let i=0;i<e.n;i++)r.push(rd(e.sides));
+  const sum=r.reduce((a,b)=>a+b,0)+e.mod;
+  dhShowRoll(`<div class="dhrow"><div><b>${esc(w.name||"Weapon")} damage: ${sum}</b> ${e.type?`<span class="tag">${esc(e.type)}</span>`:""}<br><small>${e.text}: [${r.join(", ")}]${e.mod?" + "+e.mod:""}. On a critical success add ${e.n*e.sides} more.</small></div></div>`);
+}
+function dhTakeHit(c){
+  const amt=Math.max(0,num(($("#dhDmgIn")||{}).value)), useA=($("#dhDmgArm")||{}).value==="1", d=c.dh, M=$("#dhHitMsg");
+  const say=t=>{if(M){M.textContent=t;M.className="msg"}};
+  if(!amt){say("Enter the damage first.");return}
+  let hp=amt<dhMajor(c)?1:amt<dhSevere(c)?2:3; const base=hp, label=["","Minor","Major","Severe"][base];
+  let armNote="";
+  if(useA){ if(dhArmorScore(c)-d.armorMarked>0){hp=Math.max(0,hp-1);d.armorMarked++;armNote=" An Armor Slot absorbed one step."}else armNote=" No Armor Slots are left to mark."}
+  d.hpMarked=Math.min(dhHpSlots(c),d.hpMarked+hp); save();
+  ui.dhHitNote=`${amt} damage is ${label}. Marked ${hp} Hit Point${hp===1?"":"s"}.${armNote}`;
+  dhRefresh();
+  const m2=$("#dhHitMsg"); if(m2){m2.textContent=ui.dhHitNote;m2.className="msg"}
+}
+function dhRest(c){
+  const t=($("#dhRestT")||{}).value||"short", a=($("#dhRestA")||{}).value, b=($("#dhRestB")||{}).value, d=c.dh, tier=dhTier(c.level), out=[];
+  [a,b].forEach(m=>{
+    const amt=()=>rd(4)+tier;
+    if(m==="wounds"){const n=t==="long"?d.hpMarked:Math.min(d.hpMarked,amt());d.hpMarked-=n;out.push("cleared "+n+" Hit Point"+(n===1?"":"s"))}
+    else if(m==="stress"){const n=t==="long"?d.stressMarked:Math.min(d.stressMarked,amt());d.stressMarked-=n;out.push("cleared "+n+" Stress")}
+    else if(m==="armor"){const n=t==="long"?d.armorMarked:Math.min(d.armorMarked,amt());d.armorMarked-=n;out.push("repaired "+n+" Armor Slot"+(n===1?"":"s"))}
+    else if(m==="prep"){d.hope=Math.min(d.hopeMax,d.hope+1);out.push("gained a Hope")}
+    else out.push("worked on a project");
+  });
+  save(); ui.dhRestNote=(t==="long"?"Long":"Short")+" rest: "+out.join(", and ")+".";
+  dhRefresh(); const m=$("#dhRestMsg"); if(m)m.textContent=ui.dhRestNote;
+}
+/* ---------- applying class, ancestry and so on ---------- */
+const dhStripK=(c,k)=>{c.dh.features=c.dh.features.filter(f=>f.k!==k)};
+const dhAddF=(c,k,src,f)=>{c.dh.features.push({id:uid(),k:k,name:f.name,text:f.text,src:src})};
+function dhApplyCore(c,D,w){
+  const d=c.dh, said=[];
+  const K=dhFind(D.classes,c.cls);
+  const doClass=()=>{
+    if(!K){said.push("class not found");return}
+    d.base.eva=K.evasion; d.base.hp=K.hp; d.base.stress=6;
+    dhStripK(c,"hope"); dhStripK(c,"class");
+    dhAddF(c,"hope",K.name+" hope feature",K.hope); K.features.forEach(f=>dhAddF(c,"class",K.name+" class feature",f));
+    const keep=(arr,qs)=>qs.map(q=>{const o=(arr||[]).find(x=>x.q===q);return {id:o?o.id:uid(),q:q,a:o?o.a:""}});
+    d.bg=keep(d.bg,K.background); d.cn=keep(d.cn,K.connections);
+    said.push("class "+K.name);
+  };
+  const doSub=()=>{
+    const S2=K&&dhFind(K.subclasses,c.subclass);
+    if(!S2){said.push(K?"subclass not found":"choose a class first");return}
+    dhStripK(c,"sub"); d.spell=S2.spellcast||"";
+    const rank=Math.max(1,Math.min(3,num(d.subRank,1)));
+    S2.foundation.forEach(f=>dhAddF(c,"sub",S2.name+" foundation",f));
+    if(rank>=2)(S2.specialization||[]).forEach(f=>dhAddF(c,"sub",S2.name+" specialization",f));
+    if(rank>=3)(S2.mastery||[]).forEach(f=>dhAddF(c,"sub",S2.name+" mastery",f));
+    said.push("subclass "+S2.name);
+  };
+  const doAnc=()=>{
+    const A=dhFind(D.ancestries,c.race), A2=d.anc2?dhFind(D.ancestries,d.anc2):null;
+    if(!A){said.push("ancestry not found");return}
+    dhStripK(c,"anc"); d.ancPlus={};
+    const fs=A2?[[A,A.features[0]],[A2,A2.features[1]]]:[[A,A.features[0]],[A,A.features[1]]];
+    fs.forEach(([a,f])=>{dhAddF(c,"anc",a.name+" ancestry",f);
+      const n=f.name; if(n==="Endurance")d.ancPlus.hp=(d.ancPlus.hp||0)+1; else if(n==="High Stamina")d.ancPlus.stress=(d.ancPlus.stress||0)+1;
+      else if(n==="Nimble")d.ancPlus.eva=(d.ancPlus.eva||0)+1; else if(n==="Stoneskin"){d.ancPlus.armor=(d.ancPlus.armor||0)+1;d.ancPlus.thr=(d.ancPlus.thr||0)+1}});
+    said.push("ancestry "+(A2?A.name+" and "+A2.name:A.name));
+  };
+  const doCom=()=>{const C=dhFind(D.communities,c.background);if(!C){said.push("community not found");return}dhStripK(c,"com");dhAddF(c,"com",C.name+" community",C.feature);said.push("community "+C.name)};
+  const doTr=()=>{if(!d.trans){dhStripK(c,"trans");return}const T=dhFind(D.transformations,d.trans);if(!T){said.push("transformation not found");return}dhStripK(c,"trans");T.features.forEach(f=>dhAddF(c,"trans",T.name+" transformation",f));said.push("transformation "+T.name)};
+  if(w==="class")doClass(); else if(w==="sub")doSub(); else if(w==="ancestry")doAnc(); else if(w==="community")doCom(); else if(w==="trans")doTr();
+  else {if(K)doClass(); if(K&&c.subclass)doSub(); if(c.race)doAnc(); if(c.background)doCom(); if(d.trans)doTr()}
+  dhSync(c); return said;
+}
+async function dhApply(c,w){
+  let D; try{D=await dhLoad()}catch(e){dhMsg("The Daggerheart data could not be loaded. Check your connection and try again.",true);return}
+  const said=dhApplyCore(c,D,w); save(); dhRefresh();
+  dhMsg(said.length?"Applied: "+said.join(", ")+".":"Nothing to apply yet. Fill in the class, ancestry or community first.",!said.length);
+}
+/* ---------- list pickers ---------- */
+function dhPickOpen(o){
+  DHPK=Object.assign({q:"",limit:60,all:false},o); dhPickRender();
+}
+function dhPickItems(){
+  const P=DHPK, q=lc(P.q); let L=P.items(P.all);
+  if(q)L=L.filter(x=>lc(x.name+" "+(x.meta||"")+" "+(x.text||"")).includes(q));
+  return L;
+}
+function dhPickRender(keepFocus){
+  const P=DHPK; if(!P)return;
+  const L=dhPickItems(), shown=L.slice(0,P.limit);
+  const list=shown.map((x,i)=>`<button class="crc" type="button" data-dh="pick" data-i="${P.items(P.all).indexOf(x)}"><b>${esc(x.name)}</b><span>${esc(x.meta||"")}</span>${x.text?`<span>${esc(String(x.text).slice(0,150))}${x.text.length>150?"...":""}</span>`:""}</button>`).join("");
+  dhOvHTML(P.title,`<div class="crbody"><label class="fld"><span>Search</span><input id="dhPq" type="search" value="${esc(P.q)}" placeholder="Name or words from the description"></label>
+    ${P.toggle?`<label class="chk"><input type="checkbox" id="dhPall"${P.all?" checked":""}> ${esc(P.toggle)}</label>`:""}
+    <p class="hint" style="margin:0">${L.length} option${L.length===1?"":"s"}</p><div class="crgrid one">${list||`<p class="hint">Nothing matches.</p>`}</div>
+    ${L.length>shown.length?`<button class="btn" type="button" data-dh="more">Show more</button>`:""}</div>`,"",true);
+  if(keepFocus){const i=$("#dhPq");if(i){i.focus();const n=i.value.length;try{i.setSelectionRange(n,n)}catch(e){}}}
+}
+document.addEventListener("input",e=>{
+  if(e.target.id==="dhPq"&&DHPK){DHPK.q=e.target.value;DHPK.limit=60;dhPickRender(true)}
+  if(e.target.dataset&&e.target.dataset.dhx!=null){const c=cur();if(!c)return;const id=e.target.dataset.dhx;ui.dhExp=ui.dhExp||[];const i=ui.dhExp.indexOf(id);if(e.target.checked&&i<0)ui.dhExp.push(id);else if(!e.target.checked&&i>=0)ui.dhExp.splice(i,1)}
+  if(e.target.id==="dhRollM")ui.dhMod=num(e.target.value);
+  if(e.target.id==="dhRollD")ui.dhDiff=e.target.value;
+});
+document.addEventListener("change",e=>{
+  if(e.target.id==="dhPall"&&DHPK){DHPK.all=e.target.checked;DHPK.limit=60;dhPickRender()}
+  if(e.target.id==="dhRollT")ui.dhTrait=e.target.value;
+  const c=cur(); if(!c||!isDh(c)||ui.view!=="sheet")return;
+  const f=e.target.dataset&&e.target.dataset.f;
+  if(f==="level"){c.level=Math.max(1,Math.min(10,num(c.level,1)));dhSync(c);save();dhRefresh()}
+  else if(/^dh\.(plus|hopeMax)/.test(f||"")){dhSync(c);save();dhRecompute(c)}
+});
+function dhCardItems(c){
+  return all=>{
+    const D=DHD, mine=new Set(c.dh.loadout.concat(c.dh.vault).map(x=>lc(x.name))), K=dhFind(D.classes,c.cls), dom=new Set(K?K.domains:[]);
+    const mc=c.dh.multi; if(mc&&mc.domain)dom.add(mc.domain);
+    return D.cards.filter(x=>!mine.has(lc(x.name))&&(all||(dom.has(x.domain)&&x.level<=(mc&&mc.domain===x.domain&&!(K&&K.domains.includes(x.domain))?Math.ceil(c.level/2):c.level))))
+      .sort((a,b)=>a.level-b.level||a.name.localeCompare(b.name)).map(x=>Object.assign({meta:x.domain+" \u00b7 Level "+x.level+" \u00b7 "+x.type+" \u00b7 Recall "+x.recall},x));
+  };
+}
+function dhAddCard(c,card,where){
+  const o={id:uid(),name:card.name,domain:card.domain,level:card.level,type:card.type,recall:card.recall,text:card.text};
+  const to=where||(c.dh.loadout.length<5?"loadout":"vault"); c.dh[to].push(o); return to;
+}
+async function dhOpenCardPick(c){
+  try{await dhLoad()}catch(e){dhMsg("The Daggerheart data could not be loaded.",true);return}
+  dhPickOpen({title:"Add a domain card",toggle:"Show every domain and level",items:dhCardItems(c),pick:(x)=>{const to=dhAddCard(c,x);save();dhClose();dhRefresh();dhMsg("Added "+x.name+" to your "+to+".")}});
+}
+async function dhOpenWeaponPick(c,slot){
+  try{await dhLoad()}catch(e){dhMsg("The Daggerheart data could not be loaded.",true);return}
+  dhPickOpen({title:slot==="primary"?"Choose a primary weapon":"Choose a secondary weapon",toggle:"Show every tier",items:all=>DHD.weapons.filter(w=>w.slot===slot&&(all||w.tier<=dhTier(c.level))).map(w=>Object.assign({name:w.name,text:w.feature==="\u2014"?"":w.feature,meta:["Tier "+w.tier,w.trait+" "+w.range,w.damage,w.burden].join(" \u00b7 ")},{w:w})),
+    pick:x=>{c.dh.weapons[slot]=dhWeaponFrom(x.w);save();dhClose();dhRefresh()}});
+}
+async function dhOpenArmorPick(c){
+  try{await dhLoad()}catch(e){dhMsg("The Daggerheart data could not be loaded.",true);return}
+  dhPickOpen({title:"Choose armor",toggle:"Show every tier",items:all=>DHD.armor.filter(a=>all||a.tier<=dhTier(c.level)).map(a=>({name:a.name,text:a.feature==="\u2014"?"":a.feature,meta:["Tier "+a.tier,"Thresholds "+a.major+" / "+a.severe,"Score "+a.score].join(" \u00b7 "),a:a})),
+    pick:x=>{c.dh.armor=Object.assign({},dhArmorFrom(x.a));c.dh.armorMarked=0;dhSync(c);save();dhClose();dhRefresh()}});
+}
+function dhForm(title,fields,onOk,okLabel){
+  DHPK={form:true};
+  const rows=fields.map(f=>f.area?`<label class="fld"><span>${f.l}</span><textarea id="dhf_${f.k}" style="min-height:96px">${esc(f.v||"")}</textarea></label>`:f.sel?`<label class="fld"><span>${f.l}</span><select id="dhf_${f.k}">${dhOpt(f.sel,f.v)}</select></label>`:`<label class="fld"><span>${f.l}</span><input id="dhf_${f.k}" type="${f.n?"number":"text"}" value="${esc(f.v==null?"":f.v)}"></label>`).join("");
+  dhOvHTML(title,`<div class="crbody">${rows}</div>`,`<div class="btns" style="margin-top:12px"><button class="btn pri" type="button" data-dh="form-ok">${okLabel||"Add"}</button><button class="btn" type="button" data-dh="close">Cancel</button></div>`);
+  DHPK.ok=()=>{const o={};fields.forEach(f=>{o[f.k]=($("#dhf_"+f.k)||{}).value});onOk(o)};
+}
+/* ---------- click handling ---------- */
+document.addEventListener("click",e=>{
+  const g=e.target.closest("[data-dh]");
+  if(g){
+    const a=g.dataset.dh;
+    if(a==="close"){dhClose();return}
+    if(a==="toast-x"){const t=$("#dhToast");if(t)t.hidden=true;return}
+    if(a==="pick"&&DHPK){const x=DHPK.items(DHPK.all)[num(g.dataset.i)];if(x)DHPK.pick(x);return}
+    if(a==="more"&&DHPK){DHPK.limit+=60;dhPickRender();return}
+    if(a==="form-ok"&&DHPK&&DHPK.ok){DHPK.ok();return}
+    if(typeof dhFlow==="function"&&dhFlow(a,g))return;
+    return;
+  }
+  const b=e.target.closest("[data-act]"); if(!b)return;
+  const c=cur(), a=b.dataset.act; if(!c||!isDh(c)||!/^dh-/.test(a))return;
+  const d=c.dh, done=()=>{save();dhRefresh()};
+  switch(a){
+    case "dh-pip": {const k=b.dataset.k,n=num(b.dataset.n), f={hp:"hpMarked",stress:"stressMarked",armor:"armorMarked",hope:"hope"}[k], cu=d[f]; d[f]=cu===n?n-1:n; done(); break}
+    case "dh-troll": dhDuality(c,{label:dhCap(b.dataset.k)+" roll",trait:b.dataset.k,adv:ui.dhAdv||0,exp:ui.dhExp||[],mod:ui.dhMod,diff:ui.dhDiff}); break;
+    case "dh-roll": {const t=($("#dhRollT")||{}).value||"agility"; ui.dhTrait=t; ui.dhMod=num(($("#dhRollM")||{}).value); ui.dhDiff=($("#dhRollD")||{}).value;
+      dhDuality(c,{label:dhCap(t)+" roll",trait:t,adv:ui.dhAdv||0,exp:ui.dhExp||[],mod:ui.dhMod,diff:ui.dhDiff}); break}
+    case "dh-adv": ui.dhAdv=num(b.dataset.v); {const y=window.scrollY;renderSheet();window.scrollTo(0,y)} break;
+    case "dh-atk": {const w=d.weapons[b.dataset.slot]; if(!w)break; const t=lc(w.trait); dhDuality(c,{label:"Attack with "+(w.name||"weapon"),trait:DHT.some(x=>x[0]===t)?t:(lc(d.spell)||null),adv:ui.dhAdv||0,exp:ui.dhExp||[],mod:ui.dhMod,diff:ui.dhDiff}); break}
+    case "dh-dmg": dhRollDamage(c,b.dataset.slot); break;
+    case "dh-gain": if(b.dataset.k==="hope"){d.hope=Math.min(d.hopeMax,d.hope+1)}else{d.hope=Math.min(d.hopeMax,d.hope+1);d.stressMarked=Math.max(0,d.stressMarked-1)} ui.dhLast=String(ui.dhLast||"").replace(/<div class="btns" style="margin-top:8px">[\s\S]*<\/div>$/,'<span class="hint" style="margin:0">Applied.</span>'); {const t=$("#dhToast");if(t)t.hidden=true} save(); dhRefresh(); break;
+    case "dh-hit": dhTakeHit(c); break;
+    case "dh-rest": dhRest(c); break;
+    case "dh-cond": {const n=b.dataset.n,i=d.cond.indexOf(n);if(i>=0)d.cond.splice(i,1);else d.cond.push(n);save();b.setAttribute("aria-pressed",String(d.cond.includes(n)));break}
+    case "dh-addexp": d.exp.push({id:uid(),n:"",v:2}); done(); break;
+    case "dh-delexp": d.exp.splice(num(b.dataset.i),1); done(); break;
+    case "dh-addinv": d.inv.push({id:uid(),n:"",q:1}); done(); break;
+    case "dh-delinv": d.inv.splice(num(b.dataset.i),1); done(); break;
+    case "dh-delfeat": d.features.splice(num(b.dataset.i),1); done(); break;
+    case "dh-addfeat": dhForm("Add a feature",[{k:"n",l:"Name"},{k:"t",l:"What it does",area:1}],o=>{if(!String(o.n).trim())return;d.features.push({id:uid(),k:"custom",name:o.n.trim(),text:o.t||"",src:"Custom"});save();dhClose();dhRefresh()}); break;
+    case "dh-cardpick": dhOpenCardPick(c); break;
+    case "dh-cardcustom": dhForm("Add a custom card",[{k:"n",l:"Name"},{k:"dom",l:"Domain",v:"Custom"},{k:"lv",l:"Level",n:1,v:c.level},{k:"ty",l:"Type",sel:["Ability","Spell","Grimoire"],v:"Ability"},{k:"rc",l:"Recall Cost",n:1,v:0},{k:"t",l:"What it does",area:1}],o=>{if(!String(o.n).trim())return;dhAddCard(c,{name:o.n.trim(),domain:o.dom||"Custom",level:num(o.lv,1),type:o.ty,recall:num(o.rc),text:o.t||""});save();dhClose();dhRefresh()}); break;
+    case "dh-cardmv": {const k=b.dataset.k,i=num(b.dataset.i),o=k==="loadout"?"vault":"loadout"; if(o==="loadout"&&d.loadout.length>=5)break; d[o].push(d[k].splice(i,1)[0]); done(); break}
+    case "dh-cardrm": d[b.dataset.k].splice(num(b.dataset.i),1); done(); break;
+    case "dh-wpick": dhOpenWeaponPick(c,b.dataset.slot); break;
+    case "dh-wclear": d.weapons[b.dataset.slot]=null; done(); break;
+    case "dh-wnew": d.weapons[b.dataset.slot]={name:"New weapon",trait:"Agility",range:"Melee",damage:"d8 phy",burden:"One-Handed",feature:""}; done(); break;
+    case "dh-apick": dhOpenArmorPick(c); break;
+    case "dh-aclear": d.armor=dhBlankDh().armor; d.armorMarked=0; done(); break;
+    case "dh-apply": dhApply(c,b.dataset.w); break;
+    case "dh-levelup": if(typeof dhOpenLevelUp==="function")dhOpenLevelUp(c); break;
+    case "dh-lvundo": if(typeof dhUndoLevel==="function")dhUndoLevel(c); break;
+  }
+});
+
+/* ---------- Daggerheart: guided creator, random character, level up, print ---------- */
+const DHEXP=["Bodyguard for hire","Raised by wolves","Quick with a lie","Former soldier","Tavern regular","Haunted by a promise","Born on a ship","Self-taught healer","Smuggler's apprentice","Temple scribe","Always lands on my feet","Collector of rumors","Trained in the old ways","Street urchin","Hunted by a rival","Keeper of a secret","Lifelong tinkerer","Marked by fate","Lover of maps","Debt to a stranger"];
+const DHCSTEPS=["Class","Subclass","Heritage","Traits","Equipment","Experiences","Domain cards","Details"];
+function dhNewCr(){return {step:0,cls:"",sub:"",anc:"",anc2:"",mixed:false,com:"",traits:{},armor:"",primary:"",secondary:"",potion:"Minor Health Potion",item:"",exp:["",""],cards:[],name:"",look:"",bg:{},q:"",msg:""}}
+async function dhOpenCreator(rand){
+  DHC=dhNewCr(); DHC.loading=true; ui.newChar=false; dhOvHTML("Daggerheart character",`<p>Loading game data...</p>`,"",true);
+  try{await dhLoad(); DHC.loading=false; if(rand)dhRandomFill(DHC)}catch(e){DHC.loading=false;DHC.msg="The game data could not be loaded here. "+(e.message||"")}
+  dhCrRender();
+}
+const dhKls=s=>dhFind(DHD.classes,s.cls), dhSubs=s=>{const k=dhKls(s);return k?dhFind(k.subclasses,s.sub):null};
+function dhCrOf(s){return dhFind(DHD.classes,s.cls)}
+function dhCrCards(s){const k=dhCrOf(s);return k?DHD.cards.filter(x=>k.domains.includes(x.domain)&&x.level===1).sort((a,b)=>a.name.localeCompare(b.name)):[]}
+function dhCrRender(){
+  const s=DHC; if(!s)return; const D=DHD;
+  if(s.loading||!D){return}
+  const steps=DHCSTEPS; s.step=Math.max(0,Math.min(steps.length-1,s.step));
+  const last=s.step===steps.length-1;
+  let body="";
+  try{body=dhCrBody(s)}catch(e){body=`<p class="msg err">Something went wrong building this step. ${esc(e.message||"")}</p>`}
+  dhOvHTML("Daggerheart character",`<div class="crprog" role="list" aria-label="Steps">${steps.map((t,i)=>`<span role="listitem" class="${i===s.step?"on":i<s.step?"done":""}"${i===s.step?' aria-current="step"':""}>${esc(t)}</span>`).join("")}</div>
+    <section class="crbody"><h3>${esc(steps[s.step])}</h3>${body}</section><div class="msg${s.msg?" err":""}" role="status">${esc(s.msg||"")}</div>`,
+    `<div class="crnav"><button class="btn" type="button" data-dh="c-rand">Randomize</button><span class="sp"></span><button class="btn" type="button" data-dh="c-back"${s.step?"":" disabled"}>Back</button><button class="btn pri" type="button" data-dh="${last?"c-finish":"c-next"}">${last?"Create character":"Next"}</button></div>`,true);
+}
+const dhOn=(b,t,x)=>`<button class="crc${b?" on":""}" type="button" ${t}><b>${esc(x[0])}</b><span>${esc(x[1]||"")}</span></button>`;
+function dhCrBody(s){
+  const D=DHD, st=DHCSTEPS[s.step];
+  if(st==="Class"){
+    const k=dhCrOf(s);
+    return `<div class="crgrid">${D.classes.map(x=>dhOn(s.cls===x.name,`data-dh="c-cls" data-v="${esc(x.name)}"`,[x.name,x.domains.join(" and ")+" \u00b7 "+x.hp+" HP \u00b7 Evasion "+x.evasion])).join("")}</div>
+    ${k?`<div class="crd"><b>${esc(k.name)}</b><p><b>${esc(k.hope.name)}</b> (spend 3 Hope): ${esc(k.hope.text)}</p>${k.features.map(f=>`<p><b>${esc(f.name)}</b>: ${esc(f.text)}</p>`).join("")}</div>`:`<p class="hint">Choose a class. Its two domains decide which cards you can take.</p>`}`;
+  }
+  if(st==="Subclass"){
+    const k=dhCrOf(s); if(!k)return `<p class="hint">Choose a class first.</p>`;
+    return `<div class="crgrid one">${k.subclasses.map(x=>`<button class="crc${s.sub===x.name?" on":""}" type="button" data-dh="c-sub" data-v="${esc(x.name)}"><b>${esc(x.name)}</b><span>${esc(x.blurb)}${x.spellcast?" Spellcast trait: "+esc(x.spellcast)+".":""}</span>${x.foundation.map(f=>`<span><i>${esc(f.name)}:</i> ${esc(f.text)}</span>`).join("")}</button>`).join("")}</div>`;
+  }
+  if(st==="Heritage"){
+    const A=s.anc?dhFind(D.ancestries,s.anc):null, A2=s.anc2?dhFind(D.ancestries,s.anc2):null;
+    return `<h4>Ancestry</h4><div class="crgrid">${D.ancestries.map(x=>dhOn(s.anc===x.name,`data-dh="c-anc" data-v="${esc(x.name)}"`,[x.name,x.features.map(f=>f.name).join(", ")])).join("")}</div>
+    <label class="chk"><input type="checkbox" data-dhc="mixed"${s.mixed?" checked":""}> Mixed ancestry: take the first feature of one ancestry and the second feature of another</label>
+    ${s.mixed?`<h4>Second ancestry (gives its second feature)</h4><div class="crgrid">${D.ancestries.filter(x=>x.name!==s.anc).map(x=>dhOn(s.anc2===x.name,`data-dh="c-anc2" data-v="${esc(x.name)}"`,[x.name,x.features[1].name])).join("")}</div>`:""}
+    ${A?`<div class="crd">${s.mixed&&A2?`<p><b>${esc(A.features[0].name)}</b> (${esc(A.name)}): ${esc(A.features[0].text)}</p><p><b>${esc(A2.features[1].name)}</b> (${esc(A2.name)}): ${esc(A2.features[1].text)}</p>`:A.features.map(f=>`<p><b>${esc(f.name)}</b>: ${esc(f.text)}</p>`).join("")}</div>`:""}
+    <h4>Community</h4><div class="crgrid">${D.communities.map(x=>dhOn(s.com===x.name,`data-dh="c-com" data-v="${esc(x.name)}"`,[x.name,x.feature.name+" \u00b7 "+x.blurb])).join("")}</div>
+    ${s.com?(()=>{const C=dhFind(D.communities,s.com);return `<div class="crd"><p><b>${esc(C.feature.name)}</b>: ${esc(C.feature.text)}</p></div>`})():""}`;
+  }
+  if(st==="Traits"){
+    const vals=[2,1,1,0,0,-1], used=DHT.map(t=>s.traits[t[0]]).filter(v=>v!=null), left=vals.slice(); used.forEach(v=>{const i=left.indexOf(v);if(i>=0)left.splice(i,1)});
+    return `<p class="hint" style="margin:0">Assign +2, +1, +1, 0, 0 and -1 across your six traits, one each. ${left.length?"Still to place: "+left.map(sgn).join(", ")+".":"All placed."}</p>
+    <div class="crabs">${DHT.map(([k,n,sk])=>`<label class="fld"><span>${n} <small>${sk.join(", ")}</small></span><select data-dhc="tr.${k}"><option value="">Choose</option>${vals.filter((v,i)=>vals.indexOf(v)===i).map(v=>`<option value="${v}"${s.traits[k]===v?" selected":""}>${sgn(v)}</option>`).join("")}</select></label>`).join("")}</div>
+    <div class="btns"><button class="btn sm" type="button" data-dh="c-tfill">Fill in the suggested spread for this class</button></div>`;
+  }
+  if(st==="Equipment"){
+    const k=dhCrOf(s), pri=D.weapons.filter(w=>w.tier===1&&w.slot==="primary"), sec=D.weapons.filter(w=>w.tier===1&&w.slot==="secondary"), arm=D.armor.filter(a=>a.tier===1);
+    const items=k?String(k.items||"").split(/\s+or\s+/i).map(x=>x.trim()).filter(Boolean):[];
+    const wsel=(arr,cur,key,none)=>`<select data-dhc="${key}">${none?`<option value="">None</option>`:`<option value="">Choose</option>`}${arr.map(w=>`<option value="${esc(w.name)}"${cur===w.name?" selected":""}>${esc(w.name)} (${esc(w.trait+" "+w.range+", "+w.damage)})</option>`).join("")}</select>`;
+    return `<div class="igrid"><label class="fld"><span>Primary weapon</span>${wsel(pri,s.primary,"primary")}</label><label class="fld"><span>Secondary weapon (if your primary is one-handed)</span>${wsel(sec,s.secondary,"secondary",1)}</label>
+      <label class="fld"><span>Armor</span><select data-dhc="armor"><option value="">Choose</option>${arm.map(a=>`<option value="${esc(a.name)}"${s.armor===a.name?" selected":""}>${esc(a.name)} (${a.major}/${a.severe}, score ${a.score}${a.feature!=="\u2014"?", "+esc(a.feature.split(":")[0]):""})</option>`).join("")}</select></label>
+      <label class="fld"><span>Potion</span><select data-dhc="potion">${["Minor Health Potion","Minor Stamina Potion"].map(p=>`<option${s.potion===p?" selected":""}>${p}</option>`).join("")}</select></label>
+      ${items.length?`<label class="fld"><span>Keepsake</span><select data-dhc="item">${items.map(p=>`<option value="${esc(p)}"${s.item===p?" selected":""}>${esc(p)}</option>`).join("")}</select></label>`:""}</div>
+    <p class="hint">You also start with a torch, 50 feet of rope, basic supplies and a handful of gold. Tier 1 gear only.</p>`;
+  }
+  if(st==="Experiences"){
+    return `<p class="hint" style="margin:0">Experiences are a few words about your past. Each adds +2 when you spend a Hope on a roll it fits.</p>
+    ${[0,1].map(i=>`<label class="fld"><span>Experience ${i+1}</span><input type="text" data-dhc="exp.${i}" value="${esc(s.exp[i])}" placeholder="e.g. ${esc(DHEXP[i*7])}"></label>`).join("")}
+    <div class="btns"><button class="btn sm" type="button" data-dh="c-exprand">Suggest two</button></div>`;
+  }
+  if(st==="Domain cards"){
+    const L=dhCrCards(s), q=lc(s.q), V=L.filter(x=>!q||lc(x.name+" "+x.text).includes(q));
+    return `<p class="hint" style="margin:0">Choose two level 1 cards from your class's domains. Chosen: ${s.cards.length} of 2.</p>
+    <label class="fld"><span>Search</span><input id="dhCq" data-dhc="q" type="search" value="${esc(s.q)}"></label>
+    <div class="crgrid one">${V.map(x=>`<button class="crc${s.cards.includes(x.name)?" on":""}" type="button" data-dh="c-card" data-v="${esc(x.name)}"><b>${esc(x.name)}</b><span>${esc(x.domain)} \u00b7 ${esc(x.type)} \u00b7 Recall ${x.recall}</span><span>${esc(x.text.slice(0,180))}${x.text.length>180?"...":""}</span></button>`).join("")||`<p class="hint">Choose a class first.</p>`}</div>`;
+  }
+  const k=dhCrOf(s);
+  return `<label class="fld"><span>Character name</span><input type="text" data-dhc="name" value="${esc(s.name)}" placeholder="Name"></label>
+    <div class="btns"><button class="btn sm" type="button" data-dh="c-name">Random name</button></div>
+    <label class="fld"><span>Appearance</span><textarea data-dhc="look" style="min-height:60px">${esc(s.look)}</textarea></label>
+    ${k?`<h4>Background questions (optional)</h4>${k.background.map((q,i)=>`<label class="fld"><span>${esc(q)}</span><textarea data-dhc="bg.${i}" style="min-height:52px">${esc(s.bg[i]||"")}</textarea></label>`).join("")}`:""}
+    <div class="crd"><b>${esc(s.name||"New character")}</b><p>${esc([s.anc+(s.mixed&&s.anc2?" / "+s.anc2:""),s.com,s.cls,s.sub].filter(Boolean).join(" \u00b7 "))}</p></div>`;
+}
+document.addEventListener("input",e=>{
+  const t=e.target, f=t.dataset&&t.dataset.dhc; if(!f||!DHC)return;
+  const s=DHC;
+  if(f==="mixed"){s.mixed=t.checked;if(!s.mixed)s.anc2="";dhCrRender();return}
+  if(f==="q"){s.q=t.value;dhCrRender();const i=$("#dhCq");if(i){i.focus();try{i.setSelectionRange(i.value.length,i.value.length)}catch(x){}}return}
+  if(f.startsWith("tr.")){const k=f.slice(3);if(t.value==="")delete s.traits[k];else s.traits[k]=num(t.value);dhCrRender();return}
+  if(f.startsWith("exp.")){s.exp[num(f.slice(4))]=t.value;return}
+  if(f.startsWith("bg.")){s.bg[num(f.slice(3))]=t.value;return}
+  s[f]=t.value;
+});
+document.addEventListener("change",e=>{
+  const t=e.target, f=t.dataset&&t.dataset.dhc; if(!f||!DHC)return;
+  if(["primary","secondary","armor","potion","item"].includes(f)){DHC[f]=t.value}
+});
+function dhTraitFill(s){
+  const k=dhCrOf(s); if(!k)return;
+  let vals;
+  if(k.start)vals=k.start.traits;
+  else{
+    const S2=dhFind(k.subclasses,s.sub), pri=({Assassin:["finesse","agility","instinct"],Brawler:["strength","agility","instinct"],Warlock:["presence","instinct","knowledge"],Witch:["instinct","knowledge","presence"]})[k.name]||["agility","strength","finesse"];
+    const order=[]; if(S2&&S2.spellcast)order.push(lc(S2.spellcast)); pri.forEach(x=>{if(!order.includes(x))order.push(x)});
+    DHT.forEach(t=>{if(!order.includes(t[0]))order.push(t[0])});
+    const spread=[2,1,1,0,0,-1], m={}; order.forEach((x,i)=>{m[x]=spread[i]}); vals=DHT.map(t=>m[t[0]]);
+  }
+  DHT.forEach((t,i)=>{s.traits[t[0]]=vals[i]});
+}
+function dhCrEquipDefaults(s){
+  const k=dhCrOf(s); if(!k)return;
+  const st=k.start||{}, D=DHD;
+  if(!s.armor)s.armor=st.armor||"Gambeson Armor";
+  if(!s.primary){
+    if(st.primary)s.primary=st.primary;
+    else{const top=DHT.map(t=>t[0]).sort((a,b)=>num(s.traits[b])-num(s.traits[a]))[0], c=D.weapons.filter(w=>w.tier===1&&w.slot==="primary"&&lc(w.trait)===top);s.primary=(c[0]||D.weapons.find(w=>w.tier===1&&w.slot==="primary")).name}
+  }
+  if(s.secondary===""&&st.secondary&&!s._secSet)s.secondary=st.secondary;
+  const items=String(k.items||"").split(/\s+or\s+/i).map(x=>x.trim()).filter(Boolean); if(!s.item||!items.includes(s.item))s.item=items[0]||"";
+}
+function dhCrCheck(s){
+  const st=DHCSTEPS[s.step];
+  if(st==="Class"&&!s.cls)return "Choose a class to continue.";
+  if(st==="Subclass"&&!s.sub)return "Choose a subclass to continue.";
+  if(st==="Heritage"){if(!s.anc)return "Choose an ancestry.";if(s.mixed&&!s.anc2)return "Choose the second ancestry, or turn off mixed ancestry.";if(!s.com)return "Choose a community."}
+  if(st==="Traits"){const v=DHT.map(t=>s.traits[t[0]]);if(v.some(x=>x==null))return "Give every trait a value.";if(v.slice().sort((a,b)=>b-a).join()!=="2,1,1,0,0,-1")return "Use +2, +1, +1, 0, 0 and -1, each once across the six traits."}
+  if(st==="Equipment"&&(!s.primary||!s.armor))return "Choose a primary weapon and armor.";
+  if(st==="Experiences"&&s.exp.filter(x=>String(x).trim()).length<2)return "Write two Experiences, or use Suggest two.";
+  if(st==="Domain cards"&&s.cards.length!==2)return "Choose exactly two cards.";
+  return "";
+}
+function dhBuildFrom(s){
+  const D=DHD, camp=S.campaigns.some(k=>k.id===ui.camp)?ui.camp:"";
+  const c=dhNorm({id:uid(),campaign:camp,name:s.name||"New character",cls:s.cls,subclass:s.sub,race:s.anc,background:s.com,level:1,notes:"",dh:{anc2:s.mixed?s.anc2:"",look:s.look||""}});
+  const d=c.dh; DHT.forEach(t=>{d.traits[t[0]]=num(s.traits[t[0]])});
+  dhApplyCore(c,D,"all");
+  const a=dhFind(D.armor,s.armor); if(a){d.armor=dhArmorFrom(a)}
+  const p=D.weapons.find(w=>w.name===s.primary&&w.tier===1), q=s.secondary?D.weapons.find(w=>w.name===s.secondary&&w.tier===1):null;
+  if(p)d.weapons.primary=dhWeaponFrom(p); if(q)d.weapons.secondary=dhWeaponFrom(q);
+  d.exp=s.exp.filter(x=>String(x).trim()).slice(0,2).map(x=>({id:uid(),n:String(x).trim(),v:2}));
+  s.cards.forEach(n=>{const x=dhFind(D.cards,n);if(x)dhAddCard(c,x,"loadout")});
+  const K=dhFind(D.classes,s.cls);
+  d.inv=[["Torch",1],["50 feet of rope",1],["Basic supplies",1],[s.potion,1],[s.item,1]].filter(x=>x[0]).map(x=>({id:uid(),n:x[0],q:x[1]}));
+  d.gold.h=1;
+  const keep=(arr,qs,ans)=>qs.map((q,i)=>({id:uid(),q:q,a:String(ans[i]||"")}));
+  if(K)d.bg=keep(d.bg,K.background,s.bg||{});
+  d.hpMarked=0; d.stressMarked=0; d.armorMarked=0; d.hope=2;
+  dhSync(c); return c;
+}
+function dhCrFinish(){
+  const s=DHC; s.msg=""; 
+  for(let i=0;i<DHCSTEPS.length-1;i++){s.step=i;const m=dhCrCheck(s);if(m){s.msg=m;dhCrRender();return}}
+  s.step=DHCSTEPS.length-1;
+  const c=dhBuildFrom(s); S.characters.push(c); ui.sel=c.id; ui.tab="sheet"; ui.view="sheet"; ui.q=""; save();
+  DHC=null; const o=$("#dhOv"); if(o){o.hidden=true;o.innerHTML=""} renderSheet(); window.scrollTo(0,0);
+}
+const dhPickOne=a=>a[Math.floor(Math.random()*a.length)];
+function dhRandomFill(s){
+  const D=DHD, k=dhPickOne(D.classes); s.cls=k.name; s.sub=dhPickOne(k.subclasses).name;
+  s.anc=dhPickOne(D.ancestries).name; s.mixed=Math.random()<0.2; s.anc2=s.mixed?dhPickOne(D.ancestries.filter(x=>x.name!==s.anc)).name:"";
+  s.com=dhPickOne(D.communities).name;
+  dhTraitFill(s); s.armor=""; s.primary=""; s.secondary=""; s._secSet=0; s.potion=dhPickOne(["Minor Health Potion","Minor Stamina Potion"]); s.item="";
+  dhCrEquipDefaults(s);
+  const sh=DHEXP.slice().sort(()=>Math.random()-.5); s.exp=[sh[0],sh[1]];
+  s.cards=dhCrCards(s).sort(()=>Math.random()-.5).slice(0,2).map(x=>x.name);
+  s.name=typeof crRandName==="function"?crRandName():"Wanderer";
+  s.step=DHCSTEPS.length-1;
+}
+function dhFlow(a,g){
+  const s=DHC; const v=g.dataset.v;
+  if(a==="c-cls"&&s){s.cls=v;s.sub="";s.armor="";s.primary="";s.secondary="";s._secSet=0;s.item="";s.cards=[];dhCrRender();return true}
+  if(a==="c-sub"&&s){s.sub=v;dhCrRender();return true}
+  if(a==="c-anc"&&s){s.anc=v;if(s.anc2===v)s.anc2="";dhCrRender();return true}
+  if(a==="c-anc2"&&s){s.anc2=v;dhCrRender();return true}
+  if(a==="c-com"&&s){s.com=v;dhCrRender();return true}
+  if(a==="c-tfill"&&s){dhTraitFill(s);dhCrRender();return true}
+  if(a==="c-exprand"&&s){const sh=DHEXP.slice().sort(()=>Math.random()-.5);s.exp=[sh[0],sh[1]];dhCrRender();return true}
+  if(a==="c-name"&&s){s.name=typeof crRandName==="function"?crRandName():"Wanderer";dhCrRender();return true}
+  if(a==="c-card"&&s){const i=s.cards.indexOf(v);if(i>=0)s.cards.splice(i,1);else if(s.cards.length<2)s.cards.push(v);dhCrRender();return true}
+  if(a==="c-rand"&&s){dhRandomFill(s);dhCrRender();return true}
+  if(a==="c-back"&&s){s.msg="";s.step=Math.max(0,s.step-1);dhCrRender();return true}
+  if(a==="c-next"&&s){const m=dhCrCheck(s);if(m){s.msg=m;dhCrRender();return true}s.msg="";s.step++;const st=DHCSTEPS[s.step];if(st==="Traits"&&DHT.every(t=>s.traits[t[0]]==null))dhTraitFill(s);if(st==="Equipment")dhCrEquipDefaults(s);dhCrRender();return true}
+  if(a==="c-finish"&&s){dhCrFinish();return true}
+  if(a.startsWith("l-")&&DHL)return dhLvFlow(a,g);
+  return false;
+}
+/* ---------- level up ---------- */
+const DHADV=[
+ {k:"trait",n:"Gain a +1 bonus to two unmarked character traits and mark them.",slots:3,cost:1},
+ {k:"hp",n:"Permanently gain one Hit Point slot.",slots:2,cost:1},
+ {k:"stress",n:"Permanently gain one Stress slot.",slots:2,cost:1},
+ {k:"exp",n:"Permanently gain a +1 bonus to two Experiences.",slots:1,cost:1},
+ {k:"card",n:"Choose an additional domain card of your level or lower from a domain you have access to.",slots:1,cost:1},
+ {k:"eva",n:"Permanently gain a +1 bonus to your Evasion.",slots:1,cost:1},
+ {k:"sub",n:"Take an upgraded subclass card.",slots:1,cost:1,min:3},
+ {k:"prof",n:"Increase your Proficiency by +1.",slots:1,cost:2,min:3},
+ {k:"multi",n:"Multiclass: choose an additional class.",slots:1,cost:2,min:3}];
+const DHLSTEPS=["Achievements","Advancements","Domain cards","Review"];
+const dhUsed=(c,t,k)=>num(((c.dh.adv||{})["t"+t]||{})[k]);
+function dhLvLeft(c,k,T,picks){
+  const o=DHADV.find(x=>x.k===k); let n=0, d=c.dh;
+  for(let t=2;t<=T;t++){
+    if(o.min&&t<o.min)continue;
+    let left=o.slots-dhUsed(c,t,k);
+    if(k==="multi"){if(d.multi||dhUsed(c,t,"sub")>0||dhUsed(c,t,"multi")>0)left=0}
+    if(k==="sub"&&dhUsed(c,t,"multi")>0)left=0;
+    n+=Math.max(0,left);
+  }
+  const mine=picks.filter(p=>p.k===k).length*(k==="multi"?1:1);
+  if(k==="multi"||k==="prof"||k==="sub"){}
+  return Math.max(0,n-mine);
+}
+function dhLvTierSlot(c,k,T,pickedSoFar){
+  const o=DHADV.find(x=>x.k===k), d=c.dh;
+  for(let t=2;t<=T;t++){
+    if(o.min&&t<o.min)continue;
+    const taken=pickedSoFar.filter(p=>p.k===k&&p.t===t).length, extra=(k==="sub"?pickedSoFar.filter(p=>p.k==="multi"&&p.t===t).length:k==="multi"?pickedSoFar.filter(p=>p.k==="sub"&&p.t===t).length:0);
+    let left=o.slots-dhUsed(c,t,k)-taken;
+    if(k==="multi"&&(d.multi||dhUsed(c,t,"sub")>0||dhUsed(c,t,"multi")>0||extra>0||pickedSoFar.some(p=>p.k==="multi")))left=0;
+    if(k==="sub"&&(dhUsed(c,t,"multi")>0||extra>0))left=0;
+    if(left>0)return t;
+  }
+  return 0;
+}
+function dhOpenLevelUp(c){
+  if(c.level>=10){dhMsg("Already at level 10.",true);return}
+  dhLoad().then(()=>{
+    DHL={id:c.id,step:0,to:c.level+1,picks:[],traits:[],expUp:[],newExp:"",cards:[],multi:{cls:"",domain:"",sub:""},msg:""};
+    dhLvRender();
+  }).catch(()=>dhMsg("The Daggerheart data could not be loaded.",true));
+}
+function dhLvCards(c,L){
+  const K=dhFind(DHD.classes,c.cls), dom=new Set(K?K.domains:[]), mc=L.multi&&L.multi.domain&&L.picks.some(p=>p.k==="multi")?L.multi:c.dh.multi;
+  const mine=new Set(c.dh.loadout.concat(c.dh.vault).map(x=>lc(x.name)));
+  return DHD.cards.filter(x=>!mine.has(lc(x.name))&&((dom.has(x.domain)&&x.level<=L.to)||(mc&&mc.domain===x.domain&&x.level<=Math.ceil(L.to/2)))).sort((a,b)=>a.level-b.level||a.name.localeCompare(b.name));
+}
+function dhLvNeedCards(L){return 1+L.picks.filter(p=>p.k==="card").length}
+function dhLvRender(){
+  const L=DHL, c=cur(); if(!L||!c)return;
+  const T=dhTier(L.to), st=DHLSTEPS[L.step], cost=L.picks.reduce((a,p)=>a+DHADV.find(x=>x.k===p.k).cost,0);
+  let body="";
+  if(st==="Achievements"){
+    const ach=[]; if([2,5,8].includes(L.to))ach.push("a new Experience at +2","+1 to your Proficiency"); else ach.push("no new Experience or Proficiency at this level");
+    if([5,8].includes(L.to))ach.push("all marks on your traits are cleared");
+    body=`<p>${esc(c.name)} reaches level <b>${L.to}</b> (tier ${T}). Your damage thresholds rise by 1.</p><div class="crd">${ach.map(x=>`<p>${esc(dhCap(x))}.</p>`).join("")}</div>
+    ${[2,5,8].includes(L.to)?`<label class="fld"><span>Name your new Experience (starts at +2)</span><input type="text" data-dhl="newExp" value="${esc(L.newExp)}" placeholder="e.g. ${esc(dhPickOne(DHEXP))}"></label>`:""}`;
+  }else if(st==="Advancements"){
+    body=`<p class="hint" style="margin:0">Choose two options. Proficiency and Multiclass take both choices. Chosen: ${cost} of 2.</p>
+    <div class="crgrid one">${DHADV.filter(o=>!o.min||T>=o.min).map(o=>{
+      const left=dhLvLeft(c,o.k,T,L.picks), disabled=left<=0||cost+o.cost>2||(o.k==="sub"&&c.dh.subRank>=3), n=L.picks.filter(p=>p.k===o.k).length;
+      return `<button class="crc${n?" on":""}" type="button" data-dh="l-opt" data-v="${o.k}"${disabled&&!n?" disabled":""}><b>${esc(o.n)}</b><span>${n?"Chosen"+(n>1?" x"+n:"")+". Tap to remove one.":left+" slot"+(left===1?"":"s")+" left"+(o.cost>1?", uses both choices":"")}${o.k==="sub"&&c.dh.subRank>=3?" (you already hold the mastery card)":""}</span></button>`}).join("")}</div>
+    ${L.picks.map((p,i)=>dhLvDetail(c,L,p,i)).join("")}`;
+  }else if(st==="Domain cards"){
+    const need=dhLvNeedCards(L), list=dhLvCards(c,L), q=lc(L.q||"");
+    body=`<p class="hint" style="margin:0">Take ${need} new domain card${need>1?"s":""} of level ${L.to} or lower. Chosen: ${L.cards.length} of ${need}.</p>
+    <label class="fld"><span>Search</span><input id="dhLq" data-dhl="q" type="search" value="${esc(L.q||"")}"></label>
+    <div class="crgrid one">${list.filter(x=>!q||lc(x.name+" "+x.text).includes(q)).map(x=>`<button class="crc${L.cards.includes(x.name)?" on":""}" type="button" data-dh="l-card" data-v="${esc(x.name)}"><b>${esc(x.name)}</b><span>${esc(x.domain)} \u00b7 Level ${x.level} \u00b7 ${esc(x.type)} \u00b7 Recall ${x.recall}</span><span>${esc(x.text.slice(0,180))}${x.text.length>180?"...":""}</span></button>`).join("")||`<p class="hint">No cards available.</p>`}</div>`;
+  }else{
+    const r=dhLvSummary(c,L);
+    body=`<div class="crd"><b>Level ${c.level} to ${L.to}</b>${r.map(x=>`<p>${esc(x)}</p>`).join("")}</div><p class="hint">Check the list, then apply. You can undo the last level up from the Details tab.</p>`;
+  }
+  dhOvHTML("Level up",`<div class="crprog" role="list">${DHLSTEPS.map((t,i)=>`<span class="${i===L.step?"on":i<L.step?"done":""}">${esc(t)}</span>`).join("")}</div><section class="crbody"><h3>${esc(st)}</h3>${body}</section><div class="msg${L.msg?" err":""}" role="status">${esc(L.msg||"")}</div>`,
+    `<div class="crnav"><span class="sp"></span><button class="btn" type="button" data-dh="l-back"${L.step?"":" disabled"}>Back</button><button class="btn pri" type="button" data-dh="${L.step===DHLSTEPS.length-1?"l-apply":"l-next"}">${L.step===DHLSTEPS.length-1?"Apply level up":"Next"}</button></div>`,true);
+}
+function dhLvDetail(c,L,p,i){
+  if(p.k==="trait"){
+    const avail=DHT.filter(t=>!c.dh.marked[t[0]]);
+    return `<div class="crd"><b>Traits to raise (choose two)</b><div class="chips" role="group">${avail.map(t=>`<button class="chip" type="button" data-dh="l-trait" data-i="${i}" data-v="${t[0]}" aria-pressed="${(p.sel||[]).includes(t[0])}"${!(p.sel||[]).includes(t[0])&&L.picks.some((q,j)=>j!==i&&(q.sel||[]).includes(t[0]))?" disabled":""}>${t[1]}</button>`).join("")||`<span class="hint">All traits are marked.</span>`}</div></div>`;
+  }
+  if(p.k==="exp"){
+    const ex=c.dh.exp.concat(L.newExp?[{id:"new",n:L.newExp,v:2}]:[]);
+    return `<div class="crd"><b>Experiences to raise by +1 (choose up to two)</b><div class="chips" role="group">${ex.map(x=>`<button class="chip" type="button" data-dh="l-exp" data-i="${i}" data-v="${esc(x.id)}" aria-pressed="${(p.sel||[]).includes(x.id)}">${esc(x.n||"Experience")}</button>`).join("")||`<span class="hint">No Experiences yet.</span>`}</div></div>`;
+  }
+  if(p.k==="multi"){
+    const m=L.multi, K=m.cls?dhFind(DHD.classes,m.cls):null, mine=dhFind(DHD.classes,c.cls);
+    return `<div class="crd"><b>Multiclass</b><div class="igrid"><label class="fld"><span>Class</span><select data-dhl="mcls"><option value="">Choose</option>${DHD.classes.filter(x=>x.name!==c.cls).map(x=>`<option${m.cls===x.name?" selected":""}>${esc(x.name)}</option>`).join("")}</select></label>
+      <label class="fld"><span>Domain from that class</span><select data-dhl="mdom"><option value="">Choose</option>${K?K.domains.filter(x=>!(mine&&mine.domains.includes(x))).map(x=>`<option${m.domain===x?" selected":""}>${esc(x)}</option>`).join(""):""}</select></label>
+      <label class="fld"><span>Foundation card from a subclass</span><select data-dhl="msub"><option value="">Choose</option>${K?K.subclasses.map(x=>`<option${m.sub===x.name?" selected":""}>${esc(x.name)}</option>`).join(""):""}</select></label></div>
+      <p class="hint" style="margin:0">You gain that class's feature and a subclass foundation card. Cards from your new domain are limited to half your level, rounded up.</p></div>`;
+  }
+  return "";
+}
+document.addEventListener("input",e=>{
+  const t=e.target, f=t.dataset&&t.dataset.dhl; if(!f||!DHL)return;
+  if(f==="newExp"){DHL.newExp=t.value;return}
+  if(f==="q"){DHL.q=t.value;dhLvRender();const i=$("#dhLq");if(i){i.focus();try{i.setSelectionRange(i.value.length,i.value.length)}catch(x){}}return}
+});
+document.addEventListener("change",e=>{
+  const t=e.target, f=t.dataset&&t.dataset.dhl; if(!f||!DHL)return;
+  if(f==="mcls"){DHL.multi={cls:t.value,domain:"",sub:""};dhLvRender()}
+  else if(f==="mdom"){DHL.multi.domain=t.value}
+  else if(f==="msub"){DHL.multi.sub=t.value}
+});
+function dhLvFlow(a,g){
+  const L=DHL, c=cur(); if(!L||!c)return false; const v=g.dataset.v, T=dhTier(L.to);
+  if(a==="l-opt"){
+    const mine=L.picks.map((p,i)=>[p,i]).filter(x=>x[0].k===v);
+    if(mine.length){L.picks.splice(mine[mine.length-1][1],1)}
+    else{const t=dhLvTierSlot(c,v,T,L.picks); if(t)L.picks.push({k:v,t:t,sel:[]})}
+    L.msg=""; dhLvRender(); return true;
+  }
+  if(a==="l-trait"){const p=L.picks[num(g.dataset.i)];p.sel=p.sel||[];const i=p.sel.indexOf(v);if(i>=0)p.sel.splice(i,1);else if(p.sel.length<2)p.sel.push(v);dhLvRender();return true}
+  if(a==="l-exp"){const p=L.picks[num(g.dataset.i)];p.sel=p.sel||[];const i=p.sel.indexOf(v);if(i>=0)p.sel.splice(i,1);else if(p.sel.length<2)p.sel.push(v);dhLvRender();return true}
+  if(a==="l-card"){const need=dhLvNeedCards(L), i=L.cards.indexOf(v);if(i>=0)L.cards.splice(i,1);else if(L.cards.length<need)L.cards.push(v);dhLvRender();return true}
+  if(a==="l-back"){L.msg="";L.step=Math.max(0,L.step-1);dhLvRender();return true}
+  if(a==="l-next"){const m=dhLvCheck(c,L);if(m){L.msg=m;dhLvRender();return true}L.msg="";L.step++;dhLvRender();return true}
+  if(a==="l-apply"){const m=dhLvCheck(c,L,true);if(m){L.msg=m;dhLvRender();return true}dhLvApply(c,L);return true}
+  return false;
+}
+function dhLvCheck(c,L,all){
+  const st=DHLSTEPS[L.step], T=dhTier(L.to), cost=L.picks.reduce((a,p)=>a+DHADV.find(x=>x.k===p.k).cost,0);
+  const adv=()=>{
+    if(cost!==2)return "Choose advancements worth two choices.";
+    for(const p of L.picks){
+      if(p.k==="trait"&&(p.sel||[]).length!==2)return "Choose two traits to raise.";
+      if(p.k==="exp"){const n=c.dh.exp.length+(L.newExp?1:0);if((p.sel||[]).length!==Math.min(2,n))return n?"Choose two Experiences to raise.":"You have no Experiences to raise yet."}
+      if(p.k==="multi"&&!(L.multi.cls&&L.multi.domain&&L.multi.sub))return "Choose a class, domain and subclass for your multiclass."
+    }
+    return "";
+  };
+  if(st==="Advancements"||all){const m=adv();if(m)return m}
+  if((st==="Domain cards"||all)&&L.cards.length!==dhLvNeedCards(L))return "Choose "+dhLvNeedCards(L)+" domain card"+(dhLvNeedCards(L)>1?"s":"")+".";
+  return "";
+}
+function dhLvSummary(c,L){
+  const r=[]; if([2,5,8].includes(L.to)){r.push("New Experience: "+(L.newExp||"New Experience")+" (+2)");r.push("Proficiency +1")}
+  if([5,8].includes(L.to))r.push("Trait marks cleared");
+  L.picks.forEach(p=>{const o=DHADV.find(x=>x.k===p.k);
+    if(p.k==="trait")r.push("Raise "+(p.sel||[]).map(dhCap).join(" and ")+" by 1");
+    else if(p.k==="exp")r.push("+1 to "+(p.sel||[]).map(id=>{const x=id==="new"?{n:L.newExp}:c.dh.exp.find(y=>y.id===id);return x?x.n:"Experience"}).join(" and "));
+    else if(p.k==="multi")r.push("Multiclass into "+L.multi.cls+" ("+L.multi.domain+", "+L.multi.sub+")");
+    else r.push(o.n.replace(/\.$/,""))});
+  r.push("New domain card"+(dhLvNeedCards(L)>1?"s":"")+": "+L.cards.join(", "));
+  r.push("Damage thresholds +1 (they follow your level)");
+  return r;
+}
+function dhLvApply(c,L){
+  const d=c.dh, T=dhTier(L.to), rec={from:c.level,adv:[],traits:[],marked0:Object.assign({},d.marked),expAdd:null,expBump:[],cards:[],feats:[],subRank0:d.subRank,multi0:d.multi,prof:0};
+  const tick=(t,k)=>{d.adv["t"+t]=d.adv["t"+t]||{};d.adv["t"+t][k]=num(d.adv["t"+t][k])+1;rec.adv.push([t,k])};
+  if([5,8].includes(L.to))d.marked={};
+  if([2,5,8].includes(L.to)){const x={id:uid(),n:(L.newExp||"").trim()||"New Experience",v:2};d.exp.push(x);rec.expAdd=x.id}
+  L.picks.forEach(p=>{
+    tick(p.t,p.k);
+    if(p.k==="trait")(p.sel||[]).forEach(k=>{d.traits[k]=num(d.traits[k])+1;d.marked[k]=true;rec.traits.push(k)});
+    else if(p.k==="exp")(p.sel||[]).forEach(id=>{const x=id==="new"?d.exp.find(y=>y.id===rec.expAdd):d.exp.find(y=>y.id===id);if(x){x.v=num(x.v)+1;rec.expBump.push(x.id)}});
+    else if(p.k==="sub"){tick(p.t,"multi");d.subRank=Math.min(3,num(d.subRank,1)+1);
+      const K=dhFind(DHD.classes,c.cls), S2=K&&dhFind(K.subclasses,c.subclass), list=S2?(d.subRank===2?S2.specialization:S2.mastery)||[]:[];
+      list.forEach(f=>{const o={id:uid(),k:"sub",name:f.name,text:f.text,src:S2.name+(d.subRank===2?" specialization":" mastery")};d.features.push(o);rec.feats.push(o.id)})}
+    else if(p.k==="multi"){tick(p.t,"sub");d.multi={cls:L.multi.cls,domain:L.multi.domain,sub:L.multi.sub};
+      const K=dhFind(DHD.classes,L.multi.cls), S2=K&&dhFind(K.subclasses,L.multi.sub);
+      if(K)K.features.forEach(f=>{const o={id:uid(),k:"multi",name:f.name,text:f.text,src:"Multiclass: "+K.name};d.features.push(o);rec.feats.push(o.id)});
+      if(S2)S2.foundation.forEach(f=>{const o={id:uid(),k:"multi",name:f.name,text:f.text,src:"Multiclass: "+S2.name+" foundation"};d.features.push(o);rec.feats.push(o.id)})}
+  });
+  c.level=L.to;
+  L.cards.forEach(n=>{const x=dhFind(DHD.cards,n);if(x){const o={id:uid(),name:x.name,domain:x.domain,level:x.level,type:x.type,recall:x.recall,text:x.text};const to=d.loadout.length<5?"loadout":"vault";d[to].push(o);rec.cards.push(o.id)}});
+  d.hist.push(rec); dhSync(c); save();
+  DHL=null; const o=$("#dhOv"); if(o){o.hidden=true;o.innerHTML=""}
+  dhRefresh(); dhMsg("Now level "+c.level+". "+(d.vault.length&&d.loadout.length>=5?"Your loadout is full, so new cards went to the vault.":""));
+}
+function dhUndoLevel(c){
+  const d=c.dh, rec=d.hist.pop(); if(!rec)return;
+  rec.adv.forEach(([t,k])=>{const x=(d.adv["t"+t]||{});x[k]=Math.max(0,num(x[k])-1)});
+  rec.traits.forEach(k=>{d.traits[k]=num(d.traits[k])-1}); d.marked=rec.marked0||{};
+  if(rec.expAdd)d.exp=d.exp.filter(x=>x.id!==rec.expAdd);
+  rec.expBump.forEach(id=>{const x=d.exp.find(y=>y.id===id);if(x)x.v=num(x.v)-1});
+  d.loadout=d.loadout.filter(x=>!rec.cards.includes(x.id)); d.vault=d.vault.filter(x=>!rec.cards.includes(x.id)); d.features=d.features.filter(x=>!rec.feats.includes(x.id));
+  d.subRank=rec.subRank0||1; d.multi=rec.multi0||null; c.level=rec.from; dhSync(c); save(); dhRefresh(); dhMsg("Level up undone. You are level "+c.level+" again.");
+}
+/* ---------- print ---------- */
+function dhPrint(c){
+  const d=c.dh, esc2=esc, bx=(l,v,sm)=>`<div class="bx"><span>${l}</span><b>${v}</b>${sm?`<small>${sm}</small>`:""}</div>`;
+  const h=(t,b)=>b?`<h2>${t}</h2>${b}`:"";
+  const pips=(n,on)=>Array.from({length:n},(_,i)=>`<span class="sq" style="${i<on?"background:#1b1b1b":""}"></span>`).join("");
+  const sub=[c.race+(d.anc2?" / "+d.anc2:""),c.background,[c.cls,c.subclass].filter(Boolean).join(" \u2013 "),"Level "+c.level].filter(Boolean).join(" \u00b7 ");
+  const wp=["primary","secondary"].map(k=>{const w=d.weapons[k],e=w&&dhDmgExpr(w,dhProf(c));return w?`<tr><td><b>${esc(w.name)}</b></td><td>${esc(w.trait)} ${esc(sgn(dhTrait(c,lc(w.trait))))}</td><td>${esc(w.range)}</td><td>${e?esc(e.text):esc(w.damage)}</td><td>${esc(w.feature||"")}</td></tr>`:""}).join("");
+  const card=x=>`<div class="it"><b>${esc(x.name)}</b> <small>${esc((x.domain||"")+" \u00b7 L"+x.level+" \u00b7 "+(x.type||"")+" \u00b7 Recall "+num(x.recall))}</small><br>${esc(String(x.text||"").replace(/\s+/g," "))}</div>`;
+  return `<div class="ph"><h1>${esc(c.name||"Unnamed")}</h1><div class="psub">${esc(sub)}<br>Daggerheart</div></div>
+  <div class="g6">${DHT.map(t=>bx(t[1].toUpperCase(),sgn(dhTrait(c,t[0])))).join("")}</div>
+  <div class="gs g7" style="grid-template-columns:repeat(6,1fr)">${bx("Evasion",dhEva(c))}${bx("Proficiency",dhProf(c))}${bx("Major",dhMajor(c))}${bx("Severe",dhSevere(c))}${bx("Armor Score",dhArmorScore(c))}${bx("Hope",d.hope+"/"+d.hopeMax)}</div>
+  <div class="cols"><div>
+    ${h("Hit Points",`<p>${pips(dhHpSlots(c),d.hpMarked)}</p>`)}${h("Stress",`<p>${pips(dhStressSlots(c),d.stressMarked)}</p>`)}${h("Armor Slots ("+esc(d.armor.name||"no armor")+")",`<p>${pips(dhArmorScore(c),d.armorMarked)}</p>${d.armor.feature?`<p>${esc(d.armor.feature)}</p>`:""}`)}
+    ${h("Experiences",d.exp.length?`<ul class="ls">${d.exp.map(x=>`<li><span class="n">${esc(x.n)}</span><span class="v" style="width:auto">${esc(sgn(num(x.v)))}</span></li>`).join("")}</ul>`:"")}
+    ${h("Gold",`<p>${num(d.gold.h)} handfuls \u00b7 ${num(d.gold.b)} bags \u00b7 ${num(d.gold.c)} chests</p>`)}
+    ${h("Inventory",d.inv.length?`<p>${d.inv.map(i=>esc(i.n)+(num(i.q)>1?" x"+i.q:"")).join(" \u00b7 ")}</p>`:"")}
+  </div><div>
+    ${h("Weapons",wp?`<table class="atk"><tr><th>Weapon</th><th>Trait</th><th>Range</th><th>Damage</th><th>Feature</th></tr>${wp}</table>`:"")}
+    ${h("Features",`<div>${d.features.map(f=>`<div class="it"><b>${esc(f.name)}</b> <small>${esc(f.src||"")}</small><br>${esc(String(f.text||"").replace(/\s+/g," "))}</div>`).join("")}</div>`)}
+  </div></div>
+  ${h("Domain cards: loadout",`<div class="two">${d.loadout.map(card).join("")}</div>`)}${d.vault.length?h("Vault",`<div class="two">${d.vault.map(card).join("")}</div>`):""}
+  ${c.notes?h("Notes",`<p>${esc(c.notes).replace(/\n+/g,"<br>")}</p>`):""}<div class="pf">Character Ledger \u00b7 Daggerheart SRD content \u00b7 ${new Date().toLocaleDateString()}</div>`;
+}
 
 render(); setStatus();
 })();
