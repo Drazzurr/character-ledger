@@ -2053,8 +2053,9 @@ const fullAt=n=>FULLT[Math.max(0,Math.min(20,n))]||[];
 /* library: your own classes, spells, items and text, kept private to you */
 const LIBLS="character-ledger-lib-v1";
 function normLib(p){
-  const o={classes:[],spells:[],items:[],sections:[],packs:{},updated:num(p&&p.updated),splSig:String(p&&p.splSig||"")};
+  const o={classes:[],spells:[],items:[],sections:[],dh:[],packs:{},updated:num(p&&p.updated),splSig:String(p&&p.splSig||"")};
   ["classes","spells","items","sections"].forEach(k=>{if(p&&Array.isArray(p[k]))o[k]=p[k].filter(x=>x&&x.name!=null).map(x=>Object.assign({},x,{id:x.id||uid()}))});
+  if(p&&Array.isArray(p.dh))o.dh=p.dh.filter(x=>x&&x.name!=null&&x.kind).map(x=>Object.assign({},x,{id:x.id||uid()}));
   if(p&&p.packs&&typeof p.packs==="object"&&!Array.isArray(p.packs))Object.keys(p.packs).forEach(k=>{o.packs[k]={creator:!!(p.packs[k]&&p.packs[k].creator)}});
   return o;
 }
@@ -4536,6 +4537,7 @@ const LIBSCHEMA_PF={
 const SCH=kind=>ui.lib&&ui.lib.sys==="pf2e"&&LIBSCHEMA_PF[kind]?LIBSCHEMA_PF[kind]:LIBSCHEMA[kind];
 const LIBKIND={classes:"class",spells:"spell",items:"item",sections:"text entry"};
 function libFixTab(want){
+  if(ui.lib&&ui.lib.sys==="dh")return;
   const L=ui.lib, pf=L.sys==="pf2e", custom=["spells","items","sections"];
   const ok=t=>pf?(t.indexOf("pf-")===0||custom.includes(t)):(t.indexOf("pf-")!==0);
   if(want&&ok(want))L.tab=want; else if(!ok(L.tab))L.tab=pf?"pf-spells":"classes";
@@ -4667,11 +4669,12 @@ function libImportHTML(){
 }
 function renderLib(){
   const L=ui.lib, ov=$("#libOv"); libEnrich();
+  if(L.sys==="dh"){ov.innerHTML=dhLibHTML();dhLoad().then(()=>{if(ui.lib&&ui.lib.sys==="dh"&&!$("#libOv").hidden&&!ui.lib.dh.draft&&!(ui.lib.dh.found)){const a=document.activeElement;if(!a||!/INPUT|TEXTAREA|SELECT/.test(a.tagName)){if(!ui.lib.dh._r){ui.lib.dh._r=1;renderLib()}}}}).catch(()=>{});return}
   const pf=L.sys==="pf2e", cnt=k=>LIB[k].filter(x=>sysOf(x)===L.sys).length;
   const tabs=pf?PFLIBTABS.concat([["spells","My spells ("+cnt("spells")+")"],["items","My items ("+cnt("items")+")"],["sections","My text ("+cnt("sections")+")"]])
     :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["hb","Homebrew ("+hbAll().length+")"],["review","Needs review"+(libReviewList().length?" ("+libReviewList().length+")":"")],["book","Import a book"],["import","Import text"]];
   const sysBar=L.locked?`<div class="tags"><span class="tag ex">${pf?"Pathfinder 2e only":"D&amp;D 5e and 5.5e only"}</span></div>`
-    :`<div class="seg" role="group" aria-label="Game system">${[["dnd5e","D&amp;D 5e and 5.5e"],["pf2e","Pathfinder 2e"]].map(([v,t])=>`<button class="btn sm${L.sys===v?" pri":""}" type="button" data-act="lib-sys" data-s="${v}" aria-pressed="${L.sys===v}">${t}</button>`).join("")}</div>`;
+    :`<div class="seg" role="group" aria-label="Game system">${[["dnd5e","D&amp;D 5e and 5.5e"],["pf2e","Pathfinder 2e"],["dh","Daggerheart"]].map(([v,t])=>`<button class="btn sm${L.sys===v?" pri":""}" type="button" data-act="lib-sys" data-s="${v}" aria-pressed="${L.sys===v}">${t}</button>`).join("")}</div>`;
   const hbOn=!pf&&L.hb&&L.hb.d;
   const edBar=!pf&&!L.draft&&!L.view&&!hbOn&&L.tab!=="hb"?`<label class="fld" style="max-width:260px"><span>Edition for new entries</span><select data-lined>${[["","5e and 5.5e (both)"],["2014","5e (2014)"],["2024","5.5e (2024)"]].map(([v,t])=>`<option value="${v}"${String(L.ed||"")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:"";
   let body;
@@ -9661,8 +9664,8 @@ const DHCOND=["Hidden","Restrained","Vulnerable"];
 function isDh(c){return !!c&&c.system==="dh"}
 let DHD=null, DHP=null;
 function dhLoad(){
-  if(DHD)return Promise.resolve(DHD);
-  if(!DHP)DHP=fetch("daggerheart-srd.json").then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(d=>{DHD=d;return d});
+  if(DHD){try{dhLibApply()}catch(e){}return Promise.resolve(DHD)}
+  if(!DHP)DHP=fetch("daggerheart-srd.json").then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(d=>{DHD=d;try{dhLibApply()}catch(e){}return d});
   return DHP.catch(e=>{DHP=null;throw e});
 }
 const dhCap=s=>String(s||"").replace(/^./,m=>m.toUpperCase());
@@ -10690,6 +10693,462 @@ async function dhRunImport(file){
   $("#syncOv").hidden=true; renderSheet(); window.scrollTo(0,0);
   dhToast("<b>Imported "+esc(c.name)+"</b><br><small>"+esc(r.notes.join(" \u00b7 "))+(old?". You already had a character with this name, so this one was added as a copy.":".")+" Check the sheet over, since a few things (portrait, notes) do not come from the PDF.</small>");
 }
+
+/* ---------- Daggerheart book reader: positioned text -> entries (no app dependencies, so it can be tested alone) ---------- */
+function dhpSegs(items,H){
+  const P=[]; items.forEach(i=>{if(!i||!i.str||!i.str.trim()||!i.transform)return;if(Math.abs(i.transform[1])>Math.abs(i.transform[0])*0.05+0.01)return;
+    P.push({x:i.transform[4],y:H-i.transform[5],x1:i.transform[4]+(i.width||0),t:i.str,h:Math.abs(i.transform[3])||10})});
+  P.sort((a,b)=>a.y-b.y||a.x-b.x);
+  const lines=[]; P.forEach(p=>{const l=lines.find(q=>Math.abs(q.y-p.y)<=2.5);if(l)l.p.push(p);else lines.push({y:p.y,p:[p]})});
+  const out=[];
+  lines.forEach(l=>{
+    l.p.sort((a,b)=>a.x-b.x); let cur=null;
+    l.p.forEach(p=>{
+      if(cur&&p.x-cur.x1<=Math.max(7,p.h*0.8)){cur.t+=(p.x-cur.x1>1.2&&!/\s$/.test(cur.t)&&!/^\s/.test(p.t)?" ":"")+p.t;cur.x1=Math.max(cur.x1,p.x1)}
+      else{cur={x:p.x,y:l.y,x1:p.x1,t:p.t,h:p.h};out.push(cur)}
+    });
+  });
+  out.forEach(s=>{s.t=s.t.replace(/\s+/g," ").trim()});
+  return out.filter(s=>s.t).sort((a,b)=>a.y-b.y||a.x-b.x);
+}
+function dhpBounds(S,minn,gap){
+  minn=minn||8; gap=gap||60;
+  const xs=S.map(s=>Math.round(s.x)).sort((a,b)=>a-b), cl=[];
+  xs.forEach(x=>{const c=cl[cl.length-1];if(c&&x-c[c.length-1]<=14)c.push(x);else cl.push([x])});
+  const starts=cl.filter(c=>c.length>=minn).map(c=>c[0]), m=[];
+  starts.forEach(s=>{if(m.length&&s-m[m.length-1]<gap)return;m.push(s)});
+  const b=[0]; for(let i=0;i<m.length-1;i++)b.push(Math.floor((m[i]+m[i+1])/2)-10); b.push(5000); return b;
+}
+function dhpColumns(S,bounds){
+  const b=bounds||dhpBounds(S), cols=b.slice(1).map(()=>[]);
+  S.forEach(s=>{let c=0;for(let i=0;i<cols.length;i++)if(b[i]<=s.x+3&&s.x+3<b[i+1])c=i;cols[c].push(s)});
+  return cols.map(c=>c.sort((a,b2)=>a.y-b2.y||a.x-b2.x).map(s=>s.t));
+}
+const DHP_NOISE=l=>/^\d{1,3}$/.test(l)||/^Chapter \d+:/.test(l)||/^Appendix/.test(l)||/Domain Card/i.test(l)&&l.length<30||/^[A-Z\u2019' \-]+ DOMAIN$/.test(l)||/^Daggerheart/i.test(l);
+const dhpCap=s=>String(s||"").toLowerCase().replace(/(^|[\s\-])([a-z])/g,(m,a,b)=>a+b.toUpperCase()).replace(/(\s)(And|Of|The|A|To|In|On|For|Or)(?=\s)/g,(m,a,w)=>a+w.toLowerCase());
+/* domain cards: every column holds cards that start with a name line, then "Level 3 Blade Ability", then "Recall Cost: n" */
+function dhpCards(pages){
+  const out=[], RX=/^Level (\d+) ([A-Za-z]+) (Spell|Ability|Grimoire|Transformation)$/i;
+  pages.forEach(pg=>{
+    dhpColumns(pg.segs).forEach(col=>{
+      const L=col.map(l=>l.trim()).filter(Boolean), idx=[];
+      L.forEach((l,i)=>{if(RX.test(l)&&i>0)idx.push(i)});
+      idx.forEach((i,k)=>{
+        const m=L[i].match(RX); let title=L[i-1], j=i-2;
+        while(j>=0&&/^[A-Z\u2019'\-: ]+$/.test(L[j])&&L[j].length>2&&!/DOMAIN$/.test(L[j])&&(k===0||j>idx[k-1]+1)&&/[\-]$|^[A-Z]{1,12}$/.test(L[j].trim())&&/-$/.test(L[j].trim())){title=L[j]+title;j--}
+        const rc=(L[i+1]||"").match(/Recall Cost:\s*(\d+)/i), end=k+1<idx.length?idx[k+1]-1:L.length;
+        let body=L.slice(i+(rc?2:1),end); while(body.length&&DHP_NOISE(body[body.length-1]))body.pop();
+        const name=dhpCap(title.replace(/-\s*$/,"-").replace(/\s+/g," ").trim());
+        if(!name||/^Level \d/i.test(name))return;
+        out.push({name:name,level:+m[1],domain:dhpCap(m[2]),type:dhpCap(m[3]),recall:rc?+rc[1]:0,text:body.join(" ").replace(/\s+/g," ").trim(),page:pg.n});
+      });
+    });
+  });
+  return out;
+}
+/* weapon tables: rows are anchored on the Trait cell, other cells join the nearest row by height */
+const DHP_HEAD=t=>t.length>4&&t===t.toUpperCase()&&/[A-Z]{4}/.test(t);
+const DHP_TRAITS=["Agility","Strength","Finesse","Instinct","Presence","Knowledge"];
+function dhpWeapons(pages){
+  const out=[]; let tier=1,kind="Physical",cat="Primary";
+  pages.forEach(pg=>{
+    const S=pg.segs.slice().sort((a,b)=>a.y-b.y||a.x-b.x), marks=[];
+    S.forEach(s=>{let m;
+      if(m=s.t.match(/^TIER (\d)/i))marks.push({y:s.y,tier:+m[1]});
+      else if(/^Physical Weapons/i.test(s.t))marks.push({y:s.y,kind:"Physical"});
+      else if(/^Magic Weapons/i.test(s.t))marks.push({y:s.y,kind:"Magic"});
+      else if(/^primary weapon tables/i.test(s.t))marks.push({y:s.y,cat:"Primary"});
+      else if(/^secondary weapon tables/i.test(s.t))marks.push({y:s.y,cat:"Secondary"});
+      else if(/^Tier 1 .*Magic/i.test(s.t))marks.push({y:s.y,kind:"Magic"});
+    });
+    const heads=S.filter(s=>s.t==="Name"&&S.some(q=>q.t==="Trait"&&Math.abs(q.y-s.y)<4)&&S.some(q=>q.t==="Burden"&&Math.abs(q.y-s.y)<4));
+    heads.forEach((h,hi)=>{
+      const hy=h.y, nexty=hi+1<heads.length?heads[hi+1].y:1e9, hdr={};
+      S.forEach(s=>{if(Math.abs(s.y-hy)<4&&["Name","Trait","Range","Damage","Burden","Feature"].includes(s.t))hdr[s.t]=s.x});
+      if(Object.keys(hdr).length<6)return;
+      marks.forEach(m=>{if(m.y<hy){if(m.tier)tier=m.tier;if(m.kind)kind=m.kind;if(m.cat)cat=m.cat}});
+      const stop=Math.min(nexty,...marks.filter(m=>m.y>hy+2).map(m=>m.y));
+      const seg=S.filter(s=>s.y>hy+2&&s.y<stop-1&&!/^Chapter|^\d+$/.test(s.t)&&!/Weapon Tables/i.test(s.t));
+      const data=seg.filter(s=>Math.abs(s.x-hdr.Trait)<8&&DHP_TRAITS.includes(s.t)).sort((a,b)=>a.y-b.y);
+      const rows=data.map(s=>({y:s.y,trait:s.t,name:[],feat:[]}));
+      if(!rows.length)return;
+      rows.forEach(r=>{seg.forEach(s=>{if(Math.abs(s.y-r.y)<3){
+        if(Math.abs(s.x-hdr.Range)<8)r.range=s.t; else if(Math.abs(s.x-hdr.Damage)<8)r.damage=s.t; else if(Math.abs(s.x-hdr.Burden)<8)r.burden=s.t}})});
+      seg.forEach(s=>{
+        const inName=Math.abs(s.x-hdr.Name)<10, inFeat=Math.abs(s.x-hdr.Feature)<10;
+        if((!inName&&!inFeat)||DHP_TRAITS.includes(s.t)||DHP_HEAD(s.t))return;
+        const r=rows.reduce((a,b)=>Math.abs(b.y-s.y)<Math.abs(a.y-s.y)?b:a);
+        (inName?r.name:r.feat).push(s);
+      });
+      rows.forEach(r=>{
+        let nm=r.name.sort((a,b)=>a.y-b.y).map(s=>s.t).join(" ").trim(); const ft=r.feat.sort((a,b)=>a.y-b.y).map(s=>s.t).join(" ").trim();
+        if(!nm||nm.length>40)return;
+        nm=nm.replace(/^(Magic|Physical):\s*/i,"").replace(/\s+(Primary|Secondary) Weapons?$/i,"").trim();
+        out.push({name:nm,tier:tier,kind:kind,slot:cat.toLowerCase(),trait:r.trait,range:r.range||"",damage:r.damage||"",burden:r.burden||"",feature:ft&&ft!=="\u2014"&&ft!=="-"?ft:"",page:pg.n});
+      });
+    });
+  });
+  return out;
+}
+/* armor tables: Name | base thresholds "5 / 11" | base score | Feature */
+function dhpArmor(pages){
+  const out=[]; let tier=1;
+  pages.forEach(pg=>{
+    const S=pg.segs.slice().sort((a,b)=>a.y-b.y||a.x-b.x);
+    const hd=S.find(s=>/^Base Thresholds$/i.test(s.t)||/^Thresholds$/i.test(s.t));
+    const marks=S.filter(s=>/^TIER \d/i.test(s.t)).map(s=>({y:s.y,tier:+s.t.match(/\d/)[0]}));
+    const rows=S.filter(s=>/^\d+\s*\/\s*\d+$/.test(s.t)).map(s=>{const m=s.t.match(/(\d+)\s*\/\s*(\d+)/);return {y:s.y,x:s.x,major:+m[1],severe:+m[2],name:[],feat:[]}});
+    if(!rows.length)return;
+    const tx=rows.reduce((a,r)=>a+r.x,0)/rows.length;
+    rows.forEach(r=>{
+      marks.forEach(m=>{if(m.y<r.y)tier=m.tier}); r.tier=tier;
+      S.forEach(s=>{if(Math.abs(s.y-r.y)<3&&/^\d+$/.test(s.t)&&s.x>r.x+10&&r.score==null)r.score=+s.t});
+    });
+    const scoreX=(S.find(s=>rows.some(r=>Math.abs(s.y-r.y)<3&&/^\d+$/.test(s.t)&&s.x>tx+10))||{x:tx+120}).x;
+    const nameX=Math.min(...S.filter(s=>rows.some(r=>Math.abs(s.y-r.y)<3&&s.x<tx-10&&!/^\d+$/.test(s.t))).map(s=>s.x),tx);
+    const feats=[];
+    S.forEach(s=>{
+      if(/^\d+\s*\/\s*\d+$/.test(s.t)||(/^\d+$/.test(s.t)&&rows.some(r=>Math.abs(s.y-r.y)<3&&Math.abs(s.x-scoreX)<8)))return;
+      if(hd&&s.y<=hd.y+2)return; if(/^TIER|^Chapter|^\d+$|^(Name|Base|Thresholds|Score|Feature)$|^Base /i.test(s.t))return;
+      const r=rows.reduce((a,b)=>Math.abs(b.y-s.y)<Math.abs(a.y-s.y)?b:a);
+      if(DHP_HEAD(s.t))return;
+      if(s.x<tx-10&&Math.abs(s.x-nameX)<12)r.name.push(s); else if(s.x>scoreX+8)r.feat.push(s);
+    });
+    rows.forEach(r=>{
+      const nm=r.name.sort((a,b)=>a.y-b.y).map(s=>s.t).join(" ").trim(), ft=r.feat.sort((a,b)=>a.y-b.y).map(s=>s.t).join(" ").trim();
+      if(nm)out.push({name:nm,tier:r.tier,major:r.major,severe:r.severe,score:r.score==null?0:r.score,feature:ft&&ft!=="\u2014"&&ft!=="-"?ft:"",page:pg.n});
+    });
+  });
+  return out;
+}
+
+/* ---------- heading-marked text (the app's own PDF text, # and ## headings) -> classes, ancestries, communities, text ---------- */
+function dhpSections(text){
+  const out=[], first={lvl:0,title:"",body:[]}; let cur=first; out.push(cur);
+  String(text||"").split("\n").forEach(raw=>{
+    const l=raw.replace(/\s+$/,""), t=l.trim();
+    if(/^Chapter \d+:/.test(t)||(/^\d{1,3}$/.test(t)&&!/^STARTING/i.test(cur.title)))return;
+    const m=l.match(/^(#{1,6})\s+(.*)$/);
+    if(m){cur={lvl:m[1].length,title:m[2].trim(),body:[]};out.push(cur)}else cur.body.push(l);
+  });
+  return out;
+}
+/* paragraphs: blank lines split them; bullets stay attached to the paragraph above */
+function dhpParas(lines){
+  const P=[]; let cur=null;
+  (lines||[]).forEach(l=>{
+    const t=l.trim();
+    if(!t){cur=null;return}
+    if(/^[\u2022\u25cf\-\u2013]\s+/.test(t)&&P.length){P[P.length-1]+=" "+t.replace(/^[\u2022\u25cf\-\u2013]\s+/,"");cur=null;return}
+    if(cur===null){P.push(t);cur=P.length-1}else P[cur]+=" "+t;
+  });
+  return P.map(p=>p.replace(/\s+/g," ").trim()).filter(Boolean);
+}
+const DHP_FEAT=/^([A-Z][^:.\n]{1,45}?):\s+(\S.*)$/;
+/* "Name: text" paragraphs; a paragraph without a name joins the feature above */
+function dhpFeats(lines){
+  const out=[];
+  dhpParas(lines).forEach(p=>{const m=p.match(DHP_FEAT);if(m)out.push({name:m[1].trim(),text:m[2].trim()});else if(out.length)out[out.length-1].text+=" "+p;else out.push({name:"",text:p})});
+  return out;
+}
+/* class features are written as a short name line, then the text */
+function dhpNamedBlocks(lines){
+  const out=[]; let prevBlank=true, cur=null;
+  (lines||[]).forEach((l,i)=>{
+    const t=l.trim();
+    if(!t){prevBlank=true;if(cur)cur.t.push("");return}
+    const next=(lines[i+1]||"").trim();
+    if(prevBlank&&t.length<=40&&!/[.:;,]$/.test(t)&&next&&!/^[\u2022]/.test(t)){cur={name:t,t:[]};out.push(cur);prevBlank=false;return}
+    prevBlank=false; if(cur)cur.t.push(t);
+  });
+  return out.map(b=>({name:b.name,text:dhpParas(b.t).join(" ")})).filter(f=>f.text);
+}
+const dhpBullets=lines=>{const out=[];(lines||[]).forEach(l=>{const t=l.trim();if(/^[\u2022\u25cf]/.test(t))out.push(t.replace(/^[\u2022\u25cf]\s*/,""));else if(t&&out.length)out[out.length-1]+=" "+t});return out.map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean)};
+const dhpBlurb=t=>{const S=String(t||'').replace(/\s+/g,' ').trim().match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g)||[];let o='';for(const x of S){if((o+x).length>300&&o)break;o+=x}return o.trim()};
+const dhpJoin=lines=>(lines||[]).map(l=>l.trim()).filter(Boolean).join(" ").replace(/\s+/g," ").trim();
+function dhpText(text,source){
+  const S=dhpSections(text), res={classes:[],anc:[],com:[],text:[]}, used=new Set();
+  const up=s=>/^[A-Z0-9\u2019' &\-]+$/.test(s)&&/[A-Z]/.test(s);
+  const prevHead=i=>{for(let j=i-1;j>=0;j--)if(S[j].lvl===1)return j;return -1};
+  const nameCase=t=>dhpCap(t);
+  /* classes: a "DOMAINS" section right after the class heading */
+  S.forEach((s,i)=>{
+    if(!/^DOMAINS$/i.test(s.title))return;
+    const h=prevHead(i); if(h<0)return; used.add(h);
+    const cls={name:nameCase(S[h].title),source:source||"",domains:[],evasion:0,hp:0,items:"",hope:{name:"",text:""},features:[],background:[],connections:[],subclasses:[],blurb:dhpBlurb(dhpJoin(S[h].body))};
+    cls.domains=dhpJoin(s.body).split(/\s*(?:,|\band\b|&)\s*/).map(x=>nameCase(x.trim())).filter(Boolean);
+    let sub=null, inSubs=false, j=i+1;
+    for(;j<S.length;j++){
+      const q=S[j], T=q.title.toUpperCase();
+      if(/^DOMAINS$/.test(T)&&j>i)break;
+      if(/^STARTING EVASION/.test(T)){cls.evasion=+(dhpJoin(q.body).match(/\d+/)||[0])[0];used.add(j);continue}
+      if(/^STARTING HIT POINTS/.test(T)){cls.hp=+(dhpJoin(q.body).match(/\d+/)||[0])[0];used.add(j);continue}
+      if(/^CLASS ITEMS?$/.test(T)){cls.items=dhpJoin(q.body);continue}
+      if(/HOPE FEATURE$/.test(T)){const f=dhpFeats(q.body)[0];if(f)cls.hope=f;continue}
+      if(/^CLASS FEATURES?$/.test(T)){cls.features=cls.features.concat(dhpNamedBlocks(q.body));continue}
+      if(/SUBCLASSES$/.test(T)){inSubs=true;continue}
+      if(/^CHOOSE /.test(T))continue;
+      if(/^BACKGROUND QUESTIONS/.test(T)){cls.background=dhpBullets(q.body);sub=null;inSubs=false;continue}
+      if(/^CONNECTIONS?$/.test(T)){cls.connections=dhpBullets(q.body);sub=null;used.add(j);break}
+      if(q.lvl===1&&(!inSubs||(S[j+1]&&/^(ANCESTRY|COMMUNITY) FEATURE/i.test(S[j+1].title))))break;
+      if(q.lvl===1&&up(q.title)&&!/\bDOMAIN\b/.test(T)&&S[j+1]&&/^(SPELLCAST|FOUNDATION)/i.test(S[j+1].title)){
+        /* a following class starts with its own DOMAINS section; the heading just before that belongs to the next class */
+        if(S[j+1]&&/^DOMAINS$/i.test(S[j+1].title))break;
+        sub={name:nameCase(q.title),blurb:dhpJoin(q.body),spellcast:null,foundation:[],specialization:[],mastery:[]};cls.subclasses.push(sub);used.add(j);continue}
+      if(sub){
+        if(/^SPELLCAST TRAIT/.test(T)){sub.spellcast=dhpCap(dhpJoin(q.body))||null;continue}
+        if(/^FOUNDATION FEATURES?/.test(T)){sub.foundation=dhpFeats(q.body);continue}
+        if(/^SPECIALIZATION FEATURES?/.test(T)){sub.specialization=dhpFeats(q.body);continue}
+        if(/^MASTERY FEATURES?/.test(T)){sub.mastery=dhpFeats(q.body);continue}
+      }
+    }
+    if(cls.hope.name||cls.features.length)res.classes.push(cls);
+  });
+  /* ancestries and communities: a heading followed by an ANCESTRY FEATURES / COMMUNITY FEATURE section */
+  S.forEach((s,i)=>{
+    const T=s.title.toUpperCase(), isA=/^ANCESTRY FEATURES?$/.test(T), isC=/^COMMUNITY FEATURES?$/.test(T);
+    if(!isA&&!isC)return;
+    const h=prevHead(i); if(h<0||used.has(h))return; used.add(h);
+    const blurb=dhpJoin(S[h].body);
+    if(isA)res.anc.push({name:nameCase(S[h].title),source:source||"",blurb:dhpBlurb(blurb),features:dhpFeats(s.body)});
+    else{const f=dhpFeats(s.body);res.com.push({name:nameCase(S[h].title),source:source||"",blurb:dhpBlurb(blurb),feature:f[0]||{name:"",text:""}})}
+  });
+  S.forEach((s,i)=>{
+    if(s.lvl!==1||used.has(i)||!s.title)return;
+    const body=S.slice(i+1).filter((q,k)=>{for(let m=i+1;m<=i+1+k;m++)if(S[m].lvl<=1&&m>i)return false;return true});
+    const txt=dhpParas(s.body.concat(...body.map(q=>["",q.title+":"].concat(q.body)))).join("\n\n");
+    if(txt.length>200&&!/^(DOMAINS|CHAPTER)/i.test(s.title))res.text.push({name:s.title.replace(/\s+/g," ").trim(),source:source||"",text:txt.slice(0,6000)});
+  });
+  return res;
+}
+
+/* ---------- Daggerheart Library: your own classes, ancestries, communities, cards, weapons, armor and text ---------- */
+const DHLTABS=[["class","Classes"],["anc","Ancestries"],["com","Communities"],["card","Domain cards"],["weapon","Weapons"],["armor","Armor"],["text","Text"]];
+const DHLKIND={class:"class",anc:"ancestry",com:"community",card:"domain card",weapon:"weapon",armor:"armor",text:"text entry"};
+const DHLPL={class:"Classes",anc:"Ancestries",com:"Communities",card:"Domain cards",weapon:"Weapons",armor:"Armor",text:"Rules text"};
+const DHLSCH={
+  class:[["name","Class name"],["source","Source book"],["domains","Two domains, comma separated"],["evasion","Starting Evasion","n"],["hp","Starting Hit Points","n"],["items","Class items"],["hope","Hope feature (Name: text)","t"],["features","Class features (Name: text, a blank line between each)","t"],["background","Background questions (one per line)","t"],["connections","Connection questions (one per line)","t"],["subs","Subclasses","t"]],
+  anc:[["name","Ancestry name"],["source","Source book"],["blurb","Description","t"],["features","Ancestry features (Name: text, a blank line between each)","t"]],
+  com:[["name","Community name"],["source","Source book"],["blurb","Description","t"],["feature","Community feature (Name: text)","t"]],
+  card:[["name","Card name"],["source","Source book"],["domain","Domain"],["level","Level (1 to 10)","n"],["type","Type (Ability, Spell or Grimoire)"],["recall","Recall cost","n"],["text","Card text","t"]],
+  weapon:[["name","Weapon name"],["source","Source book"],["tier","Tier (1 to 4)","n"],["slot","Slot (primary or secondary)"],["trait","Trait (for example Strength)"],["range","Range (for example Melee)"],["damage","Damage (for example d8+1 phy)"],["burden","Burden (One-Handed or Two-Handed)"],["feature","Feature","t"]],
+  armor:[["name","Armor name"],["source","Source book"],["tier","Tier (1 to 4)","n"],["major","Major threshold","n"],["severe","Severe threshold","n"],["score","Armor score","n"],["feature","Feature","t"]],
+  text:[["name","Title"],["source","Source book"],["text","Text","t"]]
+};
+const DHLSUBHELP="One block per subclass. Start with @sub Name | Spellcast trait, then its description, then @foundation, @specialization and @mastery, each followed by features written as Name: text.";
+const dhFeatText=a=>(a||[]).filter(f=>f&&(f.name||f.text)).map(f=>f.name?f.name+": "+f.text:f.text).join("\n\n");
+const dhSubsText=a=>(a||[]).map(s=>"@sub "+s.name+(s.spellcast?" | "+s.spellcast:"")+"\n"+(s.blurb||"")+[["foundation","@foundation"],["specialization","@specialization"],["mastery","@mastery"]].map(([k,h])=>(s[k]||[]).length?"\n"+h+"\n"+dhFeatText(s[k]):"").join("")).join("\n\n");
+function dhSubsParse(text){
+  const out=[]; let sub=null, sec="blurb", buf=[];
+  const flush=()=>{if(!sub)return;if(sec==="blurb")sub.blurb=buf.join(" ").replace(/\s+/g," ").trim();else sub[sec]=dhpFeats(buf);buf=[]};
+  String(text||"").split("\n").forEach(l=>{
+    let m;
+    if(m=l.match(/^@sub\s+(.+)$/i)){flush();const p=m[1].split("|");sub={name:p[0].trim(),blurb:"",spellcast:(p[1]||"").trim()||null,foundation:[],specialization:[],mastery:[]};out.push(sub);sec="blurb";buf=[];return}
+    if(m=l.match(/^@(foundation|specialization|mastery)\b/i)){flush();sec=m[1].toLowerCase();buf=[];return}
+    buf.push(l);
+  });
+  flush(); return out;
+}
+function dhLS(){const L=ui.lib; if(!L.dh)L.dh={tab:"class",draft:null,kind:null,editId:null,msg:"",bk:{source:"",from:"",to:"",busy:"",found:null,sel:new Set()},pt:{source:"",text:"",busy:"",found:null,sel:new Set()}}; return L.dh}
+const dhLibOf=k=>(LIB.dh||[]).filter(x=>x.kind===k);
+/* library entries are merged into the built-in data, so every picker, the creator and level up offer them */
+let DHLSIG="";
+function dhLibApply(){
+  if(!DHD)return;
+  const sig=String(LIB.updated||0)+":"+(LIB.dh||[]).length; if(sig===DHLSIG&&DHD._b)return; DHLSIG=sig;
+  if(!DHD._b)DHD._b={classes:DHD.classes,ancestries:DHD.ancestries,communities:DHD.communities,cards:DHD.cards,weapons:DHD.weapons,armor:DHD.armor};
+  const B=DHD._b, feats=a=>(a||[]).filter(f=>f&&f.text).map(f=>({name:f.name||"Feature",text:f.text}));
+  DHD.classes=B.classes.concat(dhLibOf("class").map(x=>({name:x.name,domains:(x.domains||[]).slice(0,2),evasion:num(x.evasion)||10,hp:num(x.hp)||6,items:x.items||"",hope:x.hope&&x.hope.text?x.hope:{name:"Hope feature",text:""},features:feats(x.features),background:x.background||[],connections:x.connections||[],
+    subclasses:(x.subclasses||[]).map(s=>({name:s.name,blurb:s.blurb||"",spellcast:s.spellcast||null,foundation:feats(s.foundation),specialization:feats(s.specialization),mastery:feats(s.mastery)})),src:"library",lib:1})));
+  DHD.ancestries=B.ancestries.concat(dhLibOf("anc").map(x=>({name:x.name,blurb:x.blurb||"",features:feats(x.features),src:"library",lib:1})));
+  DHD.communities=B.communities.concat(dhLibOf("com").map(x=>({name:x.name,blurb:x.blurb||"",feature:x.feature&&x.feature.text?x.feature:{name:"Community feature",text:""},src:"library",lib:1})));
+  DHD.cards=B.cards.concat(dhLibOf("card").map(x=>({name:x.name,level:Math.max(1,Math.min(10,num(x.level,1))),domain:dhCap(x.domain||"Custom"),type:dhCap(x.type||"Ability"),recall:num(x.recall),text:x.text||"",lib:1})));
+  DHD.weapons=B.weapons.concat(dhLibOf("weapon").map(x=>({name:x.name,tier:Math.max(1,Math.min(4,num(x.tier,1))),slot:/sec/i.test(x.slot)?"secondary":"primary",trait:x.trait||"",range:x.range||"",damage:x.damage||"",burden:x.burden||"",feature:x.feature||"",src:"library",lib:1})));
+  DHD.armor=B.armor.concat(dhLibOf("armor").map(x=>({name:x.name,tier:Math.max(1,Math.min(4,num(x.tier,1))),major:num(x.major),severe:num(x.severe),score:num(x.score),feature:x.feature||"",src:"library",lib:1})));
+}
+function dhLibMeta(x){
+  const k=x.kind;
+  if(k==="class")return [(x.domains||[]).join(" and "),"Evasion "+num(x.evasion),"HP "+num(x.hp),(x.subclasses||[]).length+" subclasses",x.source].filter(Boolean).join(" \u00b7 ");
+  if(k==="anc")return [(x.features||[]).length+" features",x.source].filter(Boolean).join(" \u00b7 ");
+  if(k==="com")return [x.feature&&x.feature.name,x.source].filter(Boolean).join(" \u00b7 ");
+  if(k==="card")return ["Level "+num(x.level,1),dhCap(x.domain||""),dhCap(x.type||""),"Recall "+num(x.recall),x.source].filter(Boolean).join(" \u00b7 ");
+  if(k==="weapon")return ["Tier "+num(x.tier,1),x.slot,x.trait,x.range,x.damage,x.burden,x.source].filter(Boolean).join(" \u00b7 ");
+  if(k==="armor")return ["Tier "+num(x.tier,1),num(x.major)+"/"+num(x.severe),"Score "+num(x.score),x.source].filter(Boolean).join(" \u00b7 ");
+  return [x.source,String(x.text||"").length+" characters"].filter(Boolean).join(" \u00b7 ");
+}
+function dhLibToDraft(k,x){
+  if(!x){const o={};DHLSCH[k].forEach(f=>{o[f[0]]=f[2]==="n"?(f[0]==="tier"||f[0]==="level"?1:0):""});if(k==="weapon")o.slot="primary";if(k==="card")o.type="Ability";return o}
+  const o=Object.assign({},x);
+  if(k==="class"){o.domains=(x.domains||[]).join(", ");o.hope=dhFeatText(x.hope&&x.hope.text?[x.hope]:[]);o.features=dhFeatText(x.features);o.background=(x.background||[]).join("\n");o.connections=(x.connections||[]).join("\n");o.subs=dhSubsText(x.subclasses)}
+  if(k==="anc")o.features=dhFeatText(x.features);
+  if(k==="com")o.feature=dhFeatText(x.feature&&x.feature.text?[x.feature]:[]);
+  return o;
+}
+const dhLines=t=>String(t||"").split("\n").map(s=>s.replace(/^[\u2022\-]\s*/,"").trim()).filter(Boolean);
+function dhLibFromDraft(k,d){
+  const name=String(d.name||"").trim(); if(!name)return {err:"Give it a name first."};
+  const r={kind:k,name:name,source:String(d.source||"").trim()};
+  if(k==="class"){
+    r.domains=String(d.domains||"").split(/\s*(?:,|\band\b)\s*/).map(s=>dhCap(s.trim())).filter(Boolean).slice(0,2);
+    if(r.domains.length<1)return {err:"Enter the class's domains, for example Grace, Codex."};
+    r.evasion=num(d.evasion)||10; r.hp=num(d.hp)||6; r.items=String(d.items||"").trim();
+    r.hope=dhpFeats(String(d.hope||"").split("\n"))[0]||{name:"",text:""};
+    r.features=dhpFeats(String(d.features||"").split("\n")); r.background=dhLines(d.background); r.connections=dhLines(d.connections);
+    r.subclasses=dhSubsParse(d.subs);
+    if(!r.subclasses.length)return {err:"Add at least one subclass. "+DHLSUBHELP};
+  }else if(k==="anc"){r.blurb=String(d.blurb||"").trim();r.features=dhpFeats(String(d.features||"").split("\n"))}
+  else if(k==="com"){r.blurb=String(d.blurb||"").trim();r.feature=dhpFeats(String(d.feature||"").split("\n"))[0]||{name:"",text:""}}
+  else if(k==="card"){r.domain=dhCap(String(d.domain||"").trim());r.level=Math.max(1,Math.min(10,num(d.level,1)));r.type=dhCap(String(d.type||"Ability").trim());r.recall=num(d.recall);r.text=String(d.text||"").trim();if(!r.domain)return {err:"Enter the card's domain."}}
+  else if(k==="weapon"){r.tier=Math.max(1,Math.min(4,num(d.tier,1)));r.slot=/sec/i.test(d.slot)?"secondary":"primary";["trait","range","damage","burden","feature"].forEach(f=>{r[f]=String(d[f]||"").trim()})}
+  else if(k==="armor"){r.tier=Math.max(1,Math.min(4,num(d.tier,1)));r.major=num(d.major);r.severe=num(d.severe);r.score=num(d.score);r.feature=String(d.feature||"").trim()}
+  else r.text=String(d.text||"").trim();
+  return {rec:r};
+}
+function dhLibFormHTML(){
+  const S=dhLS(), k=S.kind, d=S.draft;
+  const f=DHLSCH[k].map(([n,l,t])=>t==="t"?`<label class="fld"><span>${esc(l)}</span><textarea data-dlf="${n}" style="min-height:${n==="subs"||n==="features"&&k==="class"?200:110}px">${esc(d[n])}</textarea></label>`
+    :`<label class="fld"><span>${esc(l)}</span><input data-dlf="${n}" ${t==="n"?'type="number" step="1" data-dlt="n"':""} value="${esc(d[n])}"></label>`);
+  const plain=f.filter((x,i)=>DHLSCH[k][i][2]!=="t").join(""), areas=f.filter((x,i)=>DHLSCH[k][i][2]==="t").join("");
+  return `<div class="igrid">${plain}</div>${areas}${k==="class"?`<p class="hint" style="margin:0">${DHLSUBHELP}</p>`:""}<div class="msg err" role="alert">${esc(S.msg)}</div>
+    <div class="btns"><button class="btn pri" type="button" data-act="dl-save">Save to library</button><button class="btn" type="button" data-act="dl-cancel">Cancel</button></div>`;
+}
+function dhLibListHTML(k){
+  const c=cur(), rows=dhLibOf(k);
+  const intro={class:"Add a class from another book. It appears in the Daggerheart creator and level up next to the built-in classes.",anc:"Ancestries here show up in the creator next to the built-in ones.",com:"Communities here show up in the creator next to the built-in ones.",card:"Domain cards here show up in the card pickers, the creator and level up. Use the card's own domain name; a class that lists that domain can take it.",weapon:"Weapons here show up in the weapon pickers next to the built-in tables.",armor:"Armor here shows up in the armor picker next to the built-in tables.",text:"Rules, feats, options and notes. Add any entry to a character as a feature."}[k];
+  const head=`<p>${intro}</p><div class="btns"><button class="btn pri" type="button" data-act="dl-new" data-k="${k}">New ${DHLKIND[k]}</button></div>`;
+  if(!rows.length)return head+`<div class="empty">Nothing here yet. Add one by hand, or use Import a book.</div>`;
+  const dh=c&&isDh(c)&&k==="text";
+  return head+`<div class="items">`+rows.map(x=>`<div class="prow"><div class="pmain"><div class="plink"><b>${esc(x.name)}</b><span>${esc(dhLibMeta(x))}</span></div>
+    ${dh?`<button class="btn sm" type="button" data-act="dl-addfeat" data-id="${esc(x.id)}">Add to character</button>`:""}
+    <button class="btn sm" type="button" data-act="dl-edit" data-id="${esc(x.id)}">Edit</button><button class="btn sm danger" type="button" data-act="dl-del" data-id="${esc(x.id)}">Delete</button></div></div>`).join("")+`</div>`;
+}
+function dhFoundHTML(w){
+  const st=dhLS()[w], F=st.found; if(!F)return "";
+  if(!F.length)return `<div class="empty">Nothing recognised. Check that this is a Daggerheart book with selectable text, or try the Import text tab.</div>`;
+  const kinds=Object.keys(DHLPL).filter(k=>F.some(x=>x.kind===k));
+  return `<div class="listbar"><button class="btn sm" type="button" data-act="dl-all" data-w="${w}" data-v="1">Select all</button><button class="btn sm" type="button" data-act="dl-all" data-w="${w}" data-v="0">Select none</button><button class="btn pri" type="button" data-act="dl-add" data-w="${w}">Add ${st.sel.size} to library</button></div>
+    <p class="hint" style="margin:0">Untick anything that looks wrong. Entries already in the built-in data start unticked. Check each entry against the book once added.</p>`+
+    kinds.map(k=>`<div class="lvlh"><span>${DHLPL[k]}</span><span>${F.filter(x=>x.kind===k).length}</span></div><div class="items">`+F.map((x,i)=>x.kind!==k?"":
+      `<label class="prow"><span class="pmain"><input type="checkbox" data-act="dl-sel" data-w="${w}" data-i="${i}"${st.sel.has(i)?" checked":""} style="width:18px;height:18px;accent-color:var(--accent)"><span class="plink"><b>${esc(x.rec.name)}</b><span>${esc([dhLibMeta(Object.assign({kind:k},x.rec)),x.note].filter(Boolean).join(" \u00b7 "))}</span></span></span></label>`).join("")+`</div>`).join("");
+}
+function dhLibBookHTML(){
+  const S=dhLS(), b=S.bk;
+  return `<p>Bring in a Daggerheart book you own. It is read once in your browser, and nothing is uploaded. Classes and subclasses, ancestries, communities, domain cards, weapons and armor are found and shown for you to check before anything is saved.</p>
+    <div class="igrid"><label class="fld"><span>Book title (shown on each entry)</span><input data-dlb="source" value="${esc(b.source)}" placeholder="Book title"></label>
+      <label class="fld"><span>First page (optional)</span><input data-dlb="from" inputmode="numeric" value="${esc(b.from)}" placeholder="1"></label>
+      <label class="fld"><span>Last page (optional)</span><input data-dlb="to" inputmode="numeric" value="${esc(b.to)}" placeholder="all"></label></div>
+    <div class="btns"><span class="btn filebtn">Choose a book PDF<input id="dlBook" type="file" accept=".pdf,application/pdf,application/octet-stream,*/*" aria-label="Choose a book PDF"></span></div>
+    <div class="msg" id="dlBkMsg" role="status">${esc(b.busy)}</div>${dhFoundHTML("bk")}`;
+}
+function dhLibPasteHTML(){
+  const p=dhLS().pt;
+  return `<p>Paste text copied from a book. Headings written like a class page (a class name, then Domains, Starting Evasion, Hit Points, Hope feature, Class feature, then subclasses) or like an ancestry or community page are recognised. Start a heading line with # for the title and ## for section labels.</p>
+    <div class="igrid"><label class="fld"><span>Book title (shown on each entry)</span><input data-dlp="source" value="${esc(p.source)}" placeholder="Book title"></label></div>
+    <label class="fld"><span>Text</span><textarea id="dlText" style="min-height:180px;font:400 13px/1.4 var(--mono)" placeholder="Paste text from a book">${esc(p.text)}</textarea></label>
+    <div class="msg" id="dlPtMsg" role="status">${esc(p.busy)}</div>
+    <div class="btns"><button class="btn pri" type="button" data-act="dl-parse">Find content in this text</button></div>${dhFoundHTML("pt")}`;
+}
+function dhLibHTML(){
+  const S=dhLS(), L=ui.lib, cnt=k=>dhLibOf(k).length;
+  const sysBar=L.locked?`<div class="tags"><span class="tag ex">Daggerheart only</span></div>`
+    :`<div class="seg" role="group" aria-label="Game system">${[["dnd5e","D&amp;D 5e and 5.5e"],["pf2e","Pathfinder 2e"],["dh","Daggerheart"]].map(([v,t])=>`<button class="btn sm${L.sys===v?" pri":""}" type="button" data-act="lib-sys" data-s="${v}" aria-pressed="${L.sys===v}">${t}</button>`).join("")}</div>`;
+  const tabs=DHLTABS.map(([k,t])=>[k,t+" ("+cnt(k)+")"]).concat([["book","Import a book"],["paste","Import text"]]);
+  let body;
+  if(S.draft)body=`<h3>${S.editId?"Edit":"New"} ${DHLKIND[S.kind]}</h3>`+dhLibFormHTML();
+  else if(S.tab==="book")body=dhLibBookHTML();
+  else if(S.tab==="paste")body=dhLibPasteHTML();
+  else body=dhLibListHTML(S.tab);
+  const B=DHD&&DHD._b;
+  return `<div class="sheet wide" role="dialog" aria-labelledby="libT">
+    <div class="bar" style="margin:0"><h2 id="libT">Library</h2><span class="status" id="libStatus">${esc(libStatusText())}</span><button class="btn sm pri" type="button" data-act="lib-close">Done</button></div>
+    ${sysBar}
+    <p>Your own Daggerheart content. It is stored privately for you, apart from your characters, and is left out of character backups. Only add content you have the right to use, and keep it to yourself.${B?` The built-in data already has ${B.classes.length} classes, ${B.ancestries.length} ancestries, ${B.communities.length} communities, ${B.cards.length} domain cards, ${B.weapons.length} weapons and ${B.armor.length} armor.`:""}</p>
+    ${S.draft?"":`<div class="tabs" role="tablist" style="flex-wrap:wrap;overflow:visible">${tabs.map(t=>`<button class="tab" role="tab" type="button" data-act="dl-tab" data-tab="${t[0]}" aria-selected="${S.tab===t[0]}">${t[1]}</button>`).join("")}</div>`}
+    ${body}</div>`;
+}
+/* ----- reading a book ----- */
+async function dhScanBook(file){
+  const st=dhLS().bk, say=t=>{st.busy=t;const e=$("#dlBkMsg");if(e)e.textContent=t};
+  if(!st.source)st.source=file.name.replace(/\.pdf$/i,"").replace(/[_]+/g," ").replace(/^copy of\s+/i,"").trim();
+  st.found=null; say("Opening "+file.name+"...");
+  try{
+    const Lb=await pdfLib(), doc=await Lb.getDocument({data:await file.arrayBuffer()}).promise;
+    const n=doc.numPages, a=Math.max(1,num(st.from,1)), b=Math.min(n,num(st.to,n)||n), PL=[], cardP=[], wepP=[], armP=[];
+    for(let p=a;p<=b;p++){
+      const pg=await doc.getPage(p), vp=pg.getViewport({scale:1}), tc=await pg.getTextContent();
+      PL.push(assembleLines(tc.items,vp.width));
+      const segs=dhpSegs(tc.items,vp.height), pgo={n:p,segs:segs};
+      if(segs.some(s=>/^Level \d+ [A-Za-z]+ (Spell|Ability|Grimoire|Transformation)$/i.test(s.t)))cardP.push(pgo);
+      if(segs.some(s=>s.t==="Burden")&&segs.some(s=>s.t==="Trait"))wepP.push(pgo);
+      if(segs.filter(s=>/^\d+\s*\/\s*\d+$/.test(s.t)).length>=3)armP.push(pgo);
+      if(pg.cleanup)pg.cleanup();
+      if(p%4===0){say("Reading page "+p+" of "+b+"...");await new Promise(r=>setTimeout(r,0))}
+    }
+    say("Sorting what was found..."); await new Promise(r=>setTimeout(r,0));
+    const chars=PL.reduce((t,P)=>t+P.reduce((u,l)=>u+l.t.length,0),0);
+    if(chars<500){say("Almost no text came out. This PDF is probably scanned pictures of pages, which needs OCR first.");renderLib();return}
+    const T=dhpText(linesToText(PL,headDepths(PL)),st.source);
+    await dhFoundSet(st,T,{card:dhpCards(cardP),weapon:dhpWeapons(wepP),armor:dhpArmor(armP)});
+    say("Read "+PL.length+" pages. Found "+st.found.length+" entries. Untick anything that looks wrong, then add them.");
+    renderLib();
+  }catch(e){say("Could not read that PDF here. You can copy text from it and use the Import text tab instead.")}
+}
+async function dhFoundSet(st,T,P){
+  try{await dhLoad()}catch(e){}
+  const B=DHD&&DHD._b, src=st.source||"", F=[];
+  const have=(k,name)=>{const m={class:"classes",anc:"ancestries",com:"communities",card:"cards",weapon:"weapons",armor:"armor"}[k];return !!(B&&m&&B[m].some(x=>lc(x.name)===lc(name)))};
+  const add=(k,r,warn)=>{const rec=Object.assign({kind:k,source:src},r);delete rec.page;const notes=[];if(have(k,rec.name))notes.push("already built in");else if(dhLibOf(k).some(x=>lc(x.name)===lc(rec.name)))notes.push("replaces your library entry");if(warn)notes.push("check: "+warn);F.push({kind:k,rec:rec,note:notes.join(", "),dup:have(k,rec.name)})};
+  T.classes.forEach(x=>{const w=[];if(!x.evasion)w.push("Evasion");if(!x.hp)w.push("Hit Points");if(!x.hope.name)w.push("Hope feature");if(!x.subclasses.length)w.push("subclasses");if(!x.features.length)w.push("features");add("class",x,w.join(", "))});
+  T.anc.forEach(x=>add("anc",x,x.features.length?"":"features"));
+  T.com.forEach(x=>add("com",x,x.feature.text?"":"feature"));
+  (P.card||[]).forEach(x=>add("card",x,x.text?"":"card text"));
+  (P.weapon||[]).forEach(x=>add("weapon",x,x.damage&&x.trait?"":"damage or trait"));
+  (P.armor||[]).forEach(x=>add("armor",x,""));
+  (T.text||[]).forEach(x=>add("text",x,""));
+  st.found=F; st.sel=new Set(F.map((x,i)=>x.dup||x.kind==="text"?-1:i).filter(i=>i>=0));
+}
+function dhFoundAdd(w){
+  const st=dhLS()[w]; if(!st.found)return; let n=0;
+  [...st.sel].sort((a,b)=>a-b).forEach(i=>{
+    const x=st.found[i]; if(!x)return; const rec=Object.assign({},x.rec,{id:uid()});
+    LIB.dh=LIB.dh||[]; const j=LIB.dh.findIndex(q=>q.kind===rec.kind&&lc(q.name)===lc(rec.name));
+    if(j>=0){rec.id=LIB.dh[j].id;LIB.dh[j]=rec}else LIB.dh.push(rec); n++;
+  });
+  saveLib(); dhLibApply(); st.found=null; st.sel=new Set(); st.busy="Added "+n+" entr"+(n===1?"y":"ies")+" to your library.";
+  renderLib();
+}
+/* ----- events ----- */
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-act^="dl-"]'); if(!b||!ui.lib)return;
+  const a=b.dataset.act, S=dhLS();
+  switch(a){
+    case "dl-tab": S.tab=b.dataset.tab; S.draft=null; renderLib(); break;
+    case "dl-new": S.kind=b.dataset.k; S.editId=null; S.draft=dhLibToDraft(S.kind,null); S.msg=""; renderLib(); break;
+    case "dl-edit": {const x=(LIB.dh||[]).find(q=>q.id===b.dataset.id); if(!x)break; S.kind=x.kind; S.editId=x.id; S.draft=dhLibToDraft(x.kind,x); S.msg=""; renderLib(); break}
+    case "dl-cancel": S.draft=null; S.msg=""; renderLib(); break;
+    case "dl-del": LIB.dh=(LIB.dh||[]).filter(q=>q.id!==b.dataset.id); saveLib(); dhLibApply(); renderLib(); break;
+    case "dl-save": {
+      const r=dhLibFromDraft(S.kind,S.draft); if(r.err){S.msg=r.err;renderLib();break}
+      const rec=r.rec; rec.id=S.editId||uid(); LIB.dh=LIB.dh||[]; const j=LIB.dh.findIndex(q=>q.id===rec.id); if(j>=0)LIB.dh[j]=rec; else LIB.dh.push(rec);
+      saveLib(); dhLibApply(); S.tab=rec.kind; S.draft=null; S.msg=""; renderLib(); break}
+    case "dl-addfeat": {const x=(LIB.dh||[]).find(q=>q.id===b.dataset.id), c=cur(); if(!x||!c||!isDh(c))break;
+      c.dh.features.push({id:uid(),k:"custom",name:x.name,text:x.text,src:x.source||"Library"}); save(); dhToast("<b>Added to "+esc(c.name)+"</b><br><small>"+esc(x.name)+" is on the Details tab.</small>"); break}
+    case "dl-sel": {const st=S[b.dataset.w], i=num(b.dataset.i); if(b.checked)st.sel.add(i);else st.sel.delete(i); const y=window.scrollY; renderLib(); window.scrollTo(0,y); break}
+    case "dl-all": {const st=S[b.dataset.w]; st.sel=b.dataset.v==="1"?new Set(st.found.map((x,i)=>i)):new Set(); renderLib(); break}
+    case "dl-add": dhFoundAdd(b.dataset.w); break;
+    case "dl-parse": {const p=S.pt; const T=dhpText(p.text,p.source); dhFoundSet(p,T,{}).then(()=>{p.busy=p.found.length?"Found "+p.found.length+" entries.":"";renderLib()}); break}
+  }
+});
+document.addEventListener("input",e=>{
+  const t=e.target; if(!t||!t.dataset||!ui.lib||!ui.lib.dh)return; const S=ui.lib.dh;
+  if(t.dataset.dlf!=null&&S.draft)S.draft[t.dataset.dlf]=t.dataset.dlt==="n"?num(t.value):t.value;
+  else if(t.dataset.dlb!=null)S.bk[t.dataset.dlb]=t.value;
+  else if(t.dataset.dlp!=null)S.pt[t.dataset.dlp]=t.value;
+  else if(t.id==="dlText")S.pt.text=t.value;
+});
+document.addEventListener("change",e=>{
+  const t=e.target; if(t&&t.id==="dlBook"&&t.files&&t.files[0]){dhScanBook(t.files[0]);t.value=""}
+});
 
 render(); setStatus();
 })();
