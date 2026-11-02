@@ -10957,14 +10957,15 @@ function dhLibApply(){
   if(!DHD)return;
   const sig=String(LIB.updated||0)+":"+(LIB.dh||[]).length; if(sig===DHLSIG&&DHD._b)return; DHLSIG=sig;
   if(!DHD._b)DHD._b={classes:DHD.classes,ancestries:DHD.ancestries,communities:DHD.communities,cards:DHD.cards,weapons:DHD.weapons,armor:DHD.armor};
-  const B=DHD._b, feats=a=>(a||[]).filter(f=>f&&f.text).map(f=>({name:f.name||"Feature",text:f.text}));
-  DHD.classes=B.classes.concat(dhLibOf("class").map(x=>({name:x.name,domains:(x.domains||[]).slice(0,2),evasion:num(x.evasion)||10,hp:num(x.hp)||6,items:x.items||"",hope:x.hope&&x.hope.text?x.hope:{name:"Hope feature",text:""},features:feats(x.features),background:x.background||[],connections:x.connections||[],
+  const B=DHD._b, nm=x=>lc(x.name), fresh=(k,arr)=>{const seen=new Set(arr.map(nm));return dhLibOf(k).filter(x=>{const n=nm(x);if(seen.has(n))return false;seen.add(n);return true})};
+  const feats=a=>(a||[]).filter(f=>f&&f.text).map(f=>({name:f.name||"Feature",text:f.text}));
+  DHD.classes=B.classes.concat(fresh("class",B.classes).map(x=>({name:x.name,domains:(x.domains||[]).slice(0,2),evasion:num(x.evasion)||10,hp:num(x.hp)||6,items:x.items||"",hope:x.hope&&x.hope.text?x.hope:{name:"Hope feature",text:""},features:feats(x.features),background:x.background||[],connections:x.connections||[],
     subclasses:(x.subclasses||[]).map(s=>({name:s.name,blurb:s.blurb||"",spellcast:s.spellcast||null,foundation:feats(s.foundation),specialization:feats(s.specialization),mastery:feats(s.mastery)})),src:"library",lib:1})));
-  DHD.ancestries=B.ancestries.concat(dhLibOf("anc").map(x=>({name:x.name,blurb:x.blurb||"",features:feats(x.features),src:"library",lib:1})));
-  DHD.communities=B.communities.concat(dhLibOf("com").map(x=>({name:x.name,blurb:x.blurb||"",feature:x.feature&&x.feature.text?x.feature:{name:"Community feature",text:""},src:"library",lib:1})));
-  DHD.cards=B.cards.concat(dhLibOf("card").map(x=>({name:x.name,level:Math.max(1,Math.min(10,num(x.level,1))),domain:dhCap(x.domain||"Custom"),type:dhCap(x.type||"Ability"),recall:num(x.recall),text:x.text||"",lib:1})));
-  DHD.weapons=B.weapons.concat(dhLibOf("weapon").map(x=>({name:x.name,tier:Math.max(1,Math.min(4,num(x.tier,1))),slot:/sec/i.test(x.slot)?"secondary":"primary",trait:x.trait||"",range:x.range||"",damage:x.damage||"",burden:x.burden||"",feature:x.feature||"",src:"library",lib:1})));
-  DHD.armor=B.armor.concat(dhLibOf("armor").map(x=>({name:x.name,tier:Math.max(1,Math.min(4,num(x.tier,1))),major:num(x.major),severe:num(x.severe),score:num(x.score),feature:x.feature||"",src:"library",lib:1})));
+  DHD.ancestries=B.ancestries.concat(fresh("anc",B.ancestries).map(x=>({name:x.name,blurb:x.blurb||"",features:feats(x.features),src:"library",lib:1})));
+  DHD.communities=B.communities.concat(fresh("com",B.communities).map(x=>({name:x.name,blurb:x.blurb||"",feature:x.feature&&x.feature.text?x.feature:{name:"Community feature",text:""},src:"library",lib:1})));
+  DHD.cards=B.cards.concat(fresh("card",B.cards).map(x=>({name:x.name,level:Math.max(1,Math.min(10,num(x.level,1))),domain:dhCap(x.domain||"Custom"),type:dhCap(x.type||"Ability"),recall:num(x.recall),text:x.text||"",lib:1})));
+  DHD.weapons=B.weapons.concat(fresh("weapon",B.weapons).map(x=>({name:x.name,tier:Math.max(1,Math.min(4,num(x.tier,1))),slot:/sec/i.test(x.slot)?"secondary":"primary",trait:x.trait||"",range:x.range||"",damage:x.damage||"",burden:x.burden||"",feature:x.feature||"",src:"library",lib:1})));
+  DHD.armor=B.armor.concat(fresh("armor",B.armor).map(x=>({name:x.name,tier:Math.max(1,Math.min(4,num(x.tier,1))),major:num(x.major),severe:num(x.severe),score:num(x.score),feature:x.feature||"",src:"library",lib:1})));
 }
 function dhLibMeta(x){
   const k=x.kind;
@@ -11110,7 +11111,7 @@ async function dhFoundSet(st,T,P){
 function dhFoundAdd(w){
   const st=dhLS()[w]; if(!st.found)return; let n=0;
   [...st.sel].sort((a,b)=>a-b).forEach(i=>{
-    const x=st.found[i]; if(!x)return; const rec=Object.assign({},x.rec,{id:uid()});
+    const x=st.found[i]; if(!x||x.dup)return; const rec=Object.assign({},x.rec,{id:uid()});
     LIB.dh=LIB.dh||[]; const j=LIB.dh.findIndex(q=>q.kind===rec.kind&&lc(q.name)===lc(rec.name));
     if(j>=0){rec.id=LIB.dh[j].id;LIB.dh[j]=rec}else LIB.dh.push(rec); n++;
   });
