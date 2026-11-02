@@ -4538,7 +4538,7 @@ const SCH=kind=>ui.lib&&ui.lib.sys==="pf2e"&&LIBSCHEMA_PF[kind]?LIBSCHEMA_PF[kin
 const LIBKIND={classes:"class",spells:"spell",items:"item",sections:"text entry"};
 function libFixTab(want){
   if(ui.lib&&ui.lib.sys==="dh")return;
-  const L=ui.lib, pf=L.sys==="pf2e", custom=["spells","items","sections"];
+  const L=ui.lib, pf=L.sys==="pf2e", custom=["spells","items","sections","mybooks"];
   const ok=t=>pf?(t.indexOf("pf-")===0||custom.includes(t)):(t.indexOf("pf-")!==0);
   if(want&&ok(want))L.tab=want; else if(!ok(L.tab))L.tab=pf?"pf-spells":"classes";
 }
@@ -4671,8 +4671,8 @@ function renderLib(){
   const L=ui.lib, ov=$("#libOv"); libEnrich();
   if(L.sys==="dh"){ov.innerHTML=dhLibHTML();dhLoad().then(()=>{if(ui.lib&&ui.lib.sys==="dh"&&!$("#libOv").hidden&&!ui.lib.dh.draft&&!(ui.lib.dh.found)){const a=document.activeElement;if(!a||!/INPUT|TEXTAREA|SELECT/.test(a.tagName)){if(!ui.lib.dh._r){ui.lib.dh._r=1;renderLib()}}}}).catch(()=>{});return}
   const pf=L.sys==="pf2e", cnt=k=>LIB[k].filter(x=>sysOf(x)===L.sys).length;
-  const tabs=pf?PFLIBTABS.concat([["spells","My spells ("+cnt("spells")+")"],["items","My items ("+cnt("items")+")"],["sections","My text ("+cnt("sections")+")"]])
-    :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["hb","Homebrew ("+hbAll().length+")"],["review","Needs review"+(libReviewList().length?" ("+libReviewList().length+")":"")],["book","Import a book"],["import","Import text"]];
+  const tabs=pf?PFLIBTABS.concat([["spells","My spells ("+cnt("spells")+")"],["items","My items ("+cnt("items")+")"],["sections","My text ("+cnt("sections")+")"],["mybooks","Books ("+libBookGroups().length+")"]])
+    :[["classes","Classes ("+cnt("classes")+")"],["spells","Spells ("+cnt("spells")+")"],["items","Items ("+cnt("items")+")"],["sections","Text ("+cnt("sections")+")"],["hb","Homebrew ("+hbAll().length+")"],["review","Needs review"+(libReviewList().length?" ("+libReviewList().length+")":"")],["book","Import a book"],["import","Import text"],["mybooks","Books ("+libBookGroups().length+")"]];
   const sysBar=L.locked?`<div class="tags"><span class="tag ex">${pf?"Pathfinder 2e only":"D&amp;D 5e and 5.5e only"}</span></div>`
     :`<div class="seg" role="group" aria-label="Game system">${[["dnd5e","D&amp;D 5e and 5.5e"],["pf2e","Pathfinder 2e"],["dh","Daggerheart"]].map(([v,t])=>`<button class="btn sm${L.sys===v?" pri":""}" type="button" data-act="lib-sys" data-s="${v}" aria-pressed="${L.sys===v}">${t}</button>`).join("")}</div>`;
   const hbOn=!pf&&L.hb&&L.hb.d;
@@ -4686,7 +4686,7 @@ function renderLib(){
     body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-vback">Back to classes</button><button class="btn sm" type="button" data-act="lib-vedit">Edit</button></div>`+libClassViewHTML(LIB.classes[L.view.i]);
   }else if(!pf&&L.spl){
     body=`<div class="btns"><button class="btn sm" type="button" data-act="lib-spl-back">Back to spells</button></div>`+libSplHTML();
-  }else body=L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():L.tab==="sources"?`<p>Books are now turned on per campaign. On the Characters screen, tap a campaign, then Books for this campaign.</p>`:L.tab==="review"?libReviewHTML():L.tab==="hb"?hbListHTML():libListHTML(L.tab);
+  }else body=L.tab==="mybooks"?libBooksHTML():L.tab.indexOf("pf-")===0?libPfHTML():L.tab==="book"?libBookHTML():L.tab==="import"?libImportHTML():L.tab==="sources"?`<p>Books are now turned on per campaign. On the Characters screen, tap a campaign, then Books for this campaign.</p>`:L.tab==="review"?libReviewHTML():L.tab==="hb"?hbListHTML():libListHTML(L.tab);
   ov.innerHTML=`<div class="sheet wide" role="dialog" aria-labelledby="libT">
     <div class="bar" style="margin:0"><h2 id="libT">Library</h2><span class="status" id="libStatus">${esc(libStatusText())}</span><button class="btn sm pri" type="button" data-act="lib-close">Done</button></div>
     ${sysBar}
@@ -11053,11 +11053,12 @@ function dhLibHTML(){
   const S=dhLS(), L=ui.lib, cnt=k=>dhLibOf(k).length;
   const sysBar=L.locked?`<div class="tags"><span class="tag ex">Daggerheart only</span></div>`
     :`<div class="seg" role="group" aria-label="Game system">${[["dnd5e","D&amp;D 5e and 5.5e"],["pf2e","Pathfinder 2e"],["dh","Daggerheart"]].map(([v,t])=>`<button class="btn sm${L.sys===v?" pri":""}" type="button" data-act="lib-sys" data-s="${v}" aria-pressed="${L.sys===v}">${t}</button>`).join("")}</div>`;
-  const tabs=DHLTABS.map(([k,t])=>[k,t+" ("+cnt(k)+")"]).concat([["book","Import a book"],["paste","Import text"]]);
+  const tabs=DHLTABS.map(([k,t])=>[k,t+" ("+cnt(k)+")"]).concat([["book","Import a book"],["paste","Import text"],["mybooks","Books ("+libBookGroups().length+")"]]);
   let body;
   if(S.draft)body=`<h3>${S.editId?"Edit":"New"} ${DHLKIND[S.kind]}</h3>`+dhLibFormHTML();
   else if(S.tab==="book")body=dhLibBookHTML();
   else if(S.tab==="paste")body=dhLibPasteHTML();
+  else if(S.tab==="mybooks")body=libBooksHTML();
   else body=dhLibListHTML(S.tab);
   const B=DHD&&DHD._b;
   return `<div class="sheet wide" role="dialog" aria-labelledby="libT">
@@ -11149,6 +11150,34 @@ document.addEventListener("input",e=>{
 });
 document.addEventListener("change",e=>{
   const t=e.target; if(t&&t.id==="dlBook"&&t.files&&t.files[0]){dhScanBook(t.files[0]);t.value=""}
+});
+
+/* ----- imported books: every library entry remembers its book, so a whole book can be removed at once ----- */
+function libBookGroups(){
+  const sys=ui.lib.sys, G={}, put=(kind,x)=>{const n=String(x.source||"").trim();if(!n)return;const g=G[n]||(G[n]={name:n,n:0,k:{}});g.n++;g.k[kind]=(g.k[kind]||0)+1};
+  if(sys==="dh")(LIB.dh||[]).forEach(x=>put(DHLPL[x.kind]||x.kind,x));
+  else["classes","spells","items","sections"].forEach(k=>LIB[k].forEach(x=>{if(sysOf(x)===sys)put({classes:"classes",spells:"spells",items:"items",sections:"text entries"}[k],x)}));
+  return Object.values(G).sort((a,b)=>a.name.localeCompare(b.name));
+}
+function libBooksHTML(){
+  const L=ui.lib, G=libBookGroups(), ask=L.rmBook||"";
+  const intro=`<p>Every entry you import or add with a book title is grouped here. Removing a book deletes all of its entries from your library at once. Characters you already built keep their own copies of anything they took from it. Entries with no book title are not listed.</p>`;
+  if(!G.length)return intro+`<div class="empty">No books yet. Import one from the Import a book tab, or give your own entries a source book.</div>`;
+  return intro+`<div class="items">`+G.map(g=>`<div class="prow"><div class="pmain"><div class="plink"><b>${esc(g.name)}</b><span>${esc(g.n+" entr"+(g.n===1?"y":"ies")+": "+Object.keys(g.k).map(k=>g.k[k]+" "+k.toLowerCase()).join(", "))}</span></div>
+    ${ask===g.name?`<button class="btn sm danger" type="button" data-act="dl-bk-do" data-n="${esc(g.name)}">Remove ${g.n}</button><button class="btn sm" type="button" data-act="dl-bk-no">Keep</button>`
+    :`<button class="btn sm danger" type="button" data-act="dl-bk-ask" data-n="${esc(g.name)}">Remove book</button>`}</div></div>`).join("")+`</div>`;
+}
+function libBookRemove(name){
+  const sys=ui.lib.sys, same=x=>String(x.source||"").trim()===name;
+  if(sys==="dh")LIB.dh=(LIB.dh||[]).filter(x=>!same(x));
+  else["classes","spells","items","sections"].forEach(k=>{LIB[k]=LIB[k].filter(x=>!(sysOf(x)===sys&&same(x)))});
+  ui.lib.rmBook=""; saveLib(); try{dhLibApply()}catch(e){} renderLib();
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-act^="dl-bk-"]'); if(!b||!ui.lib)return;
+  if(b.dataset.act==="dl-bk-ask"){ui.lib.rmBook=b.dataset.n;renderLib()}
+  else if(b.dataset.act==="dl-bk-no"){ui.lib.rmBook="";renderLib()}
+  else if(b.dataset.act==="dl-bk-do")libBookRemove(b.dataset.n);
 });
 
 render(); setStatus();
